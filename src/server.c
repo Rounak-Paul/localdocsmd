@@ -106,6 +106,15 @@ bool http_get_session_token(struct mg_http_message *hm, char *token_out, size_t 
     return false;
 }
 
+bool http_get_query_param(http_request_t *req, const char *name, char *value_out, size_t value_size) {
+    if (!req || !req->hm || !name || !value_out || value_size == 0) {
+        return false;
+    }
+    
+    int result = mg_http_get_var(&req->hm->query, name, value_out, (int)value_size);
+    return result > 0;
+}
+
 // Build Set-Cookie header into provided buffer, returns the buffer
 char *http_build_cookie_header(char *buf, size_t size, const char *token, int max_age) {
     if (token) {

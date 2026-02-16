@@ -182,6 +182,11 @@ bool routes_handle(http_request_t *req) {
     }
     
     // Users API
+    if (uri_match(req, "/api/users/search", NULL, NULL) && method_is(req, "GET")) {
+        route_api_users_search(req);
+        return true;
+    }
+    
     if (uri_match(req, "/api/users", NULL, NULL)) {
         if (method_is(req, "GET")) {
             route_api_users_list(req);
@@ -265,6 +270,24 @@ bool routes_handle(http_request_t *req) {
     }
     
     // Projects API
+    if (uri_match(req, "/api/projects/*/members/*", param1, param2)) {
+        if (method_is(req, "DELETE")) {
+            route_api_projects_remove_member(req, param1, param2);
+            return true;
+        }
+    }
+    
+    if (uri_match(req, "/api/projects/*/members", param1, NULL)) {
+        if (method_is(req, "GET")) {
+            route_api_projects_list_members(req, param1);
+            return true;
+        }
+        if (method_is(req, "POST")) {
+            route_api_projects_add_member(req, param1);
+            return true;
+        }
+    }
+    
     if (uri_match(req, "/api/projects/*/documents", param1, NULL)) {
         if (method_is(req, "GET")) {
             route_api_documents_list(req, param1);
@@ -687,8 +710,8 @@ void route_api_change_password(http_request_t *req) {
     
     ldmd_error_t err;
     
-    // First password change doesn't need approval
-    if (req->user.status == USER_STATUS_PENDING) {
+    // First password change (pending user or forced password change) doesn't need approval
+    if (req->user.status == USER_STATUS_PENDING || req->user.password_change_pending) {
         err = auth_change_password_first(req->server->db, req->server->config,
                                         req->user.id, current, new_pass);
         if (err == LDMD_OK) {
@@ -746,6 +769,48 @@ void route_api_users_list(http_request_t *req) {
     cJSON_Delete(arr);
 }
 
+// User search for permission dialogs - returns minimal user info
+void route_api_users_search(http_request_t *req) {
+    if (!require_auth(req)) return;
+    
+    // Get search query from URL parameter
+    char query[256] = "";
+    http_get_query_param(req, "q", query, sizeof(query));
+    
+    ldmd_user_t *users = NULL;
+    int count = 0;
+    
+    ldmd_error_t err = db_user_list(req->server->db, &users, &count);
+    if (err != LDMD_OK) {
+        http_respond_error(req->conn, 500, "Database error");
+        return;
+    }
+    
+    cJSON *arr = cJSON_CreateArray();
+    for (int i = 0; i < count; i++) {
+        // Filter by query if provided
+        if (query[0] != '\0') {
+            // Case-insensitive search in username and email
+            bool match = (strcasestr(users[i].username, query) != NULL) ||
+                        (strcasestr(users[i].email, query) != NULL);
+            if (!match) continue;
+        }
+        
+        // Return minimal info for privacy
+        cJSON *user = cJSON_CreateObject();
+        cJSON_AddStringToObject(user, "uuid", users[i].uuid);
+        cJSON_AddStringToObject(user, "username", users[i].username);
+        cJSON_AddStringToObject(user, "email", users[i].email);
+        cJSON_AddItemToArray(arr, user);
+    }
+    free(users);
+    
+    char *json_str = cJSON_PrintUnformatted(arr);
+    http_respond_json(req->conn, 200, json_str);
+    free(json_str);
+    cJSON_Delete(arr);
+}
+
 void route_api_users_create(http_request_t *req) {
     if (!require_admin(req)) return;
     
@@ -766,7 +831,7 @@ void route_api_users_create(http_request_t *req) {
         return;
     }
     
-    ldmd_role_t role = role_str ? rbac_string_to_role(role_str) : ROLE_VIEWER;
+    ldmd_role_t role = role_str ? rbac_string_to_role(role_str) : ROLE_USER;
     
     ldmd_user_t user;
     ldmd_error_t err = auth_create_user(req->server->db, req->server->config,
@@ -1031,7 +1096,7 @@ void route_api_workspaces_members(http_request_t *req, const char *ws_uuid) {
             cJSON *m = cJSON_CreateObject();
             cJSON_AddStringToObject(m, "user_uuid", user.uuid);
             cJSON_AddStringToObject(m, "username", user.username);
-            cJSON_AddStringToObject(m, "role", rbac_role_to_string(members[i].role));
+            cJSON_AddStringToObject(m, "role", rbac_workspace_role_to_string(members[i].role));
             cJSON_AddItemToArray(arr, m);
         }
     }
@@ -1079,7 +1144,7 @@ void route_api_workspaces_add_member(http_request_t *req, const char *ws_uuid) {
         return;
     }
     
-    ldmd_role_t role = role_str ? rbac_string_to_role(role_str) : ROLE_VIEWER;
+    ldmd_role_t role = role_str ? rbac_string_to_role(role_str) : ROLE_USER;
     
     workspace_add_member(req->server->db, workspace.id, user.id, role);
     cJSON_Delete(json);
@@ -1268,6 +1333,113 @@ void route_api_projects_delete(http_request_t *req, const char *project_uuid) {
     }
     
     project_delete(req->server->db, req->server->config, proj.id);
+    http_respond_json(req->conn, 200, "{\"success\":true}");
+}
+
+// Project member handlers (view permissions)
+void route_api_projects_list_members(http_request_t *req, const char *project_uuid) {
+    if (!require_auth(req)) return;
+    
+    ldmd_project_t project;
+    if (db_project_get_by_uuid(req->server->db, project_uuid, &project) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Project not found");
+        return;
+    }
+    
+    // Need edit access to the workspace to see project members
+    if (!rbac_can_edit_workspace(req->server->db, req->user.id, project.workspace_id)) {
+        http_respond_error(req->conn, 403, "Edit access required");
+        return;
+    }
+    
+    ldmd_project_member_t *members = NULL;
+    int count = 0;
+    project_list_members(req->server->db, project.id, &members, &count);
+    
+    cJSON *arr = cJSON_CreateArray();
+    for (int i = 0; i < count; i++) {
+        ldmd_user_t user;
+        if (db_user_get_by_id(req->server->db, members[i].user_id, &user) == LDMD_OK) {
+            cJSON *m = cJSON_CreateObject();
+            cJSON_AddStringToObject(m, "uuid", user.uuid);
+            cJSON_AddStringToObject(m, "username", user.username);
+            cJSON_AddStringToObject(m, "email", user.email);
+            cJSON_AddBoolToObject(m, "can_view", members[i].can_view);
+            cJSON_AddItemToArray(arr, m);
+        }
+    }
+    free(members);
+    
+    char *json_str = cJSON_PrintUnformatted(arr);
+    http_respond_json(req->conn, 200, json_str);
+    free(json_str);
+    cJSON_Delete(arr);
+}
+
+void route_api_projects_add_member(http_request_t *req, const char *project_uuid) {
+    if (!require_auth(req)) return;
+    
+    ldmd_project_t project;
+    if (db_project_get_by_uuid(req->server->db, project_uuid, &project) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Project not found");
+        return;
+    }
+    
+    // Need edit access to the workspace to grant project view permissions
+    if (!rbac_can_edit_workspace(req->server->db, req->user.id, project.workspace_id)) {
+        http_respond_error(req->conn, 403, "Edit access required");
+        return;
+    }
+    
+    cJSON *json = parse_json_body(req);
+    if (!json) {
+        http_respond_error(req->conn, 400, "Invalid JSON");
+        return;
+    }
+    
+    const char *user_uuid = json_get_string(json, "user_uuid");
+    if (!user_uuid) {
+        cJSON_Delete(json);
+        http_respond_error(req->conn, 400, "user_uuid required");
+        return;
+    }
+    
+    ldmd_user_t user;
+    if (db_user_get_by_uuid(req->server->db, user_uuid, &user) != LDMD_OK) {
+        cJSON_Delete(json);
+        http_respond_error(req->conn, 404, "User not found");
+        return;
+    }
+    
+    project_grant_view(req->server->db, project.id, user.id, req->user.id);
+    cJSON_Delete(json);
+    
+    http_respond_json(req->conn, 201, "{\"success\":true}");
+}
+
+void route_api_projects_remove_member(http_request_t *req, const char *project_uuid,
+                                      const char *user_uuid) {
+    if (!require_auth(req)) return;
+    
+    ldmd_project_t project;
+    if (db_project_get_by_uuid(req->server->db, project_uuid, &project) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Project not found");
+        return;
+    }
+    
+    // Need edit access to the workspace to revoke project view permissions
+    if (!rbac_can_edit_workspace(req->server->db, req->user.id, project.workspace_id)) {
+        http_respond_error(req->conn, 403, "Edit access required");
+        return;
+    }
+    
+    ldmd_user_t user;
+    if (db_user_get_by_uuid(req->server->db, user_uuid, &user) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "User not found");
+        return;
+    }
+    
+    project_revoke_view(req->server->db, project.id, user.id);
     http_respond_json(req->conn, 200, "{\"success\":true}");
 }
 

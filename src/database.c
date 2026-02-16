@@ -91,6 +91,20 @@ static const char *SCHEMA_SQL =
     "  FOREIGN KEY (updated_by) REFERENCES users(id)"
     ");"
     
+    // Project members table - for granting view access to individual projects
+    "CREATE TABLE IF NOT EXISTS project_members ("
+    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "  project_id INTEGER NOT NULL,"
+    "  user_id INTEGER NOT NULL,"
+    "  can_view INTEGER NOT NULL DEFAULT 1,"
+    "  granted_by INTEGER NOT NULL,"
+    "  created_at INTEGER NOT NULL,"
+    "  UNIQUE(project_id, user_id),"
+    "  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,"
+    "  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,"
+    "  FOREIGN KEY (granted_by) REFERENCES users(id)"
+    ");"
+    
     // Password change requests table
     "CREATE TABLE IF NOT EXISTS password_requests ("
     "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -116,7 +130,9 @@ static const char *SCHEMA_SQL =
     "CREATE INDEX IF NOT EXISTS idx_documents_uuid ON documents(uuid);"
     "CREATE INDEX IF NOT EXISTS idx_documents_project ON documents(project_id);"
     "CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace ON workspace_members(workspace_id);"
-    "CREATE INDEX IF NOT EXISTS idx_workspace_members_user ON workspace_members(user_id);";
+    "CREATE INDEX IF NOT EXISTS idx_workspace_members_user ON workspace_members(user_id);"
+    "CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id);"
+    "CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id);";
 
 ldmd_database_t *db_init(const char *path) {
     ldmd_database_t *db = calloc(1, sizeof(ldmd_database_t));
@@ -1081,6 +1097,127 @@ ldmd_error_t db_project_list(ldmd_database_t *db, int64_t workspace_id,
     int i = 0;
     while ((rc = sqlite3_step(stmt)) == SQLITE_ROW && i < n) {
         fill_project_from_stmt(stmt, &(*projects)[i++]);
+    }
+    
+    sqlite3_finalize(stmt);
+    *count = i;
+    
+    return LDMD_OK;
+}
+
+// Project member operations (view permissions)
+ldmd_error_t db_project_member_add(ldmd_database_t *db, ldmd_project_member_t *member) {
+    const char *sql = 
+        "INSERT INTO project_members (project_id, user_id, can_view, granted_by, created_at) "
+        "VALUES (?, ?, ?, ?, ?);";
+    
+    sqlite3_stmt *stmt;
+    int rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        return LDMD_ERROR_DATABASE;
+    }
+    
+    member->created_at = utils_now();
+    
+    sqlite3_bind_int64(stmt, 1, member->project_id);
+    sqlite3_bind_int64(stmt, 2, member->user_id);
+    sqlite3_bind_int(stmt, 3, member->can_view ? 1 : 0);
+    sqlite3_bind_int64(stmt, 4, member->granted_by);
+    sqlite3_bind_int64(stmt, 5, member->created_at);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        return LDMD_ERROR_DATABASE;
+    }
+    
+    member->id = sqlite3_last_insert_rowid(db->db);
+    return LDMD_OK;
+}
+
+ldmd_error_t db_project_member_remove(ldmd_database_t *db, int64_t project_id, int64_t user_id) {
+    const char *sql = "DELETE FROM project_members WHERE project_id = ? AND user_id = ?;";
+    
+    sqlite3_stmt *stmt;
+    int rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        return LDMD_ERROR_DATABASE;
+    }
+    
+    sqlite3_bind_int64(stmt, 1, project_id);
+    sqlite3_bind_int64(stmt, 2, user_id);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    return (rc == SQLITE_DONE) ? LDMD_OK : LDMD_ERROR_DATABASE;
+}
+
+ldmd_error_t db_project_member_check(ldmd_database_t *db, int64_t project_id, 
+                                     int64_t user_id, bool *can_view) {
+    const char *sql = "SELECT can_view FROM project_members WHERE project_id = ? AND user_id = ?;";
+    
+    sqlite3_stmt *stmt;
+    int rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        return LDMD_ERROR_DATABASE;
+    }
+    
+    sqlite3_bind_int64(stmt, 1, project_id);
+    sqlite3_bind_int64(stmt, 2, user_id);
+    
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW) {
+        *can_view = sqlite3_column_int(stmt, 0) != 0;
+        sqlite3_finalize(stmt);
+        return LDMD_OK;
+    }
+    
+    sqlite3_finalize(stmt);
+    *can_view = false;
+    return LDMD_ERROR_NOT_FOUND;
+}
+
+ldmd_error_t db_project_member_list(ldmd_database_t *db, int64_t project_id,
+                                    ldmd_project_member_t **members, int *count) {
+    const char *sql = "SELECT id, project_id, user_id, can_view, granted_by, created_at "
+                      "FROM project_members WHERE project_id = ?;";
+    
+    sqlite3_stmt *stmt;
+    int rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        return LDMD_ERROR_DATABASE;
+    }
+    
+    sqlite3_bind_int64(stmt, 1, project_id);
+    
+    // First pass to count
+    int n = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW) n++;
+    sqlite3_reset(stmt);
+    
+    *count = n;
+    if (n == 0) {
+        *members = NULL;
+        sqlite3_finalize(stmt);
+        return LDMD_OK;
+    }
+    
+    *members = calloc(n, sizeof(ldmd_project_member_t));
+    if (!*members) {
+        sqlite3_finalize(stmt);
+        return LDMD_ERROR_MEMORY;
+    }
+    
+    int i = 0;
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW && i < n) {
+        (*members)[i].id = sqlite3_column_int64(stmt, 0);
+        (*members)[i].project_id = sqlite3_column_int64(stmt, 1);
+        (*members)[i].user_id = sqlite3_column_int64(stmt, 2);
+        (*members)[i].can_view = sqlite3_column_int(stmt, 3) != 0;
+        (*members)[i].granted_by = sqlite3_column_int64(stmt, 4);
+        (*members)[i].created_at = sqlite3_column_int64(stmt, 5);
+        i++;
     }
     
     sqlite3_finalize(stmt);

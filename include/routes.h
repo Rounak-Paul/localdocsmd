@@ -32,6 +32,7 @@ void route_api_change_password(http_request_t *req);
 
 // API routes - Users
 void route_api_users_list(http_request_t *req);
+void route_api_users_search(http_request_t *req);
 void route_api_users_create(http_request_t *req);
 void route_api_users_get(http_request_t *req, const char *user_uuid);
 void route_api_users_update(http_request_t *req, const char *user_uuid);
@@ -54,6 +55,10 @@ void route_api_projects_create(http_request_t *req, const char *ws_uuid);
 void route_api_projects_get(http_request_t *req, const char *project_uuid);
 void route_api_projects_update(http_request_t *req, const char *project_uuid);
 void route_api_projects_delete(http_request_t *req, const char *project_uuid);
+void route_api_projects_list_members(http_request_t *req, const char *project_uuid);
+void route_api_projects_add_member(http_request_t *req, const char *project_uuid);
+void route_api_projects_remove_member(http_request_t *req, const char *project_uuid,
+                                      const char *user_uuid);
 
 // API routes - Documents
 void route_api_documents_list(http_request_t *req, const char *project_uuid);

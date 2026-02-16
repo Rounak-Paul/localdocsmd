@@ -231,7 +231,8 @@ ldmd_error_t auth_create_user(ldmd_database_t *db, ldmd_config_t *config,
     }
     
     user.global_role = role;
-    user.password_change_pending = (user.status == USER_STATUS_PENDING);
+    // New users always need to change password on first login
+    user.password_change_pending = true;
     
     err = db_user_create(db, &user);
     if (err != LDMD_OK) {

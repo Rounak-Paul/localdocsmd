@@ -3,6 +3,8 @@
         <h1>Admin Panel</h1>
     </div>
     
+    <script>const currentUsername = '{{username}}';</script>
+    
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-value" id="stat-users">-</div>
@@ -87,8 +89,7 @@
             <div class="form-group">
                 <label for="user-role">Role</label>
                 <select id="user-role">
-                    <option value="viewer">Viewer</option>
-                    <option value="editor">Editor</option>
+                    <option value="user">User</option>
                     <option value="admin">Admin</option>
                 </select>
             </div>
@@ -116,8 +117,7 @@
             <div class="form-group">
                 <label for="edit-user-role">Role</label>
                 <select id="edit-user-role">
-                    <option value="viewer">Viewer</option>
-                    <option value="editor">Editor</option>
+                    <option value="user">User</option>
                     <option value="admin">Admin</option>
                 </select>
             </div>
@@ -188,7 +188,7 @@ async function loadUsers() {
                 <td><span class="badge badge-status-${user.status}">${statusLabels[user.status] || 'Unknown'}</span></td>
                 <td>
                     <button onclick="editUser('${user.uuid}')" class="btn btn-sm">Edit</button>
-                    <button onclick="deleteUser('${user.uuid}', '${escapeHtml(user.username)}')" class="btn btn-sm btn-danger">Delete</button>
+                    ${user.username !== currentUsername ? `<button onclick="deleteUser('${user.uuid}', '${escapeHtml(user.username)}')" class="btn btn-sm btn-danger">Delete</button>` : ''}
                 </td>
             </tr>
         `).join('');

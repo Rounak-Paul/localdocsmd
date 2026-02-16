@@ -89,6 +89,16 @@ void http_parse_request(ldmd_server_t *server, struct mg_connection *c,
 bool http_get_session_token(struct mg_http_message *hm, char *token_out, size_t token_size);
 
 /**
+ * Get query parameter from request
+ * @param req Request context
+ * @param name Parameter name
+ * @param value_out Output buffer
+ * @param value_size Buffer size
+ * @return true if found
+ */
+bool http_get_query_param(http_request_t *req, const char *name, char *value_out, size_t value_size);
+
+/**
  * Set session cookie
  * @param c Connection
  * @param token Session token (NULL to clear)

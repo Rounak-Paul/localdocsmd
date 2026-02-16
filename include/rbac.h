@@ -113,6 +113,13 @@ ldmd_role_t rbac_get_effective_role(ldmd_database_t *db, const ldmd_user_t *user
 const char *rbac_role_to_string(ldmd_role_t role);
 
 /**
+ * Role to workspace-specific string (viewer/editor/manager)
+ * @param role Role
+ * @return String representation for workspace context
+ */
+const char *rbac_workspace_role_to_string(ldmd_role_t role);
+
+/**
  * String to role
  * @param str String
  * @return Role or ROLE_NONE

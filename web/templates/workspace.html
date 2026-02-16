@@ -65,17 +65,59 @@
             <hr>
             <h4>Add Member</h4>
             <form onsubmit="return addMember(event)" class="form-inline">
-                <input type="text" id="member-username" placeholder="Username or UUID" required>
+                <div class="user-search-container" style="position: relative; flex: 1;">
+                    <input type="text" id="member-search" placeholder="Search by name or email..." autocomplete="off"
+                           oninput="searchUsers(this.value)" onfocus="searchUsers(this.value)">
+                    <input type="hidden" id="member-uuid">
+                    <div id="user-search-results" class="search-dropdown" style="display: none;"></div>
+                </div>
                 <select id="member-role">
                     <option value="viewer">Viewer</option>
                     <option value="editor">Editor</option>
-                    <option value="admin">Admin</option>
+                    <option value="manager">Manager</option>
                 </select>
                 <button type="submit" class="btn btn-primary">Add</button>
             </form>
         </div>
     </div>
 </div>
+
+<style>
+.user-search-container {
+    position: relative;
+}
+.search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-top: none;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.search-dropdown-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+.search-dropdown-item:last-child {
+    border-bottom: none;
+}
+.search-dropdown-item:hover {
+    background: #f0f0f0;
+}
+.search-dropdown-item .username {
+    font-weight: bold;
+}
+.search-dropdown-item .email {
+    color: #666;
+    font-size: 0.9em;
+}
+</style>
 
 <!-- Settings Modal -->
 <div id="settings-modal" class="modal" style="display: none;">
@@ -210,7 +252,11 @@ async function showMembers() {
 async function addMember(e) {
     e.preventDefault();
     
-    const userUuid = document.getElementById('member-username').value;
+    const userUuid = document.getElementById('member-uuid').value;
+    if (!userUuid) {
+        alert('Please select a user from the search results');
+        return false;
+    }
     const role = document.getElementById('member-role').value;
     
     try {
@@ -221,7 +267,8 @@ async function addMember(e) {
         });
         
         if (response.ok) {
-            document.getElementById('member-username').value = '';
+            document.getElementById('member-search').value = '';
+            document.getElementById('member-uuid').value = '';
             showMembers();
         } else {
             const data = await response.json();
@@ -233,6 +280,53 @@ async function addMember(e) {
     
     return false;
 }
+
+let searchTimeout = null;
+async function searchUsers(query) {
+    clearTimeout(searchTimeout);
+    const resultsDiv = document.getElementById('user-search-results');
+    
+    if (!query || query.length < 1) {
+        resultsDiv.style.display = 'none';
+        return;
+    }
+    
+    // Debounce the search
+    searchTimeout = setTimeout(async () => {
+        try {
+            const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+            const users = await response.json();
+            
+            if (users.length === 0) {
+                resultsDiv.innerHTML = '<div class="search-dropdown-item">No users found</div>';
+            } else {
+                resultsDiv.innerHTML = users.map(u => `
+                    <div class="search-dropdown-item" onclick="selectUser('${u.uuid}', '${u.username}')">
+                        <div class="username">${u.username}</div>
+                        <div class="email">${u.email}</div>
+                    </div>
+                `).join('');
+            }
+            resultsDiv.style.display = 'block';
+        } catch (err) {
+            console.error('Search error:', err);
+        }
+    }, 200);
+}
+
+function selectUser(uuid, username) {
+    document.getElementById('member-uuid').value = uuid;
+    document.getElementById('member-search').value = username;
+    document.getElementById('user-search-results').style.display = 'none';
+}
+
+// Hide dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.user-search-container')) {
+        const resultsDiv = document.getElementById('user-search-results');
+        if (resultsDiv) resultsDiv.style.display = 'none';
+    }
+});
 
 async function removeMember(userUuid) {
     if (!confirm('Remove this member?')) {

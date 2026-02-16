@@ -43,9 +43,9 @@ typedef enum {
 // User roles
 typedef enum {
     ROLE_NONE = 0,
-    ROLE_VIEWER = 1,
-    ROLE_EDITOR = 2,
-    ROLE_ADMIN = 3
+    ROLE_USER = 1,      // Regular user (global) / Viewer (workspace)
+    ROLE_EDITOR = 2,    // Editor (workspace only)
+    ROLE_ADMIN = 3      // Admin (global and workspace)
 } ldmd_role_t;
 
 // User status
@@ -141,6 +141,16 @@ typedef struct {
     ldmd_role_t role;
     time_t created_at;
 } ldmd_workspace_member_t;
+
+// Project membership (view permissions)
+typedef struct {
+    int64_t id;
+    int64_t project_id;
+    int64_t user_id;
+    bool can_view;
+    int64_t granted_by;
+    time_t created_at;
+} ldmd_project_member_t;
 
 // Password change request
 typedef struct {

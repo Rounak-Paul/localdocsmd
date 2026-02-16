@@ -96,6 +96,33 @@ ldmd_error_t project_get_path(ldmd_config_t *config, const ldmd_workspace_t *wor
     return LDMD_OK;
 }
 
+// Project member operations (view permissions)
+ldmd_error_t project_grant_view(ldmd_database_t *db, int64_t project_id,
+                                int64_t user_id, int64_t granted_by) {
+    ldmd_project_member_t member;
+    memset(&member, 0, sizeof(member));
+    member.project_id = project_id;
+    member.user_id = user_id;
+    member.can_view = true;
+    member.granted_by = granted_by;
+    
+    return db_project_member_add(db, &member);
+}
+
+ldmd_error_t project_revoke_view(ldmd_database_t *db, int64_t project_id, int64_t user_id) {
+    return db_project_member_remove(db, project_id, user_id);
+}
+
+ldmd_error_t project_can_view(ldmd_database_t *db, int64_t project_id,
+                              int64_t user_id, bool *can_view) {
+    return db_project_member_check(db, project_id, user_id, can_view);
+}
+
+ldmd_error_t project_list_members(ldmd_database_t *db, int64_t project_id,
+                                  ldmd_project_member_t **members_out, int *count_out) {
+    return db_project_member_list(db, project_id, members_out, count_out);
+}
+
 // Document operations
 ldmd_error_t document_create(ldmd_database_t *db, ldmd_config_t *config,
                              int64_t project_id, const char *name,

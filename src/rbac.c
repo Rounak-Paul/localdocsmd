@@ -6,12 +6,13 @@
 static const uint32_t GLOBAL_ROLE_PERMISSIONS[] = {
     [ROLE_NONE] = PERM_NONE,
     
-    [ROLE_VIEWER] = PERM_VIEW_WORKSPACE | PERM_VIEW_DOCUMENT,
+    // Regular user - basic access, no special global permissions
+    [ROLE_USER] = PERM_NONE,
     
-    [ROLE_EDITOR] = PERM_VIEW_WORKSPACE | PERM_VIEW_DOCUMENT |
-                    PERM_CREATE_PROJECT | PERM_EDIT_PROJECT |
-                    PERM_CREATE_DOCUMENT | PERM_EDIT_DOCUMENT,
+    // Editor role doesn't exist at global level, treat as user
+    [ROLE_EDITOR] = PERM_NONE,
     
+    // Admin - full access including admin dashboard and workspace creation
     [ROLE_ADMIN] = PERM_ADMIN | PERM_CREATE_USER | PERM_MANAGE_USER |
                    PERM_CREATE_WORKSPACE | PERM_VIEW_WORKSPACE | PERM_EDIT_WORKSPACE |
                    PERM_DELETE_WORKSPACE | PERM_MANAGE_MEMBERS |
@@ -24,12 +25,16 @@ static const uint32_t GLOBAL_ROLE_PERMISSIONS[] = {
 static const uint32_t WORKSPACE_ROLE_PERMISSIONS[] = {
     [ROLE_NONE] = PERM_NONE,
     
-    [ROLE_VIEWER] = PERM_VIEW_WORKSPACE | PERM_VIEW_DOCUMENT,
+    // Viewer (ROLE_USER at workspace level) - can view only
+    [ROLE_USER] = PERM_VIEW_WORKSPACE | PERM_VIEW_DOCUMENT,
     
+    // Editor - can create projects/docs, manage members (add editors/viewers)
     [ROLE_EDITOR] = PERM_VIEW_WORKSPACE | PERM_VIEW_DOCUMENT |
+                    PERM_MANAGE_MEMBERS |
                     PERM_CREATE_PROJECT | PERM_EDIT_PROJECT |
-                    PERM_CREATE_DOCUMENT | PERM_EDIT_DOCUMENT,
+                    PERM_CREATE_DOCUMENT | PERM_EDIT_DOCUMENT | PERM_DELETE_DOCUMENT,
     
+    // Workspace admin - full workspace control  
     [ROLE_ADMIN] = PERM_VIEW_WORKSPACE | PERM_EDIT_WORKSPACE | PERM_DELETE_WORKSPACE |
                    PERM_MANAGE_MEMBERS |
                    PERM_CREATE_PROJECT | PERM_EDIT_PROJECT | PERM_DELETE_PROJECT |
@@ -156,9 +161,20 @@ ldmd_role_t rbac_get_effective_role(ldmd_database_t *db, const ldmd_user_t *user
 const char *rbac_role_to_string(ldmd_role_t role) {
     switch (role) {
         case ROLE_NONE:   return "none";
-        case ROLE_VIEWER: return "viewer";
+        case ROLE_USER:   return "user";
         case ROLE_EDITOR: return "editor";
         case ROLE_ADMIN:  return "admin";
+        default:          return "unknown";
+    }
+}
+
+// Workspace-specific role names (viewer/editor/manager instead of user/editor/admin)
+const char *rbac_workspace_role_to_string(ldmd_role_t role) {
+    switch (role) {
+        case ROLE_NONE:   return "none";
+        case ROLE_USER:   return "viewer";
+        case ROLE_EDITOR: return "editor";
+        case ROLE_ADMIN:  return "manager";
         default:          return "unknown";
     }
 }
@@ -166,9 +182,11 @@ const char *rbac_role_to_string(ldmd_role_t role) {
 ldmd_role_t rbac_string_to_role(const char *str) {
     if (!str) return ROLE_NONE;
     
-    if (strcasecmp(str, "viewer") == 0) return ROLE_VIEWER;
+    if (strcasecmp(str, "user") == 0) return ROLE_USER;
+    if (strcasecmp(str, "viewer") == 0) return ROLE_USER;  // workspace alias
     if (strcasecmp(str, "editor") == 0) return ROLE_EDITOR;
     if (strcasecmp(str, "admin") == 0) return ROLE_ADMIN;
+    if (strcasecmp(str, "manager") == 0) return ROLE_ADMIN;  // workspace alias
     
     return ROLE_NONE;
 }

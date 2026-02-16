@@ -80,6 +80,50 @@ ldmd_error_t project_list(ldmd_database_t *db, int64_t workspace_id,
 ldmd_error_t project_get_path(ldmd_config_t *config, const ldmd_workspace_t *workspace,
                               const ldmd_project_t *project, char *path_out, size_t path_size);
 
+// Project member operations (view permissions)
+
+/**
+ * Grant view access to a project
+ * @param db Database handle
+ * @param project_id Project ID
+ * @param user_id User to grant access to
+ * @param granted_by User granting access
+ * @return LDMD_OK or error code
+ */
+ldmd_error_t project_grant_view(ldmd_database_t *db, int64_t project_id, 
+                                int64_t user_id, int64_t granted_by);
+
+/**
+ * Revoke view access from a project
+ * @param db Database handle
+ * @param project_id Project ID
+ * @param user_id User to revoke access from
+ * @return LDMD_OK or error code
+ */
+ldmd_error_t project_revoke_view(ldmd_database_t *db, int64_t project_id, int64_t user_id);
+
+/**
+ * Check if user can view a project
+ * @param db Database handle
+ * @param project_id Project ID
+ * @param user_id User to check
+ * @param can_view Output boolean
+ * @return LDMD_OK or error code
+ */
+ldmd_error_t project_can_view(ldmd_database_t *db, int64_t project_id, 
+                              int64_t user_id, bool *can_view);
+
+/**
+ * List project members (users with view access)
+ * @param db Database handle
+ * @param project_id Project ID
+ * @param members_out Output array (caller frees)
+ * @param count_out Output count  
+ * @return LDMD_OK or error code
+ */
+ldmd_error_t project_list_members(ldmd_database_t *db, int64_t project_id,
+                                  ldmd_project_member_t **members_out, int *count_out);
+
 // Document operations within projects
 
 /**

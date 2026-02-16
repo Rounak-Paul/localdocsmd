@@ -93,6 +93,14 @@ ldmd_error_t db_project_delete(ldmd_database_t *db, int64_t id);
 ldmd_error_t db_project_list(ldmd_database_t *db, int64_t workspace_id, 
                              ldmd_project_t **projects, int *count);
 
+// Project membership operations (view permissions)
+ldmd_error_t db_project_member_add(ldmd_database_t *db, ldmd_project_member_t *member);
+ldmd_error_t db_project_member_remove(ldmd_database_t *db, int64_t project_id, int64_t user_id);
+ldmd_error_t db_project_member_check(ldmd_database_t *db, int64_t project_id, 
+                                     int64_t user_id, bool *can_view);
+ldmd_error_t db_project_member_list(ldmd_database_t *db, int64_t project_id,
+                                    ldmd_project_member_t **members, int *count);
+
 // Document operations
 ldmd_error_t db_document_create(ldmd_database_t *db, ldmd_document_t *document);
 ldmd_error_t db_document_get_by_id(ldmd_database_t *db, int64_t id, ldmd_document_t *document);
