@@ -1,0 +1,31 @@
+<div class="document-page">
+    <nav class="breadcrumb">
+        <a href="/dashboard">Dashboard</a>
+        <span>/</span>
+        <a href="/project/{{project_uuid}}">{{project_name}}</a>
+        <span>/</span>
+        <span>{{document_name}}</span>
+    </nav>
+    
+    <div class="page-header">
+        <h1>{{document_name}}</h1>
+        <div class="actions">
+            {{#if can_edit}}
+            <a href="/editor/{{document_uuid}}" class="btn btn-primary">Edit</a>
+            {{/if}}
+        </div>
+    </div>
+    
+    <article class="markdown-body">
+        {{content}}
+    </article>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Syntax highlight code blocks
+    document.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+    });
+});
+</script>

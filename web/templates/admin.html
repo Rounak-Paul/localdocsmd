@@ -1,0 +1,369 @@
+<div class="admin-page">
+    <div class="page-header">
+        <h1>Admin Panel</h1>
+    </div>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="stat-users">-</div>
+            <div class="stat-label">Users</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-workspaces">-</div>
+            <div class="stat-label">Workspaces</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-pending">-</div>
+            <div class="stat-label">Pending Requests</div>
+        </div>
+    </div>
+    
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('users')">Users</button>
+        <button class="tab" onclick="showTab('password-requests')">Password Requests</button>
+    </div>
+    
+    <!-- Users Tab -->
+    <div id="users-tab" class="tab-content">
+        <div class="section-header">
+            <h2>Users</h2>
+            <button onclick="showCreateUser()" class="btn btn-primary">Add User</button>
+        </div>
+        <table class="table" id="users-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="users-tbody">
+                <tr><td colspan="5" class="loading">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Password Requests Tab -->
+    <div id="password-requests-tab" class="tab-content" style="display: none;">
+        <h2>Pending Password Changes</h2>
+        <table class="table" id="requests-table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Requested</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="requests-tbody">
+                <tr><td colspan="3" class="loading">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create User Modal -->
+<div id="create-user-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create User</h3>
+            <button onclick="closeModal('create-user-modal')" class="btn-close">&times;</button>
+        </div>
+        <form onsubmit="return createUser(event)">
+            <div class="form-group">
+                <label for="user-username">Username</label>
+                <input type="text" id="user-username" required>
+            </div>
+            <div class="form-group">
+                <label for="user-email">Email</label>
+                <input type="email" id="user-email" required>
+            </div>
+            <div class="form-group">
+                <label for="user-password">Initial Password</label>
+                <input type="password" id="user-password" minlength="8">
+                <small>Leave blank for random password</small>
+            </div>
+            <div class="form-group">
+                <label for="user-role">Role</label>
+                <select id="user-role">
+                    <option value="viewer">Viewer</option>
+                    <option value="editor">Editor</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('create-user-modal')" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div id="edit-user-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit User</h3>
+            <button onclick="closeModal('edit-user-modal')" class="btn-close">&times;</button>
+        </div>
+        <form onsubmit="return updateUser(event)">
+            <input type="hidden" id="edit-user-uuid">
+            <div class="form-group">
+                <label for="edit-user-email">Email</label>
+                <input type="email" id="edit-user-email" required>
+            </div>
+            <div class="form-group">
+                <label for="edit-user-role">Role</label>
+                <select id="edit-user-role">
+                    <option value="viewer">Viewer</option>
+                    <option value="editor">Editor</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="edit-user-status">Status</label>
+                <select id="edit-user-status">
+                    <option value="0">Pending</option>
+                    <option value="1">Active</option>
+                    <option value="2">Locked</option>
+                    <option value="3">Disabled</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('edit-user-modal')" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadStats();
+    loadUsers();
+    loadPasswordRequests();
+});
+
+async function loadStats() {
+    try {
+        const response = await fetch('/api/admin/stats');
+        const stats = await response.json();
+        
+        document.getElementById('stat-users').textContent = stats.users;
+        document.getElementById('stat-workspaces').textContent = stats.workspaces;
+        document.getElementById('stat-pending').textContent = stats.pending_password_requests;
+    } catch (err) {
+        console.error('Error loading stats:', err);
+    }
+}
+
+function showTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+    
+    document.querySelector(`[onclick="showTab('${tab}')"]`).classList.add('active');
+    document.getElementById(`${tab}-tab`).style.display = 'block';
+}
+
+async function loadUsers() {
+    try {
+        const response = await fetch('/api/users');
+        const users = await response.json();
+        
+        const tbody = document.getElementById('users-tbody');
+        
+        if (users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5">No users found</td></tr>';
+            return;
+        }
+        
+        const statusLabels = ['Pending', 'Active', 'Locked', 'Disabled', 'Password Reset'];
+        
+        tbody.innerHTML = users.map(user => `
+            <tr>
+                <td>${escapeHtml(user.username)}</td>
+                <td>${escapeHtml(user.email)}</td>
+                <td><span class="badge badge-${user.role}">${user.role}</span></td>
+                <td><span class="badge badge-status-${user.status}">${statusLabels[user.status] || 'Unknown'}</span></td>
+                <td>
+                    <button onclick="editUser('${user.uuid}')" class="btn btn-sm">Edit</button>
+                    <button onclick="deleteUser('${user.uuid}', '${escapeHtml(user.username)}')" class="btn btn-sm btn-danger">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error('Error loading users:', err);
+    }
+}
+
+async function loadPasswordRequests() {
+    try {
+        const response = await fetch('/api/admin/password-requests');
+        const requests = await response.json();
+        
+        const tbody = document.getElementById('requests-tbody');
+        
+        if (requests.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3">No pending requests</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = requests.map(req => `
+            <tr>
+                <td>${escapeHtml(req.username)}</td>
+                <td>${new Date(req.created_at * 1000).toLocaleString()}</td>
+                <td>
+                    <button onclick="approvePassword(${req.id})" class="btn btn-sm btn-success">Approve</button>
+                    <button onclick="rejectPassword(${req.id})" class="btn btn-sm btn-danger">Reject</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error('Error loading password requests:', err);
+    }
+}
+
+function showCreateUser() {
+    showModal('create-user-modal');
+}
+
+async function createUser(e) {
+    e.preventDefault();
+    
+    const data = {
+        username: document.getElementById('user-username').value,
+        email: document.getElementById('user-email').value,
+        password: document.getElementById('user-password').value || undefined,
+        role: document.getElementById('user-role').value
+    };
+    
+    try {
+        const response = await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            closeModal('create-user-modal');
+            loadUsers();
+            loadStats();
+        } else {
+            const err = await response.json();
+            alert(err.error || 'Failed to create user');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+    
+    return false;
+}
+
+async function editUser(uuid) {
+    try {
+        const response = await fetch(`/api/users/${uuid}`);
+        const user = await response.json();
+        
+        document.getElementById('edit-user-uuid').value = uuid;
+        document.getElementById('edit-user-email').value = user.email;
+        document.getElementById('edit-user-role').value = user.role;
+        document.getElementById('edit-user-status').value = user.status;
+        
+        showModal('edit-user-modal');
+    } catch (err) {
+        alert('Failed to load user');
+    }
+}
+
+async function updateUser(e) {
+    e.preventDefault();
+    
+    const uuid = document.getElementById('edit-user-uuid').value;
+    const data = {
+        email: document.getElementById('edit-user-email').value,
+        role: document.getElementById('edit-user-role').value,
+        status: parseInt(document.getElementById('edit-user-status').value)
+    };
+    
+    try {
+        const response = await fetch(`/api/users/${uuid}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            closeModal('edit-user-modal');
+            loadUsers();
+        } else {
+            const err = await response.json();
+            alert(err.error || 'Failed to update user');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+    
+    return false;
+}
+
+async function deleteUser(uuid, username) {
+    if (!confirm(`Delete user "${username}"? This cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/users/${uuid}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            loadUsers();
+            loadStats();
+        } else {
+            const err = await response.json();
+            alert(err.error || 'Failed to delete user');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+}
+
+async function approvePassword(id) {
+    try {
+        const response = await fetch(`/api/admin/password-requests/${id}/approve`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            loadPasswordRequests();
+            loadStats();
+        } else {
+            alert('Failed to approve');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+}
+
+async function rejectPassword(id) {
+    if (!confirm('Reject this password change request?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/admin/password-requests/${id}/reject`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            loadPasswordRequests();
+            loadStats();
+        } else {
+            alert('Failed to reject');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+}
+</script>

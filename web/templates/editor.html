@@ -1,0 +1,229 @@
+<div class="editor-page">
+    <nav class="breadcrumb">
+        <a href="/dashboard">Dashboard</a>
+        <span>/</span>
+        <a href="/project/{{project_uuid}}">{{project_name}}</a>
+        <span>/</span>
+        <a href="/document/{{document_uuid}}">{{document_name}}</a>
+        <span>/</span>
+        <span>Edit</span>
+    </nav>
+    
+    <div class="editor-header">
+        <h1>{{document_name}}</h1>
+        <div class="editor-actions">
+            <span id="save-status"></span>
+            <button onclick="saveDocument()" class="btn btn-primary" id="save-btn">Save</button>
+            <a href="/document/{{document_uuid}}" class="btn">View</a>
+        </div>
+    </div>
+    
+    <div class="editor-container">
+        <div class="editor-pane">
+            <div class="pane-header">
+                <span>Markdown</span>
+                <div class="editor-toolbar">
+                    <button onclick="insertMarkdown('# ')" title="Heading 1">H1</button>
+                    <button onclick="insertMarkdown('## ')" title="Heading 2">H2</button>
+                    <button onclick="insertMarkdown('**', '**')" title="Bold"><b>B</b></button>
+                    <button onclick="insertMarkdown('*', '*')" title="Italic"><i>I</i></button>
+                    <button onclick="insertMarkdown('`', '`')" title="Inline Code"><code>C</code></button>
+                    <button onclick="insertMarkdown('\\n```\\n', '\\n```\\n')" title="Code Block">```</button>
+                    <button onclick="insertMarkdown('[', '](url)')" title="Link">🔗</button>
+                    <button onclick="insertMarkdown('- ')" title="List">•</button>
+                </div>
+            </div>
+            <textarea id="editor" class="editor-textarea" placeholder="# Start writing..."></textarea>
+        </div>
+        <div class="preview-pane">
+            <div class="pane-header">
+                <span>Preview</span>
+                <button onclick="togglePreview()" class="btn-icon" title="Toggle preview">👁</button>
+            </div>
+            <div id="preview" class="markdown-body"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const documentUuid = '{{document_uuid}}';
+const editor = document.getElementById('editor');
+const preview = document.getElementById('preview');
+const saveBtn = document.getElementById('save-btn');
+const saveStatus = document.getElementById('save-status');
+
+let content = decodeContent('{{content}}');
+let lastSavedContent = content;
+let previewTimeout = null;
+
+function decodeContent(encoded) {
+    try {
+        return JSON.parse('"' + encoded + '"');
+    } catch (e) {
+        return encoded;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    editor.value = content;
+    updatePreview();
+    
+    editor.addEventListener('input', function() {
+        content = editor.value;
+        schedulePreviewUpdate();
+        updateSaveStatus();
+    });
+    
+    // Keyboard shortcuts
+    editor.addEventListener('keydown', function(e) {
+        if (e.ctrlKey || e.metaKey) {
+            if (e.key === 's') {
+                e.preventDefault();
+                saveDocument();
+            } else if (e.key === 'b') {
+                e.preventDefault();
+                insertMarkdown('**', '**');
+            } else if (e.key === 'i') {
+                e.preventDefault();
+                insertMarkdown('*', '*');
+            }
+        }
+        
+        // Tab handling
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            
+            if (e.shiftKey) {
+                // Remove indent
+                const beforeCursor = this.value.substring(0, start);
+                const lineStart = beforeCursor.lastIndexOf('\n') + 1;
+                const lineContent = this.value.substring(lineStart, start);
+                if (lineContent.startsWith('    ') || lineContent.startsWith('\t')) {
+                    const removeCount = lineContent.startsWith('    ') ? 4 : 1;
+                    this.value = this.value.substring(0, lineStart) + 
+                                this.value.substring(lineStart + removeCount);
+                    this.selectionStart = this.selectionEnd = start - removeCount;
+                }
+            } else {
+                // Add indent
+                this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+                this.selectionStart = this.selectionEnd = start + 4;
+            }
+            
+            content = this.value;
+            schedulePreviewUpdate();
+            updateSaveStatus();
+        }
+    });
+    
+    // Warn before leaving with unsaved changes
+    window.addEventListener('beforeunload', function(e) {
+        if (content !== lastSavedContent) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+});
+
+function schedulePreviewUpdate() {
+    if (previewTimeout) {
+        clearTimeout(previewTimeout);
+    }
+    previewTimeout = setTimeout(updatePreview, 300);
+}
+
+async function updatePreview() {
+    try {
+        const response = await fetch(`/api/documents/${documentUuid}/render`);
+        const data = await response.json();
+        preview.innerHTML = data.html || '<p class="empty">Preview will appear here...</p>';
+        
+        // Syntax highlight
+        preview.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+        });
+    } catch (err) {
+        // Fallback: basic markdown preview
+        preview.innerHTML = '<p><em>Preview unavailable</em></p>';
+    }
+}
+
+function updateSaveStatus() {
+    if (content !== lastSavedContent) {
+        saveStatus.textContent = 'Unsaved changes';
+        saveStatus.className = 'status-unsaved';
+        saveBtn.disabled = false;
+    } else {
+        saveStatus.textContent = 'Saved';
+        saveStatus.className = 'status-saved';
+    }
+}
+
+async function saveDocument() {
+    saveBtn.disabled = true;
+    saveStatus.textContent = 'Saving...';
+    
+    try {
+        const response = await fetch(`/api/documents/${documentUuid}/content`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content })
+        });
+        
+        if (response.ok) {
+            lastSavedContent = content;
+            saveStatus.textContent = 'Saved';
+            saveStatus.className = 'status-saved';
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to save');
+            saveStatus.textContent = 'Save failed';
+            saveStatus.className = 'status-error';
+            saveBtn.disabled = false;
+        }
+    } catch (err) {
+        alert('Connection error');
+        saveStatus.textContent = 'Save failed';
+        saveStatus.className = 'status-error';
+        saveBtn.disabled = false;
+    }
+}
+
+function insertMarkdown(before, after = '') {
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const selectedText = editor.value.substring(start, end);
+    
+    editor.value = editor.value.substring(0, start) + 
+                   before + selectedText + after + 
+                   editor.value.substring(end);
+    
+    // Position cursor
+    if (selectedText) {
+        editor.selectionStart = start + before.length;
+        editor.selectionEnd = start + before.length + selectedText.length;
+    } else {
+        editor.selectionStart = editor.selectionEnd = start + before.length;
+    }
+    
+    content = editor.value;
+    editor.focus();
+    schedulePreviewUpdate();
+    updateSaveStatus();
+}
+
+function togglePreview() {
+    const previewPane = document.querySelector('.preview-pane');
+    const editorPane = document.querySelector('.editor-pane');
+    
+    if (previewPane.style.display === 'none') {
+        previewPane.style.display = 'flex';
+        editorPane.style.width = '';
+    } else {
+        previewPane.style.display = 'none';
+        editorPane.style.width = '100%';
+    }
+}
+</script>

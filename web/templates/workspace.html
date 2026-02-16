@@ -1,0 +1,306 @@
+<div class="workspace-page">
+    <nav class="breadcrumb">
+        <a href="/dashboard">Dashboard</a>
+        <span>/</span>
+        <span>{{workspace_name}}</span>
+    </nav>
+    
+    <div class="page-header">
+        <div>
+            <h1>{{workspace_name}}</h1>
+            <p class="description">{{workspace_description}}</p>
+        </div>
+        <div class="actions">
+            {{#if can_edit}}
+            <button onclick="showCreateProject()" class="btn btn-primary">New Project</button>
+            {{/if}}
+            {{#if is_admin}}
+            <button onclick="showMembers()" class="btn">Members</button>
+            <button onclick="showSettings()" class="btn">Settings</button>
+            {{/if}}
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>Projects</h2>
+        <div id="projects-list" class="grid">
+            <div class="loading">Loading projects...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Project Modal -->
+<div id="create-project-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create Project</h3>
+            <button onclick="closeModal('create-project-modal')" class="btn-close">&times;</button>
+        </div>
+        <form onsubmit="return createProject(event)">
+            <div class="form-group">
+                <label for="project-name">Name</label>
+                <input type="text" id="project-name" required>
+            </div>
+            <div class="form-group">
+                <label for="project-description">Description</label>
+                <textarea id="project-description" rows="3"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('create-project-modal')" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Members Modal -->
+<div id="members-modal" class="modal" style="display: none;">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h3>Workspace Members</h3>
+            <button onclick="closeModal('members-modal')" class="btn-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="members-list"></div>
+            <hr>
+            <h4>Add Member</h4>
+            <form onsubmit="return addMember(event)" class="form-inline">
+                <input type="text" id="member-username" placeholder="Username or UUID" required>
+                <select id="member-role">
+                    <option value="viewer">Viewer</option>
+                    <option value="editor">Editor</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <button type="submit" class="btn btn-primary">Add</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Workspace Settings</h3>
+            <button onclick="closeModal('settings-modal')" class="btn-close">&times;</button>
+        </div>
+        <form onsubmit="return updateWorkspace(event)">
+            <div class="form-group">
+                <label for="ws-edit-name">Name</label>
+                <input type="text" id="ws-edit-name" value="{{workspace_name}}" required>
+            </div>
+            <div class="form-group">
+                <label for="ws-edit-description">Description</label>
+                <textarea id="ws-edit-description" rows="3">{{workspace_description}}</textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="deleteWorkspace()" class="btn btn-danger">Delete Workspace</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const workspaceUuid = '{{workspace_uuid}}';
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadProjects();
+});
+
+async function loadProjects() {
+    try {
+        const response = await fetch(`/api/workspaces/${workspaceUuid}/projects`);
+        const projects = await response.json();
+        
+        const container = document.getElementById('projects-list');
+        
+        if (projects.length === 0) {
+            container.innerHTML = '<p class="empty-state">No projects yet. Create one to get started.</p>';
+            return;
+        }
+        
+        container.innerHTML = projects.map(p => `
+            <div class="card" onclick="window.location='/project/${p.uuid}'">
+                <div class="card-header">
+                    <h3>${escapeHtml(p.name)}</h3>
+                </div>
+                <div class="card-body">
+                    <p>${escapeHtml(p.description || 'No description')}</p>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('Error loading projects:', err);
+    }
+}
+
+function showCreateProject() {
+    showModal('create-project-modal');
+}
+
+async function createProject(e) {
+    e.preventDefault();
+    
+    const name = document.getElementById('project-name').value;
+    const description = document.getElementById('project-description').value;
+    
+    try {
+        const response = await fetch(`/api/workspaces/${workspaceUuid}/projects`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description })
+        });
+        
+        if (response.ok) {
+            closeModal('create-project-modal');
+            loadProjects();
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to create project');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+    
+    return false;
+}
+
+async function showMembers() {
+    showModal('members-modal');
+    
+    try {
+        const response = await fetch(`/api/workspaces/${workspaceUuid}/members`);
+        const members = await response.json();
+        
+        const container = document.getElementById('members-list');
+        
+        if (members.length === 0) {
+            container.innerHTML = '<p>No members</p>';
+            return;
+        }
+        
+        container.innerHTML = `
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${members.map(m => `
+                        <tr>
+                            <td>${escapeHtml(m.username)}</td>
+                            <td><span class="badge badge-${m.role}">${m.role}</span></td>
+                            <td>
+                                <button onclick="removeMember('${m.user_uuid}')" class="btn btn-sm btn-danger">Remove</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (err) {
+        alert('Failed to load members');
+    }
+}
+
+async function addMember(e) {
+    e.preventDefault();
+    
+    const userUuid = document.getElementById('member-username').value;
+    const role = document.getElementById('member-role').value;
+    
+    try {
+        const response = await fetch(`/api/workspaces/${workspaceUuid}/members`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_uuid: userUuid, role })
+        });
+        
+        if (response.ok) {
+            document.getElementById('member-username').value = '';
+            showMembers();
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to add member');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+    
+    return false;
+}
+
+async function removeMember(userUuid) {
+    if (!confirm('Remove this member?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/workspaces/${workspaceUuid}/members/${userUuid}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showMembers();
+        } else {
+            alert('Failed to remove member');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+}
+
+function showSettings() {
+    showModal('settings-modal');
+}
+
+async function updateWorkspace(e) {
+    e.preventDefault();
+    
+    const name = document.getElementById('ws-edit-name').value;
+    const description = document.getElementById('ws-edit-description').value;
+    
+    try {
+        const response = await fetch(`/api/workspaces/${workspaceUuid}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description })
+        });
+        
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to update');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+    
+    return false;
+}
+
+async function deleteWorkspace() {
+    if (!confirm('Delete this workspace? This will delete all projects and documents. This cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/workspaces/${workspaceUuid}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            window.location.href = '/dashboard';
+        } else {
+            alert('Failed to delete workspace');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+}
+</script>

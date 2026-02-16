@@ -1,0 +1,26 @@
+# Build output
+build/
+bin/
+
+# Runtime data
+data/
+
+# Config with secrets
+# config.ini
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Compiled objects
+*.o
+*.a
+*.so
+*.dylib

@@ -1,0 +1,186 @@
+<div class="dashboard">
+    <div class="page-header">
+        <h1>Dashboard</h1>
+        {{#if is_admin}}
+        <button onclick="showCreateWorkspace()" class="btn btn-primary">New Workspace</button>
+        {{/if}}
+    </div>
+    
+    {{#if password_pending}}
+    <div class="alert alert-warning">
+        Your password change is pending admin approval.
+    </div>
+    {{/if}}
+    
+    <div class="section">
+        <h2>Your Workspaces</h2>
+        <div id="workspaces-list" class="grid">
+            <div class="loading">Loading workspaces...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Workspace Modal -->
+<div id="create-workspace-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create Workspace</h3>
+            <button onclick="closeModal('create-workspace-modal')" class="btn-close">&times;</button>
+        </div>
+        <form onsubmit="return createWorkspace(event)">
+            <div class="form-group">
+                <label for="ws-name">Name</label>
+                <input type="text" id="ws-name" required>
+            </div>
+            <div class="form-group">
+                <label for="ws-description">Description</label>
+                <textarea id="ws-description" rows="3"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('create-workspace-modal')" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Change Password Modal -->
+<div id="change-password-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Change Password</h3>
+            <button onclick="closeModal('change-password-modal')" class="btn-close">&times;</button>
+        </div>
+        <form onsubmit="return changePassword(event)">
+            <div class="form-group">
+                <label for="current-password">Current Password</label>
+                <input type="password" id="current-password" required>
+            </div>
+            <div class="form-group">
+                <label for="new-password">New Password</label>
+                <input type="password" id="new-password" required minlength="8">
+            </div>
+            <div class="form-group">
+                <label for="confirm-password">Confirm Password</label>
+                <input type="password" id="confirm-password" required>
+            </div>
+            <div id="password-error" class="error-message" style="display: none;"></div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('change-password-modal')" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Change Password</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadWorkspaces();
+    
+    // Check if password change is required
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('change_password') === '1') {
+        showModal('change-password-modal');
+    }
+});
+
+async function loadWorkspaces() {
+    try {
+        const response = await fetch('/api/workspaces');
+        const workspaces = await response.json();
+        
+        const container = document.getElementById('workspaces-list');
+        
+        if (workspaces.length === 0) {
+            container.innerHTML = '<p class="empty-state">No workspaces yet.</p>';
+            return;
+        }
+        
+        container.innerHTML = workspaces.map(ws => `
+            <div class="card" onclick="window.location='/workspace/${ws.uuid}'">
+                <div class="card-header">
+                    <h3>${escapeHtml(ws.name)}</h3>
+                </div>
+                <div class="card-body">
+                    <p>${escapeHtml(ws.description || 'No description')}</p>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('Error loading workspaces:', err);
+    }
+}
+
+function showCreateWorkspace() {
+    showModal('create-workspace-modal');
+}
+
+async function createWorkspace(e) {
+    e.preventDefault();
+    
+    const name = document.getElementById('ws-name').value;
+    const description = document.getElementById('ws-description').value;
+    
+    try {
+        const response = await fetch('/api/workspaces', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description })
+        });
+        
+        if (response.ok) {
+            closeModal('create-workspace-modal');
+            loadWorkspaces();
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to create workspace');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+    
+    return false;
+}
+
+async function changePassword(e) {
+    e.preventDefault();
+    
+    const current = document.getElementById('current-password').value;
+    const newPass = document.getElementById('new-password').value;
+    const confirm = document.getElementById('confirm-password').value;
+    const errorDiv = document.getElementById('password-error');
+    
+    if (newPass !== confirm) {
+        errorDiv.textContent = 'Passwords do not match';
+        errorDiv.style.display = 'block';
+        return false;
+    }
+    
+    try {
+        const response = await fetch('/api/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                current_password: current, 
+                new_password: newPass 
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert(data.message || 'Password changed successfully');
+            closeModal('change-password-modal');
+            window.location.href = '/dashboard';
+        } else {
+            errorDiv.textContent = data.error || 'Failed to change password';
+            errorDiv.style.display = 'block';
+        }
+    } catch (err) {
+        errorDiv.textContent = 'Connection error';
+        errorDiv.style.display = 'block';
+    }
+    
+    return false;
+}
+</script>
