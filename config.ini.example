@@ -28,8 +28,6 @@ lockout_duration = 300
 secret_key = change_this_secret_key_in_production
 
 [admin]
-# Allow localhost to access admin without login (true/false)
-localhost_admin = true
 # Default admin username (created on first run)
 default_username = admin
 # Default admin email

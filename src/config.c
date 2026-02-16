@@ -110,23 +110,6 @@ static int ini_get_int(ini_file_t *ini, const char *section, const char *key, in
     return default_value;
 }
 
-static bool ini_get_bool(ini_file_t *ini, const char *section, const char *key, bool default_value) {
-    const char *value = ini_get(ini, section, key, NULL);
-    if (value) {
-        if (strcasecmp(value, "true") == 0 || 
-            strcasecmp(value, "yes") == 0 || 
-            strcasecmp(value, "1") == 0) {
-            return true;
-        }
-        if (strcasecmp(value, "false") == 0 || 
-            strcasecmp(value, "no") == 0 || 
-            strcasecmp(value, "0") == 0) {
-            return false;
-        }
-    }
-    return default_value;
-}
-
 ldmd_config_t *config_load(const char *path) {
     ini_file_t *ini = ini_parse(path);
     if (!ini) {
@@ -164,7 +147,6 @@ ldmd_config_t *config_load(const char *path) {
                  sizeof(config->secret_key));
     
     // Admin settings
-    config->localhost_admin = ini_get_bool(ini, "admin", "localhost_admin", true);
     ldmd_strlcpy(config->default_admin_username,
                  ini_get(ini, "admin", "default_username", "admin"),
                  sizeof(config->default_admin_username));

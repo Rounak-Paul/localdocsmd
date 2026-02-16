@@ -68,33 +68,6 @@ void http_parse_request(ldmd_server_t *server, struct mg_connection *c,
             db_user_get_by_id(server->db, req_out->session.user_id, &req_out->user);
         }
     }
-    
-    // Handle localhost admin auto-login
-    if (!req_out->authenticated && req_out->is_localhost && server->config->localhost_admin) {
-        // Check if requesting admin pages or API
-        if (mg_match(hm->uri, mg_str("/admin*"), NULL) ||
-            mg_match(hm->uri, mg_str("/api/admin*"), NULL)) {
-            // Create admin session
-            struct mg_str ua = mg_http_get_header(hm, "User-Agent") ? 
-                              *mg_http_get_header(hm, "User-Agent") : mg_str("");
-            char user_agent[512] = {0};
-            if (ua.len > 0) {
-                size_t copy_len = ua.len < sizeof(user_agent) - 1 ? ua.len : sizeof(user_agent) - 1;
-                memcpy(user_agent, ua.buf, copy_len);
-            }
-            
-            if (auth_localhost_admin_session(server->db, server->config,
-                                            req_out->client_ip, user_agent,
-                                            &req_out->session) == LDMD_OK) {
-                req_out->authenticated = true;
-                db_user_get_by_id(server->db, req_out->session.user_id, &req_out->user);
-                
-                // Set cookie for future requests
-                http_set_session_cookie(c, req_out->session.token, 
-                                       server->config->session_timeout);
-            }
-        }
-    }
 }
 
 bool http_get_session_token(struct mg_http_message *hm, char *token_out, size_t token_size) {
@@ -214,7 +187,6 @@ ldmd_error_t server_start(ldmd_server_t *server) {
     server->running = true;
     
     LOG_INFO("Server started on %s", listen_url);
-    LOG_INFO("Localhost admin access: %s", server->config->localhost_admin ? "enabled" : "disabled");
     
     return LDMD_OK;
 }

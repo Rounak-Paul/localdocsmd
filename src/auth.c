@@ -197,6 +197,8 @@ ldmd_error_t auth_create_user(ldmd_database_t *db, ldmd_config_t *config,
                               const char *username, const char *email,
                               const char *password, ldmd_role_t role,
                               ldmd_user_t *user_out) {
+    (void)config;  // Reserved for future use
+    
     // Check if username exists
     ldmd_user_t existing;
     if (db_user_get_by_username(db, username, &existing) == LDMD_OK) {
@@ -219,11 +221,6 @@ ldmd_error_t auth_create_user(ldmd_database_t *db, ldmd_config_t *config,
         user.status = USER_STATUS_PENDING;
         LOG_INFO("Created user %s with temporary password: %s", username, temp_password);
     } else {
-        // Validate password length
-        if (strlen(password) < (size_t)config->password_min_length) {
-            LOG_WARN("User creation failed - password too short");
-            return LDMD_ERROR_INVALID;
-        }
         user.status = USER_STATUS_ACTIVE;
     }
     
@@ -422,38 +419,4 @@ ldmd_error_t auth_reject_password_change(ldmd_database_t *db, int64_t request_id
              (long long)found->user_id, (long long)admin_id);
     
     return err;
-}
-
-ldmd_error_t auth_localhost_admin_session(ldmd_database_t *db, ldmd_config_t *config,
-                                          const char *ip_address, const char *user_agent,
-                                          ldmd_session_t *session_out) {
-    if (!auth_is_localhost(ip_address)) {
-        return LDMD_ERROR_FORBIDDEN;
-    }
-    
-    if (!config->localhost_admin) {
-        return LDMD_ERROR_FORBIDDEN;
-    }
-    
-    // Find or create admin user
-    ldmd_user_t admin;
-    ldmd_error_t err = db_user_get_by_username(db, config->default_admin_username, &admin);
-    if (err == LDMD_ERROR_NOT_FOUND) {
-        // Create admin user
-        err = auth_create_user(db, config, config->default_admin_username,
-                               config->default_admin_email, "admin", ROLE_ADMIN, &admin);
-        if (err != LDMD_OK) {
-            return err;
-        }
-        // Set as active (no password change needed for localhost admin)
-        admin.status = USER_STATUS_ACTIVE;
-        admin.password_change_pending = false;
-        db_user_update(db, &admin);
-    } else if (err != LDMD_OK) {
-        return err;
-    }
-    
-    // Create admin session
-    return session_create(db, admin.id, ip_address, user_agent,
-                         config->session_timeout, true, session_out);
 }

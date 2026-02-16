@@ -100,7 +100,6 @@ int main(int argc, char *argv[]) {
         config->max_login_attempts = 5;
         config->lockout_duration = 300;
         ldmd_strlcpy(config->secret_key, "change_this_secret", sizeof(config->secret_key));
-        config->localhost_admin = true;
         ldmd_strlcpy(config->default_admin_username, "admin", sizeof(config->default_admin_username));
         ldmd_strlcpy(config->default_admin_email, "admin@localhost", sizeof(config->default_admin_email));
         ldmd_strlcpy(config->documents_path, "data/documents", sizeof(config->documents_path));
@@ -137,12 +136,13 @@ int main(int argc, char *argv[]) {
                                             "admin",  // Default password
                                             ROLE_ADMIN, &admin);
         if (err == LDMD_OK) {
-            // Set admin as active (no password change needed for initial setup)
+            // Admin must change password on first login
             admin.status = USER_STATUS_ACTIVE;
-            admin.password_change_pending = false;
+            admin.password_change_pending = true;
             db_user_update(db, &admin);
             LOG_INFO("Created admin user: %s (password: admin)", config->default_admin_username);
-            LOG_WARN("Please change the default admin password!");
+            LOG_WARN("*** Default credentials: admin / admin ***");
+            LOG_WARN("*** You will be required to change the password on first login ***");
         } else {
             LOG_ERROR("Failed to create admin user");
         }
@@ -174,9 +174,6 @@ int main(int argc, char *argv[]) {
     LOG_INFO("Web interface: http://%s:%d", 
              strcmp(config->server_host, "0.0.0.0") == 0 ? "localhost" : config->server_host,
              config->server_port);
-    if (config->localhost_admin) {
-        LOG_INFO("Admin access: http://localhost:%d/admin (from localhost)", config->server_port);
-    }
     LOG_INFO("==============================================");
     
     // Run server (blocks until stopped)

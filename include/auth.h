@@ -139,17 +139,4 @@ ldmd_error_t auth_reject_password_change(ldmd_database_t *db, int64_t request_id
  */
 bool auth_is_localhost(const char *ip);
 
-/**
- * Create admin session for localhost
- * @param db Database handle
- * @param config Configuration
- * @param ip_address IP address (must be localhost)
- * @param user_agent User agent
- * @param session_out Output session
- * @return LDMD_OK or error code
- */
-ldmd_error_t auth_localhost_admin_session(ldmd_database_t *db, ldmd_config_t *config,
-                                          const char *ip_address, const char *user_agent,
-                                          ldmd_session_t *session_out);
-
 #endif // AUTH_H

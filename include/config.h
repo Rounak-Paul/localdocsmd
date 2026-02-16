@@ -22,7 +22,6 @@ struct ldmd_config {
     char secret_key[256];
     
     // Admin settings
-    bool localhost_admin;
     char default_admin_username[LDMD_MAX_USERNAME];
     char default_admin_email[LDMD_MAX_EMAIL];
     
