@@ -1,5 +1,19 @@
 // LocalDocsMD - Application JavaScript
 
+// Theme management
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('ldmd-theme', theme);
+}
+
+// Initialize theme from localStorage
+(function() {
+    const saved = localStorage.getItem('ldmd-theme');
+    if (saved) {
+        document.documentElement.setAttribute('data-theme', saved);
+    }
+})();
+
 // Helper functions
 function escapeHtml(text) {
     if (!text) return '';

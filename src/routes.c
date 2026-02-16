@@ -88,17 +88,28 @@ static void set_navbar(template_ctx_t *ctx, http_request_t *req) {
         return;
     }
     
-    char navbar[1024];
+    char navbar[2048];
     const char *admin_link = (req->user.global_role == ROLE_ADMIN) 
-        ? "<a href=\"/admin\" class=\"navbar-link\">Admin</a>" 
+        ? "<a href=\"/admin\">Admin</a>" 
         : "";
     
     snprintf(navbar, sizeof(navbar),
         "<nav class=\"navbar\">"
-        "<a href=\"/dashboard\" class=\"navbar-brand\">LocalDocsMD</a>"
+        "<div class=\"navbar-brand\"><a href=\"/dashboard\">Local<span>Docs</span>MD</a></div>"
+        "<div class=\"navbar-menu\">"
         "<span class=\"navbar-user\">%s</span>"
         "%s"
-        "<button onclick=\"logout()\" class=\"btn btn-small\">Logout</button>"
+        "<div class=\"theme-switcher\">"
+        "<button class=\"btn\" title=\"Theme\">&#9728;</button>"
+        "<div class=\"theme-dropdown\">"
+        "<button class=\"theme-option\" onclick=\"setTheme('midnight')\"><span class=\"theme-preview\" style=\"background:#0d1117;border-color:#30363d\"></span>Midnight</button>"
+        "<button class=\"theme-option\" onclick=\"setTheme('daylight')\"><span class=\"theme-preview\" style=\"background:#fff;border-color:#d0d7de\"></span>Daylight</button>"
+        "<button class=\"theme-option\" onclick=\"setTheme('dracula')\"><span class=\"theme-preview\" style=\"background:#282a36;border-color:#6272a4\"></span>Dracula</button>"
+        "<button class=\"theme-option\" onclick=\"setTheme('nord')\"><span class=\"theme-preview\" style=\"background:#2e3440;border-color:#4c566a\"></span>Nord</button>"
+        "</div>"
+        "</div>"
+        "<a href=\"#\" onclick=\"logout();return false;\" class=\"btn\">Logout</a>"
+        "</div>"
         "</nav>",
         req->user.username, admin_link);
     

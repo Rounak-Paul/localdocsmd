@@ -1,6 +1,9 @@
 <div class="admin-page">
     <div class="page-header">
-        <h1>Admin Panel</h1>
+        <div>
+            <h1>Admin Panel</h1>
+            <p class="description">Manage users, workspaces, and system settings</p>
+        </div>
     </div>
     
     <script>const currentUsername = '{{username}}';</script>
@@ -8,7 +11,7 @@
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-value" id="stat-users">-</div>
-            <div class="stat-label">Users</div>
+            <div class="stat-label">Total Users</div>
         </div>
         <div class="stat-card">
             <div class="stat-value" id="stat-workspaces">-</div>
@@ -21,47 +24,75 @@
     </div>
     
     <div class="tabs">
-        <button class="tab active" onclick="showTab('users')">Users</button>
-        <button class="tab" onclick="showTab('password-requests')">Password Requests</button>
+        <button class="tab active" onclick="showTab('users')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            Users
+        </button>
+        <button class="tab" onclick="showTab('password-requests')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            Password Requests
+        </button>
     </div>
     
     <!-- Users Tab -->
     <div id="users-tab" class="tab-content">
         <div class="section-header">
-            <h2>Users</h2>
-            <button onclick="showCreateUser()" class="btn btn-primary">Add User</button>
+            <h2>User Management</h2>
+            <button onclick="showCreateUser()" class="btn btn-primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <line x1="19" y1="8" x2="19" y2="14"></line>
+                    <line x1="22" y1="11" x2="16" y2="11"></line>
+                </svg>
+                Add User
+            </button>
         </div>
-        <table class="table" id="users-table">
-            <thead>
-                <tr>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="users-tbody">
-                <tr><td colspan="5" class="loading">Loading...</td></tr>
-            </tbody>
-        </table>
+        <div class="table-container">
+            <table class="table" id="users-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-tbody">
+                    <tr><td colspan="5" class="loading">Loading users...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
     
     <!-- Password Requests Tab -->
     <div id="password-requests-tab" class="tab-content" style="display: none;">
-        <h2>Pending Password Changes</h2>
-        <table class="table" id="requests-table">
-            <thead>
-                <tr>
-                    <th>User</th>
-                    <th>Requested</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="requests-tbody">
-                <tr><td colspan="3" class="loading">Loading...</td></tr>
-            </tbody>
-        </table>
+        <div class="section-header">
+            <h2>Pending Password Changes</h2>
+        </div>
+        <div class="table-container">
+            <table class="table" id="requests-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Requested</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="requests-tbody">
+                    <tr><td colspan="3" class="loading">Loading requests...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -69,22 +100,22 @@
 <div id="create-user-modal" class="modal" style="display: none;">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Create User</h3>
+            <h3>Create New User</h3>
             <button onclick="closeModal('create-user-modal')" class="btn-close">&times;</button>
         </div>
         <form onsubmit="return createUser(event)">
             <div class="form-group">
                 <label for="user-username">Username</label>
-                <input type="text" id="user-username" required>
+                <input type="text" id="user-username" placeholder="Enter username" required>
             </div>
             <div class="form-group">
                 <label for="user-email">Email</label>
-                <input type="email" id="user-email" required>
+                <input type="email" id="user-email" placeholder="Enter email address" required>
             </div>
             <div class="form-group">
                 <label for="user-password">Initial Password</label>
-                <input type="password" id="user-password" minlength="8">
-                <small>Leave blank for random password</small>
+                <input type="password" id="user-password" placeholder="Leave blank for random" minlength="8">
+                <small>Leave blank to generate a random password</small>
             </div>
             <div class="form-group">
                 <label for="user-role">Role</label>
@@ -95,7 +126,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" onclick="closeModal('create-user-modal')" class="btn">Cancel</button>
-                <button type="submit" class="btn btn-primary">Create</button>
+                <button type="submit" class="btn btn-primary">Create User</button>
             </div>
         </form>
     </div>
@@ -132,11 +163,45 @@
             </div>
             <div class="modal-footer">
                 <button type="button" onclick="closeModal('edit-user-modal')" class="btn">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
             </div>
         </form>
     </div>
 </div>
+
+<style>
+.admin-page .tabs {
+    margin-bottom: var(--spacing-xl);
+}
+
+.admin-page .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.admin-page .tab svg {
+    opacity: 0.6;
+}
+
+.admin-page .tab.active svg {
+    opacity: 1;
+}
+
+.table-container {
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+}
+
+.admin-page .table td {
+    vertical-align: middle;
+}
+
+.admin-page .section-header h2 {
+    margin: 0;
+}
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -150,12 +215,35 @@ async function loadStats() {
         const response = await fetch('/api/admin/stats');
         const stats = await response.json();
         
-        document.getElementById('stat-users').textContent = stats.users;
-        document.getElementById('stat-workspaces').textContent = stats.workspaces;
-        document.getElementById('stat-pending').textContent = stats.pending_password_requests;
+        animateValue('stat-users', 0, stats.users, 500);
+        animateValue('stat-workspaces', 0, stats.workspaces, 500);
+        animateValue('stat-pending', 0, stats.pending_password_requests, 500);
     } catch (err) {
         console.error('Error loading stats:', err);
     }
+}
+
+function animateValue(id, start, end, duration) {
+    const element = document.getElementById(id);
+    const range = end - start;
+    const startTime = performance.now();
+    
+    function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const value = Math.floor(start + range * easeOutQuart(progress));
+        element.textContent = value;
+        
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        }
+    }
+    
+    requestAnimationFrame(update);
+}
+
+function easeOutQuart(x) {
+    return 1 - Math.pow(1 - x, 4);
 }
 
 function showTab(tab) {
@@ -174,7 +262,7 @@ async function loadUsers() {
         const tbody = document.getElementById('users-tbody');
         
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5">No users found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No users found</td></tr>';
             return;
         }
         
@@ -182,13 +270,15 @@ async function loadUsers() {
         
         tbody.innerHTML = users.map(user => `
             <tr>
-                <td>${escapeHtml(user.username)}</td>
+                <td><strong>${escapeHtml(user.username)}</strong></td>
                 <td>${escapeHtml(user.email)}</td>
                 <td><span class="badge badge-${user.role}">${user.role}</span></td>
                 <td><span class="badge badge-status-${user.status}">${statusLabels[user.status] || 'Unknown'}</span></td>
                 <td>
-                    <button onclick="editUser('${user.uuid}')" class="btn btn-sm">Edit</button>
-                    ${user.username !== currentUsername ? `<button onclick="deleteUser('${user.uuid}', '${escapeHtml(user.username)}')" class="btn btn-sm btn-danger">Delete</button>` : ''}
+                    <div style="display: flex; gap: var(--spacing-xs);">
+                        <button onclick="editUser('${user.uuid}')" class="btn btn-sm">Edit</button>
+                        ${user.username !== currentUsername ? `<button onclick="deleteUser('${user.uuid}', '${escapeHtml(user.username)}')" class="btn btn-sm btn-danger">Delete</button>` : ''}
+                    </div>
                 </td>
             </tr>
         `).join('');
@@ -205,17 +295,19 @@ async function loadPasswordRequests() {
         const tbody = document.getElementById('requests-tbody');
         
         if (requests.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3">No pending requests</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No pending requests</td></tr>';
             return;
         }
         
         tbody.innerHTML = requests.map(req => `
             <tr>
-                <td>${escapeHtml(req.username)}</td>
+                <td><strong>${escapeHtml(req.username)}</strong></td>
                 <td>${new Date(req.created_at * 1000).toLocaleString()}</td>
                 <td>
-                    <button onclick="approvePassword(${req.id})" class="btn btn-sm btn-success">Approve</button>
-                    <button onclick="rejectPassword(${req.id})" class="btn btn-sm btn-danger">Reject</button>
+                    <div style="display: flex; gap: var(--spacing-xs);">
+                        <button onclick="approvePassword(${req.id})" class="btn btn-sm btn-success">Approve</button>
+                        <button onclick="rejectPassword(${req.id})" class="btn btn-sm btn-danger">Reject</button>
+                    </div>
                 </td>
             </tr>
         `).join('');
@@ -230,6 +322,10 @@ function showCreateUser() {
 
 async function createUser(e) {
     e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
     
     const data = {
         username: document.getElementById('user-username').value,
@@ -249,6 +345,7 @@ async function createUser(e) {
             closeModal('create-user-modal');
             loadUsers();
             loadStats();
+            e.target.reset();
         } else {
             const err = await response.json();
             alert(err.error || 'Failed to create user');
@@ -256,6 +353,9 @@ async function createUser(e) {
     } catch (err) {
         alert('Connection error');
     }
+    
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Create User';
     
     return false;
 }
@@ -278,6 +378,10 @@ async function editUser(uuid) {
 
 async function updateUser(e) {
     e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
     
     const uuid = document.getElementById('edit-user-uuid').value;
     const data = {
@@ -304,11 +408,14 @@ async function updateUser(e) {
         alert('Connection error');
     }
     
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Save Changes';
+    
     return false;
 }
 
 async function deleteUser(uuid, username) {
-    if (!confirm(`Delete user "${username}"? This cannot be undone.`)) {
+    if (!confirm(`Delete user "${username}"? This action cannot be undone.`)) {
         return;
     }
     
