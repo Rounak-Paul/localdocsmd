@@ -371,7 +371,30 @@ bool routes_handle(http_request_t *req) {
         route_api_admin_reject_password(req, param1);
         return true;
     }
-    
+
+    // Forgot-password (public - no auth required)
+    if (uri_match(req, "/api/forgot-password", NULL, NULL) && method_is(req, "POST")) {
+        route_api_forgot_password(req);
+        return true;
+    }
+
+    // Admin: forgot-password requests
+    if (uri_match(req, "/api/admin/forgot-requests", NULL, NULL) && method_is(req, "GET")) {
+        route_api_admin_forgot_requests(req);
+        return true;
+    }
+
+    if (uri_match(req, "/api/admin/forgot-requests/*/handle", param1, NULL) && method_is(req, "POST")) {
+        route_api_admin_handle_forgot(req, param1);
+        return true;
+    }
+
+    // Admin: direct password reset for any user
+    if (uri_match(req, "/api/admin/users/*/reset-password", param1, NULL) && method_is(req, "POST")) {
+        route_api_admin_reset_user_password(req, param1);
+        return true;
+    }
+
     return false;
 }
 
@@ -473,7 +496,7 @@ void route_page_workspace(http_request_t *req, const char *workspace_uuid) {
     template_set(ctx, "workspace_name", workspace.name);
     template_set(ctx, "workspace_uuid", workspace.uuid);
     template_set(ctx, "workspace_description", workspace.description);
-    template_set_bool(ctx, "is_admin", req->user.global_role == ROLE_ADMIN);
+    template_set_bool(ctx, "is_admin", rbac_is_workspace_admin(req->server->db, req->user.id, workspace.id));
     template_set_bool(ctx, "can_edit", rbac_can_edit_workspace(req->server->db, req->user.id, workspace.id));
     set_navbar(ctx, req);
     
@@ -864,6 +887,10 @@ void route_api_users_create(http_request_t *req) {
     cJSON_AddStringToObject(resp, "email", user.email);
     cJSON_AddStringToObject(resp, "role", rbac_role_to_string(user.global_role));
     cJSON_AddBoolToObject(resp, "password_pending", user.password_change_pending);
+    // Include the generated temp password if no password was supplied by the admin
+    if (user.generated_password[0] != '\0') {
+        cJSON_AddStringToObject(resp, "generated_password", user.generated_password);
+    }
     
     char *json_str = cJSON_PrintUnformatted(resp);
     http_respond_json(req->conn, 201, json_str);
@@ -1183,7 +1210,13 @@ void route_api_workspaces_remove_member(http_request_t *req, const char *ws_uuid
         http_respond_error(req->conn, 404, "User not found");
         return;
     }
-    
+
+    // Managers (non-global-admins) cannot remove application admins
+    if (user.global_role == ROLE_ADMIN && req->user.global_role != ROLE_ADMIN) {
+        http_respond_error(req->conn, 403, "Cannot remove an application admin");
+        return;
+    }
+
     workspace_remove_member(req->server->db, workspace.id, user.id);
     http_respond_json(req->conn, 200, "{\"success\":true}");
 }
@@ -1721,11 +1754,15 @@ void route_api_admin_stats(http_request_t *req) {
     int pending_count = 0;
     db_password_request_list_pending(req->server->db, &requests, &pending_count);
     free(requests);
-    
+
+    int forgot_count = 0;
+    db_password_forgot_count_pending(req->server->db, &forgot_count);
+
     cJSON *resp = cJSON_CreateObject();
     cJSON_AddNumberToObject(resp, "users", user_count);
     cJSON_AddNumberToObject(resp, "workspaces", workspace_count);
     cJSON_AddNumberToObject(resp, "pending_password_requests", pending_count);
+    cJSON_AddNumberToObject(resp, "pending_forgot_requests", forgot_count);
     
     char *json_str = cJSON_PrintUnformatted(resp);
     http_respond_json(req->conn, 200, json_str);
@@ -1785,4 +1822,115 @@ void route_api_admin_reject_password(http_request_t *req, const char *request_id
     }
     
     http_respond_json(req->conn, 200, "{\"success\":true}");
+}
+
+// ---- Forgot-password routes ----
+
+void route_api_forgot_password(http_request_t *req) {
+    // Public endpoint - no authentication required
+    cJSON *json = parse_json_body(req);
+    if (!json) {
+        http_respond_error(req->conn, 400, "Invalid JSON");
+        return;
+    }
+
+    const char *username = json_get_string(json, "username");
+    if (!username || strlen(username) == 0) {
+        cJSON_Delete(json);
+        http_respond_error(req->conn, 400, "Username required");
+        return;
+    }
+
+    // Always succeed to avoid username enumeration
+    auth_forgot_password(req->server->db, username);
+    cJSON_Delete(json);
+
+    http_respond_json(req->conn, 200,
+        "{\"success\":true,\"message\":\"If this account exists, an admin has been notified\"}");
+}
+
+void route_api_admin_forgot_requests(http_request_t *req) {
+    if (!require_admin(req)) return;
+
+    ldmd_password_forgot_t *requests = NULL;
+    int count = 0;
+    db_password_forgot_list_pending(req->server->db, &requests, &count);
+
+    cJSON *arr = cJSON_CreateArray();
+    for (int i = 0; i < count; i++) {
+        cJSON *r = cJSON_CreateObject();
+        cJSON_AddNumberToObject(r, "id", (double)requests[i].id);
+        cJSON_AddStringToObject(r, "username", requests[i].username);
+        cJSON_AddNumberToObject(r, "created_at", (double)requests[i].created_at);
+        cJSON_AddItemToArray(arr, r);
+    }
+    free(requests);
+
+    char *json_str = cJSON_PrintUnformatted(arr);
+    http_respond_json(req->conn, 200, json_str);
+    free(json_str);
+    cJSON_Delete(arr);
+}
+
+void route_api_admin_handle_forgot(http_request_t *req, const char *request_id) {
+    if (!require_admin(req)) return;
+
+    cJSON *json = parse_json_body(req);
+    if (!json) {
+        http_respond_error(req->conn, 400, "Invalid JSON");
+        return;
+    }
+
+    const char *new_password = json_get_string(json, "new_password");
+    if (!new_password || strlen(new_password) == 0) {
+        cJSON_Delete(json);
+        http_respond_error(req->conn, 400, "new_password required");
+        return;
+    }
+
+    int64_t id = atoll(request_id);
+    ldmd_error_t err = auth_handle_forgot_password(req->server->db, req->server->config,
+                                                   id, new_password, req->user.id);
+    cJSON_Delete(json);
+
+    if (err == LDMD_ERROR_NOT_FOUND) {
+        http_respond_error(req->conn, 404, "Request not found");
+    } else if (err == LDMD_ERROR_INVALID) {
+        http_respond_error(req->conn, 400, "Password too short");
+    } else if (err != LDMD_OK) {
+        http_respond_error(req->conn, 500, "Internal error");
+    } else {
+        http_respond_json(req->conn, 200, "{\"success\":true}");
+    }
+}
+
+void route_api_admin_reset_user_password(http_request_t *req, const char *user_uuid) {
+    if (!require_admin(req)) return;
+
+    cJSON *json = parse_json_body(req);
+    if (!json) {
+        http_respond_error(req->conn, 400, "Invalid JSON");
+        return;
+    }
+
+    const char *new_password = json_get_string(json, "new_password");
+    if (!new_password || strlen(new_password) == 0) {
+        cJSON_Delete(json);
+        http_respond_error(req->conn, 400, "new_password required");
+        return;
+    }
+
+    ldmd_error_t err = auth_admin_reset_password(req->server->db, req->server->config,
+                                                 user_uuid, new_password, req->user.id);
+    cJSON_Delete(json);
+
+    if (err == LDMD_ERROR_NOT_FOUND) {
+        http_respond_error(req->conn, 404, "User not found");
+    } else if (err == LDMD_ERROR_INVALID) {
+        http_respond_error(req->conn, 400, "Password too short");
+    } else if (err != LDMD_OK) {
+        http_respond_error(req->conn, 500, "Internal error");
+    } else {
+        http_respond_json(req->conn, 200, "{\"success\":true}");
+    }
 }

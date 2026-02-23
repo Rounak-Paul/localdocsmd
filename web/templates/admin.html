@@ -19,7 +19,11 @@
         </div>
         <div class="stat-card">
             <div class="stat-value" id="stat-pending">-</div>
-            <div class="stat-label">Pending Requests</div>
+            <div class="stat-label">Pending Password Changes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-forgot">-</div>
+            <div class="stat-label">Forgot Password Requests</div>
         </div>
     </div>
     
@@ -39,6 +43,14 @@
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
             </svg>
             Password Requests
+        </button>
+        <button class="tab" onclick="showTab('forgot-requests')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            Forgot Password
         </button>
     </div>
     
@@ -92,6 +104,61 @@
                     <tr><td colspan="3" class="loading">Loading requests...</td></tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Forgot Password Requests Tab -->
+    <div id="forgot-requests-tab" class="tab-content" style="display: none;">
+        <div class="section-header">
+            <h2>Forgot Password Requests</h2>
+            <p style="margin:0; color: var(--text-secondary); font-size:0.9em;">Users who cannot log in and asked for a password reset.</p>
+        </div>
+        <div class="table-container">
+            <table class="table" id="forgot-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Requested</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="forgot-tbody">
+                    <tr><td colspan="3" class="loading">Loading requests...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Generated Password Modal -->
+<div id="generated-password-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>User Created — Save This Password</h3>
+            <button onclick="closeModal('generated-password-modal')" class="btn-close">&times;</button>
+        </div>
+        <p style="color: var(--text-secondary); font-size:0.9em; margin-bottom: var(--spacing-md);">
+            No password was specified, so one was generated automatically for
+            <strong id="gen-pass-username"></strong>.
+            Share it with the user — <strong>it will not be shown again.</strong>
+            They will be required to change it on first login.
+        </p>
+        <div style="display:flex; align-items:center; gap: var(--spacing-sm); margin-bottom: var(--spacing-md);">
+            <code id="gen-pass-value" style="
+                flex: 1;
+                background: var(--bg-secondary, #1a1f2e);
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-md);
+                padding: var(--spacing-sm) var(--spacing-md);
+                font-family: monospace;
+                font-size: 1.1em;
+                letter-spacing: 0.05em;
+                color: var(--primary-color);
+            "></code>
+            <button onclick="copyGeneratedPassword()" class="btn" id="copy-gen-pass-btn">Copy</button>
+        </div>
+        <div class="modal-footer">
+            <button onclick="closeModal('generated-password-modal')" class="btn btn-primary">Done</button>
         </div>
     </div>
 </div>
@@ -169,9 +236,39 @@
     </div>
 </div>
 
+<!-- Set Temporary Password Modal (used for both admin reset and forgot-request handling) -->
+<div id="set-password-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="set-password-title">Set Temporary Password</h3>
+            <button onclick="closeModal('set-password-modal')" class="btn-close">&times;</button>
+        </div>
+        <p id="set-password-desc" style="color: var(--text-secondary); font-size:0.9em; margin-bottom: var(--spacing-md);">
+            The user will be required to change this password on next login.
+        </p>
+        <form onsubmit="return submitSetPassword(event)">
+            <input type="hidden" id="set-password-target-type">  <!-- 'user' or 'forgot' -->
+            <input type="hidden" id="set-password-target-id">
+            <div class="form-group">
+                <label for="set-password-value">New Temporary Password</label>
+                <input type="password" id="set-password-value" placeholder="Enter temporary password" required minlength="8">
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('set-password-modal')" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Set Password</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <style>
-.admin-page .tabs {
-    margin-bottom: var(--spacing-xl);
+.btn-warning {
+    background-color: var(--warning-color, #f59e0b);
+    color: #fff;
+    border-color: var(--warning-color, #f59e0b);
+}
+.btn-warning:hover {
+    opacity: 0.85;
 }
 
 .admin-page .tab {
@@ -208,6 +305,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadStats();
     loadUsers();
     loadPasswordRequests();
+    loadForgotRequests();
 });
 
 async function loadStats() {
@@ -218,6 +316,7 @@ async function loadStats() {
         animateValue('stat-users', 0, stats.users, 500);
         animateValue('stat-workspaces', 0, stats.workspaces, 500);
         animateValue('stat-pending', 0, stats.pending_password_requests, 500);
+        animateValue('stat-forgot', 0, stats.pending_forgot_requests || 0, 500);
     } catch (err) {
         console.error('Error loading stats:', err);
     }
@@ -277,6 +376,7 @@ async function loadUsers() {
                 <td>
                     <div style="display: flex; gap: var(--spacing-xs);">
                         <button onclick="editUser('${user.uuid}')" class="btn btn-sm">Edit</button>
+                        <button onclick="resetUserPassword('${user.uuid}', '${escapeHtml(user.username)}')" class="btn btn-sm btn-warning">Reset Password</button>
                         ${user.username !== currentUsername ? `<button onclick="deleteUser('${user.uuid}', '${escapeHtml(user.username)}')" class="btn btn-sm btn-danger">Delete</button>` : ''}
                     </div>
                 </td>
@@ -342,10 +442,14 @@ async function createUser(e) {
         });
         
         if (response.ok) {
+            const data = await response.json();
             closeModal('create-user-modal');
             loadUsers();
             loadStats();
             e.target.reset();
+            if (data.generated_password) {
+                showGeneratedPassword(data.username, data.generated_password);
+            }
         } else {
             const err = await response.json();
             alert(err.error || 'Failed to create user');
@@ -472,5 +576,121 @@ async function rejectPassword(id) {
     } catch (err) {
         alert('Connection error');
     }
+}
+
+async function loadForgotRequests() {
+    try {
+        const response = await fetch('/api/admin/forgot-requests');
+        const requests = await response.json();
+
+        const tbody = document.getElementById('forgot-tbody');
+
+        if (requests.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No pending requests</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = requests.map(req => `
+            <tr>
+                <td><strong>${escapeHtml(req.username)}</strong></td>
+                <td>${new Date(req.created_at * 1000).toLocaleString()}</td>
+                <td>
+                    <button onclick="handleForgotRequest(${req.id}, '${escapeHtml(req.username)}')" class="btn btn-sm btn-primary">Set Password</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error('Error loading forgot requests:', err);
+    }
+}
+
+function resetUserPassword(uuid, username) {
+    document.getElementById('set-password-title').textContent = `Reset Password — ${username}`;
+    document.getElementById('set-password-desc').textContent =
+        `Set a temporary password for ${username}. They will be required to change it on next login.`;
+    document.getElementById('set-password-target-type').value = 'user';
+    document.getElementById('set-password-target-id').value = uuid;
+    document.getElementById('set-password-value').value = '';
+    showModal('set-password-modal');
+}
+
+function handleForgotRequest(id, username) {
+    document.getElementById('set-password-title').textContent = `Handle Forgot Password — ${username}`;
+    document.getElementById('set-password-desc').textContent =
+        `Set a temporary password for ${username}. They will be required to change it on next login.`;
+    document.getElementById('set-password-target-type').value = 'forgot';
+    document.getElementById('set-password-target-id').value = id;
+    document.getElementById('set-password-value').value = '';
+    showModal('set-password-modal');
+}
+
+async function submitSetPassword(e) {
+    e.preventDefault();
+
+    const type = document.getElementById('set-password-target-type').value;
+    const targetId = document.getElementById('set-password-target-id').value;
+    const newPassword = document.getElementById('set-password-value').value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Setting...';
+
+    let url;
+    if (type === 'user') {
+        url = `/api/admin/users/${targetId}/reset-password`;
+    } else {
+        url = `/api/admin/forgot-requests/${targetId}/handle`;
+    }
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_password: newPassword })
+        });
+
+        if (response.ok) {
+            closeModal('set-password-modal');
+            loadUsers();
+            loadForgotRequests();
+            loadStats();
+        } else {
+            const err = await response.json();
+            alert(err.error || 'Failed to set password');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Set Password';
+    return false;
+}
+
+function showGeneratedPassword(username, password) {
+    document.getElementById('gen-pass-username').textContent = username;
+    document.getElementById('gen-pass-value').textContent = password;
+    document.getElementById('copy-gen-pass-btn').textContent = 'Copy';
+    showModal('generated-password-modal');
+}
+
+function copyGeneratedPassword() {
+    const password = document.getElementById('gen-pass-value').textContent;
+    navigator.clipboard.writeText(password).then(() => {
+        const btn = document.getElementById('copy-gen-pass-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+    }).catch(() => {
+        // Fallback for older browsers
+        const el = document.getElementById('gen-pass-value');
+        const range = document.createRange();
+        range.selectNode(el);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+        document.execCommand('copy');
+        window.getSelection().removeAllRanges();
+        const btn = document.getElementById('copy-gen-pass-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+    });
 }
 </script>

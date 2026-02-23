@@ -83,6 +83,9 @@ struct ldmd_user {
     time_t updated_at;
     time_t last_login;
     bool password_change_pending;
+    // Only populated transiently when a random temp password was auto-generated;
+    // never stored in the database.
+    char generated_password[32];
 };
 
 // Workspace structure
@@ -152,7 +155,7 @@ typedef struct {
     time_t created_at;
 } ldmd_project_member_t;
 
-// Password change request
+// Password change request (by a logged-in user, pending admin approval)
 typedef struct {
     int64_t id;
     int64_t user_id;
@@ -163,6 +166,17 @@ typedef struct {
     time_t reviewed_at;
     int64_t reviewed_by;
 } ldmd_password_request_t;
+
+// Forgot-password request (by an unauthenticated user who cannot log in)
+typedef struct {
+    int64_t id;
+    int64_t user_id;
+    char username[LDMD_MAX_USERNAME];  // denormalised for display
+    int status;                        // 0 = pending, 1 = handled
+    time_t created_at;
+    time_t handled_at;
+    int64_t handled_by;
+} ldmd_password_forgot_t;
 
 // Global application context
 typedef struct {

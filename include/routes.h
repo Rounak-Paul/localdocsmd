@@ -75,4 +75,14 @@ void route_api_admin_password_requests(http_request_t *req);
 void route_api_admin_approve_password(http_request_t *req, const char *request_id);
 void route_api_admin_reject_password(http_request_t *req, const char *request_id);
 
+// Forgot-password (public, no auth)
+void route_api_forgot_password(http_request_t *req);
+
+// Admin: password-forgot-requests management
+void route_api_admin_forgot_requests(http_request_t *req);
+void route_api_admin_handle_forgot(http_request_t *req, const char *request_id);
+
+// Admin: direct password reset for any user
+void route_api_admin_reset_user_password(http_request_t *req, const char *user_uuid);
+
 #endif // ROUTES_H

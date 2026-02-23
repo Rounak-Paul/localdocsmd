@@ -33,6 +33,30 @@
                 </svg>
             </button>
         </form>
+
+        <div style="text-align:center; margin-top: var(--spacing-md);">
+            <button type="button" onclick="toggleForgotForm()" class="btn-link" id="forgot-link">
+                Forgot your password?
+            </button>
+        </div>
+
+        <!-- Forgot password form (hidden by default) -->
+        <div id="forgot-section" style="display:none; margin-top: var(--spacing-md);">
+            <hr style="border-color: var(--border-color); margin-bottom: var(--spacing-md);">
+            <p style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: var(--spacing-md);">
+                Enter your username and an admin will be notified to reset your password.
+            </p>
+            <form id="forgot-form" onsubmit="return handleForgot(event)">
+                <div class="form-group">
+                    <label for="forgot-username">Username</label>
+                    <input type="text" id="forgot-username" name="forgot-username"
+                           placeholder="Enter your username" required>
+                </div>
+                <div id="forgot-message" class="error-message" style="display: none;"></div>
+                <div id="forgot-success" style="display:none; color: var(--success-color); margin-bottom: var(--spacing-sm);"></div>
+                <button type="submit" class="btn btn-primary btn-block">Send Request</button>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -67,6 +91,21 @@
 
 #login-form .btn:hover svg {
     transform: translateX(4px);
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    font-size: 0.9em;
+    padding: 0;
+    text-decoration: underline;
+    opacity: 0.8;
+}
+
+.btn-link:hover {
+    opacity: 1;
 }
 </style>
 
@@ -111,6 +150,55 @@ async function handleLogin(e) {
         submitBtn.innerHTML = 'Sign In <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>';
     }
     
+    return false;
+}
+
+function toggleForgotForm() {
+    const section = document.getElementById('forgot-section');
+    const isHidden = section.style.display === 'none';
+    section.style.display = isHidden ? 'block' : 'none';
+    document.getElementById('forgot-link').textContent = isHidden
+        ? 'Back to login'
+        : 'Forgot your password?';
+}
+
+async function handleForgot(e) {
+    e.preventDefault();
+
+    const username = document.getElementById('forgot-username').value;
+    const msgDiv = document.getElementById('forgot-message');
+    const successDiv = document.getElementById('forgot-success');
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+
+    msgDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending...';
+
+    try {
+        const response = await fetch('/api/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            successDiv.textContent = data.message || 'Request sent. An admin will reset your password shortly.';
+            successDiv.style.display = 'block';
+            document.getElementById('forgot-form').reset();
+        } else {
+            msgDiv.textContent = data.error || 'Failed to send request.';
+            msgDiv.style.display = 'block';
+        }
+    } catch (err) {
+        msgDiv.textContent = 'Connection error. Please try again.';
+        msgDiv.style.display = 'block';
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Send Request';
     return false;
 }
 </script>

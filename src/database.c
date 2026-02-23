@@ -118,6 +118,18 @@ static const char *SCHEMA_SQL =
     "  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
     ");"
     
+    // Forgot-password requests (from unauthenticated users)
+    "CREATE TABLE IF NOT EXISTS password_forgot_requests ("
+    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "  user_id INTEGER NOT NULL,"
+    "  username TEXT NOT NULL,"
+    "  status INTEGER NOT NULL DEFAULT 0,"
+    "  created_at INTEGER NOT NULL,"
+    "  handled_at INTEGER DEFAULT 0,"
+    "  handled_by INTEGER DEFAULT 0,"
+    "  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+    ");"
+
     // Indexes
     "CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);"
     "CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);"
@@ -1543,5 +1555,110 @@ ldmd_error_t db_password_request_list_pending(ldmd_database_t *db,
     sqlite3_finalize(stmt);
     *count = i;
     
+    return LDMD_OK;
+}
+
+// Forgot-password request operations
+ldmd_error_t db_password_forgot_create(ldmd_database_t *db, ldmd_password_forgot_t *request) {
+    // Delete any existing pending forgot-request for this user
+    const char *del_sql = "DELETE FROM password_forgot_requests WHERE user_id = ? AND status = 0;";
+    sqlite3_stmt *stmt;
+    sqlite3_prepare_v2(db->db, del_sql, -1, &stmt, NULL);
+    sqlite3_bind_int64(stmt, 1, request->user_id);
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    const char *sql =
+        "INSERT INTO password_forgot_requests (user_id, username, status, created_at) "
+        "VALUES (?, ?, 0, ?);";
+
+    int rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) return LDMD_ERROR_DATABASE;
+
+    request->created_at = utils_now();
+    request->status = 0;
+
+    sqlite3_bind_int64(stmt, 1, request->user_id);
+    sqlite3_bind_text(stmt, 2, request->username, -1, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 3, request->created_at);
+
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) return LDMD_ERROR_DATABASE;
+
+    request->id = sqlite3_last_insert_rowid(db->db);
+    return LDMD_OK;
+}
+
+ldmd_error_t db_password_forgot_list_pending(ldmd_database_t *db,
+                                             ldmd_password_forgot_t **requests, int *count) {
+    const char *sql =
+        "SELECT id, user_id, username, status, created_at, handled_at, handled_by "
+        "FROM password_forgot_requests WHERE status = 0 ORDER BY created_at;";
+
+    sqlite3_stmt *stmt;
+    int rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) return LDMD_ERROR_DATABASE;
+
+    int n = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW) n++;
+    sqlite3_reset(stmt);
+
+    *count = n;
+    if (n == 0) {
+        *requests = NULL;
+        sqlite3_finalize(stmt);
+        return LDMD_OK;
+    }
+
+    *requests = calloc(n, sizeof(ldmd_password_forgot_t));
+    if (!*requests) { sqlite3_finalize(stmt); return LDMD_ERROR_MEMORY; }
+
+    int i = 0;
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW && i < n) {
+        (*requests)[i].id         = sqlite3_column_int64(stmt, 0);
+        (*requests)[i].user_id    = sqlite3_column_int64(stmt, 1);
+        ldmd_strlcpy((*requests)[i].username,
+                     (const char *)sqlite3_column_text(stmt, 2), LDMD_MAX_USERNAME);
+        (*requests)[i].status     = sqlite3_column_int(stmt, 3);
+        (*requests)[i].created_at = sqlite3_column_int64(stmt, 4);
+        (*requests)[i].handled_at = sqlite3_column_int64(stmt, 5);
+        (*requests)[i].handled_by = sqlite3_column_int64(stmt, 6);
+        i++;
+    }
+    sqlite3_finalize(stmt);
+    *count = i;
+    return LDMD_OK;
+}
+
+ldmd_error_t db_password_forgot_update(ldmd_database_t *db, ldmd_password_forgot_t *request) {
+    const char *sql =
+        "UPDATE password_forgot_requests SET status=?, handled_at=?, handled_by=? WHERE id=?;";
+
+    sqlite3_stmt *stmt;
+    int rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) return LDMD_ERROR_DATABASE;
+
+    sqlite3_bind_int(stmt,   1, request->status);
+    sqlite3_bind_int64(stmt, 2, request->handled_at);
+    sqlite3_bind_int64(stmt, 3, request->handled_by);
+    sqlite3_bind_int64(stmt, 4, request->id);
+
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_DONE) ? LDMD_OK : LDMD_ERROR_DATABASE;
+}
+
+ldmd_error_t db_password_forgot_count_pending(ldmd_database_t *db, int *count) {
+    const char *sql = "SELECT COUNT(*) FROM password_forgot_requests WHERE status = 0;";
+    sqlite3_stmt *stmt;
+    int rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) return LDMD_ERROR_DATABASE;
+
+    *count = 0;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        *count = sqlite3_column_int(stmt, 0);
+    }
+    sqlite3_finalize(stmt);
     return LDMD_OK;
 }

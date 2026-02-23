@@ -139,4 +139,38 @@ ldmd_error_t auth_reject_password_change(ldmd_database_t *db, int64_t request_id
  */
 bool auth_is_localhost(const char *ip);
 
+/**
+ * Submit a forgot-password request (no authentication needed)
+ * @param db Database handle
+ * @param username Username of the user who forgot their password
+ * @return LDMD_OK always (do not leak whether username exists)
+ */
+ldmd_error_t auth_forgot_password(ldmd_database_t *db, const char *username);
+
+/**
+ * Admin directly resets a user's password (sets temp password + forces change on next login)
+ * @param db Database handle
+ * @param config Configuration
+ * @param user_uuid Target user UUID
+ * @param new_password New temporary password
+ * @param admin_id Admin user ID performing the reset
+ * @return LDMD_OK or error code
+ */
+ldmd_error_t auth_admin_reset_password(ldmd_database_t *db, ldmd_config_t *config,
+                                       const char *user_uuid, const char *new_password,
+                                       int64_t admin_id);
+
+/**
+ * Admin handles a forgot-password request by supplying a new temp password
+ * @param db Database handle
+ * @param config Configuration
+ * @param request_id The forgot-password request ID
+ * @param new_password New temporary password to set for the user
+ * @param admin_id Admin performing the action
+ * @return LDMD_OK or error code
+ */
+ldmd_error_t auth_handle_forgot_password(ldmd_database_t *db, ldmd_config_t *config,
+                                         int64_t request_id, const char *new_password,
+                                         int64_t admin_id);
+
 #endif // AUTH_H

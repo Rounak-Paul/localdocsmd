@@ -118,4 +118,11 @@ ldmd_error_t db_password_request_update(ldmd_database_t *db, ldmd_password_reque
 ldmd_error_t db_password_request_list_pending(ldmd_database_t *db, 
                                               ldmd_password_request_t **requests, int *count);
 
+// Forgot-password request operations
+ldmd_error_t db_password_forgot_create(ldmd_database_t *db, ldmd_password_forgot_t *request);
+ldmd_error_t db_password_forgot_list_pending(ldmd_database_t *db,
+                                             ldmd_password_forgot_t **requests, int *count);
+ldmd_error_t db_password_forgot_update(ldmd_database_t *db, ldmd_password_forgot_t *request);
+ldmd_error_t db_password_forgot_count_pending(ldmd_database_t *db, int *count);
+
 #endif // DATABASE_H

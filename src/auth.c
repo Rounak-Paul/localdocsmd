@@ -218,9 +218,11 @@ ldmd_error_t auth_create_user(ldmd_database_t *db, ldmd_config_t *config,
     if (!password || strlen(password) == 0) {
         generate_random_hex(temp_password, 8);
         password = temp_password;
+        ldmd_strlcpy(user.generated_password, temp_password, sizeof(user.generated_password));
         user.status = USER_STATUS_PENDING;
-        LOG_INFO("Created user %s with temporary password: %s", username, temp_password);
+        LOG_INFO("Created user %s with auto-generated temporary password", username);
     } else {
+        user.generated_password[0] = '\0';
         user.status = USER_STATUS_ACTIVE;
     }
     
@@ -420,4 +422,106 @@ ldmd_error_t auth_reject_password_change(ldmd_database_t *db, int64_t request_id
              (long long)found->user_id, (long long)admin_id);
     
     return err;
+}
+
+ldmd_error_t auth_forgot_password(ldmd_database_t *db, const char *username) {
+    ldmd_user_t user;
+    ldmd_error_t err = db_user_get_by_username(db, username, &user);
+    if (err == LDMD_ERROR_NOT_FOUND) {
+        // Return OK to avoid username enumeration
+        return LDMD_OK;
+    }
+    if (err != LDMD_OK) return err;
+
+    ldmd_password_forgot_t req;
+    memset(&req, 0, sizeof(req));
+    req.user_id = user.id;
+    ldmd_strlcpy(req.username, user.username, LDMD_MAX_USERNAME);
+
+    err = db_password_forgot_create(db, &req);
+    if (err != LDMD_OK) return err;
+
+    LOG_INFO("Forgot-password request created for user: %s", username);
+    return LDMD_OK;
+}
+
+ldmd_error_t auth_admin_reset_password(ldmd_database_t *db, ldmd_config_t *config,
+                                       const char *user_uuid, const char *new_password,
+                                       int64_t admin_id) {
+    (void)admin_id;
+
+    ldmd_user_t user;
+    ldmd_error_t err = db_user_get_by_uuid(db, user_uuid, &user);
+    if (err != LDMD_OK) return err;
+
+    if (strlen(new_password) < (size_t)config->password_min_length) {
+        return LDMD_ERROR_INVALID;
+    }
+
+    err = auth_hash_password(new_password, NULL, user.password_hash, user.salt);
+    if (err != LDMD_OK) return err;
+
+    user.password_change_pending = true;
+    user.status = USER_STATUS_ACTIVE;
+
+    err = db_user_update(db, &user);
+    if (err != LDMD_OK) return err;
+
+    // Invalidate all existing sessions for this user so they must log in fresh
+    db_session_delete_by_user(db, user.id);
+
+    LOG_INFO("Admin reset password for user: %s (admin ID %lld)",
+             user.username, (long long)admin_id);
+    return LDMD_OK;
+}
+
+ldmd_error_t auth_handle_forgot_password(ldmd_database_t *db, ldmd_config_t *config,
+                                         int64_t request_id, const char *new_password,
+                                         int64_t admin_id) {
+    ldmd_password_forgot_t *requests = NULL;
+    int count = 0;
+    ldmd_error_t err = db_password_forgot_list_pending(db, &requests, &count);
+    if (err != LDMD_OK) return err;
+
+    ldmd_password_forgot_t *found = NULL;
+    for (int i = 0; i < count; i++) {
+        if (requests[i].id == request_id) {
+            found = &requests[i];
+            break;
+        }
+    }
+
+    if (!found) {
+        free(requests);
+        return LDMD_ERROR_NOT_FOUND;
+    }
+
+    // Reuse admin reset logic (looks up by uuid) — get uuid first
+    ldmd_user_t user;
+    err = db_user_get_by_id(db, found->user_id, &user);
+    if (err != LDMD_OK) { free(requests); return err; }
+
+    if (strlen(new_password) < (size_t)config->password_min_length) {
+        free(requests);
+        return LDMD_ERROR_INVALID;
+    }
+
+    err = auth_hash_password(new_password, NULL, user.password_hash, user.salt);
+    if (err != LDMD_OK) { free(requests); return err; }
+
+    user.password_change_pending = true;
+    user.status = USER_STATUS_ACTIVE;
+    db_user_update(db, &user);
+    db_session_delete_by_user(db, user.id);
+
+    // Mark request handled
+    found->status = 1;
+    found->handled_at = utils_now();
+    found->handled_by = admin_id;
+    db_password_forgot_update(db, found);
+
+    free(requests);
+    LOG_INFO("Forgot-password request %lld handled by admin %lld for user: %s",
+             (long long)request_id, (long long)admin_id, user.username);
+    return LDMD_OK;
 }
