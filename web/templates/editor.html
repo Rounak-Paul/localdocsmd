@@ -1,14 +1,20 @@
 <!-- Editor CDN dependencies -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=IBM+Plex+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Source+Code+Pro:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600&family=Nunito:wght@400;500;600&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown.min.css">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked-highlight/lib/index.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/morphdom@2.7.2/dist/morphdom-umd.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 
 <div class="editor-page">
     <nav class="breadcrumb">
         <a href="/dashboard">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
             Dashboard
         </a>
         <span>/</span>
@@ -24,6 +30,26 @@
         </h1>
         <div class="editor-actions">
             <span id="save-status" class="save-status"></span>
+
+            <!-- Download dropdown -->
+            <div class="act-dropdown" id="download-dropdown">
+                <button class="btn" id="download-btn" onclick="toggleActDropdown('download-dropdown')">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg>
+                    Download
+                    <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="opacity:.6"><path d="M4.427 7.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z"/></svg>
+                </button>
+                <div class="act-dropdown-menu" id="download-menu">
+                    <button class="act-dropdown-item" onclick="downloadMd()">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14.85 3c.63 0 1.15.52 1.14 1.15v7.7c0 .63-.51 1.15-1.15 1.15H1.15C.52 13 0 12.48 0 11.84V4.15C0 3.52.52 3 1.15 3ZM9 11V5H7L5.5 7 4 5H2v6h2V8l1.5 1.92L7 8v3Zm2.99.5L14.5 8H13V5h-2v3H9.5Z"/></svg>
+                        Markdown (.md)
+                    </button>
+                    <button class="act-dropdown-item" onclick="downloadHtml()">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.708 5.578L2.061 8.224l2.647 2.646-.708.708-3-3V7.87l3-3 .708.708zm7.292 5.354l2.647-2.646-2.647-2.646.708-.708 3 3v.708l-3 3-.708-.708zM6.417 11.646l2.5-8 .833.417-2.5 8-.833-.417z"/></svg>
+                        HTML (.html)
+                    </button>
+                </div>
+            </div>
+
             <button onclick="toggleHelp()" class="btn" id="help-btn" title="Markdown reference (Ctrl+/)">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.756 2.756 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.195l-.006.004a6.24 6.24 0 0 0-.26.16.952.952 0 0 0-.276.245.75.75 0 0 1-1.248-.832c.184-.264.42-.489.692-.661.103-.067.207-.132.313-.195l.007-.004c.1-.061.182-.11.258-.161a.969.969 0 0 0 .277-.245C8.96 6.514 9 6.427 9 6.25a.612.612 0 0 0-.262-.525A1.27 1.27 0 0 0 8 5.5c-.369 0-.595.09-.74.187a1.01 1.01 0 0 0-.34.398ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>
                 Help
@@ -40,15 +66,28 @@
     </div>
 
     <div class="editor-container">
-        <!-- Left pane: Markdown editor -->
         <div class="editor-pane">
             <div class="pane-header">
                 <span>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6"><path d="M14.85 3c.63 0 1.15.52 1.14 1.15v7.7c0 .63-.51 1.15-1.15 1.15H1.15C.52 13 0 12.48 0 11.84V4.15C0 3.52.52 3 1.15 3zM9 11V5H7L5.5 7 4 5H2v6h2V8l1.5 1.92L7 8v3zm2.99.5L14.5 8H13V5h-2v3H9.5z" fill="currentColor" stroke="none"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.6"><path d="M14.85 3c.63 0 1.15.52 1.14 1.15v7.7c0 .63-.51 1.15-1.15 1.15H1.15C.52 13 0 12.48 0 11.84V4.15C0 3.52.52 3 1.15 3ZM9 11V5H7L5.5 7 4 5H2v6h2V8l1.5 1.92L7 8v3Zm2.99.5L14.5 8H13V5h-2v3H9.5Z"/></svg>
                     Markdown
                 </span>
+                <div class="pane-font-selector">
+                    <button class="pane-font-btn" onclick="toggleFontDropdown('editor-font-dropdown')">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M6.71 10H2.332l-.874 2.498a.75.75 0 0 1-1.415-.496l3.39-9.688a1.217 1.217 0 0 1 2.302.018l3.227 9.681a.75.75 0 0 1-1.423.474ZM6.21 8.5 4.574 3.594 2.857 8.5Z"/><path d="M15.09 12.5h-3.181l-.51 1.458a.75.75 0 0 1-1.413-.495l2.09-5.965a1 1 0 0 1 1.886-.003l2.09 5.965a.75.75 0 0 1-1.415.496ZM13.5 11l-.787-2.248L11.93 11Z"/></svg>
+                        <span>Font</span>
+                        <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4.427 7.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z"/></svg>
+                    </button>
+                    <div class="pane-font-dropdown" id="editor-font-dropdown">
+                        <button class="pane-font-item active" data-font-type="mono" data-font="system">System Default</button>
+                        <button class="pane-font-item" data-font-type="mono" data-font="jetbrains">JetBrains Mono</button>
+                        <button class="pane-font-item" data-font-type="mono" data-font="fira">Fira Code</button>
+                        <button class="pane-font-item" data-font-type="mono" data-font="source-code">Source Code Pro</button>
+                        <button class="pane-font-item" data-font-type="mono" data-font="ibm-mono">IBM Plex Mono</button>
+                    </div>
+                </div>
             </div>
-            <textarea id="editor" class="editor-textarea" placeholder="# Start writing...&#10;&#10;Use **bold**, *italic*, or ==highlight==.&#10;Add math with $E = mc^2$ or $$\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}$$&#10;Use > [!note] for callouts."></textarea>
+            <textarea id="editor" class="editor-textarea" placeholder="# Start writing..."></textarea>
             <div class="editor-status-bar">
                 <span id="status-pos">Ln 1, Col 1</span>
                 <span id="status-chars">0 chars</span>
@@ -56,14 +95,29 @@
             </div>
         </div>
 
-        <!-- Right pane: Preview with TOC -->
         <div class="preview-pane">
             <div class="pane-header">
                 <span>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                     Preview
                 </span>
-                <div class="viewer-presence" id="viewer-presence" title="Active viewers"></div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <div class="viewer-presence" id="viewer-presence"></div>
+                    <div class="pane-font-selector">
+                        <button class="pane-font-btn" onclick="toggleFontDropdown('preview-font-dropdown')">
+                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M6.71 10H2.332l-.874 2.498a.75.75 0 0 1-1.415-.496l3.39-9.688a1.217 1.217 0 0 1 2.302.018l3.227 9.681a.75.75 0 0 1-1.423.474ZM6.21 8.5 4.574 3.594 2.857 8.5Z"/><path d="M15.09 12.5h-3.181l-.51 1.458a.75.75 0 0 1-1.413-.495l2.09-5.965a1 1 0 0 1 1.886-.003l2.09 5.965a.75.75 0 0 1-1.415.496ZM13.5 11l-.787-2.248L11.93 11Z"/></svg>
+                            <span>Font</span>
+                            <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4.427 7.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z"/></svg>
+                        </button>
+                        <div class="pane-font-dropdown" id="preview-font-dropdown">
+                            <button class="pane-font-item active" data-font-type="sans" data-font="system">System Default</button>
+                            <button class="pane-font-item" data-font-type="sans" data-font="inter">Inter</button>
+                            <button class="pane-font-item" data-font-type="sans" data-font="open-sans">Open Sans</button>
+                            <button class="pane-font-item" data-font-type="sans" data-font="nunito">Nunito</button>
+                            <button class="pane-font-item" data-font-type="sans" data-font="ibm-sans">IBM Plex Sans</button>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="preview-content-wrapper" id="preview-wrapper">
                 <nav class="toc-sidebar" id="toc-sidebar">
@@ -76,7 +130,8 @@
     </div>
 </div>
 
-<!-- Help Panel -->
+<div class="toast" id="toast"></div>
+
 <div class="help-overlay" id="help-overlay" onclick="toggleHelp()"></div>
 <div class="help-panel" id="help-panel">
     <div class="help-panel-header">
@@ -88,619 +143,198 @@
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg>
         </button>
     </div>
-    <div class="help-panel-body">
-        <div class="help-section">
-            <h3>Headings</h3>
-            <div class="help-row"><code># Heading 1</code><span>H1</span></div>
-            <div class="help-row"><code>## Heading 2</code><span>H2</span></div>
-            <div class="help-row"><code>### Heading 3</code><span>H3</span></div>
-        </div>
-        <div class="help-section">
-            <h3>Emphasis</h3>
-            <div class="help-row"><code>**bold**</code><span><strong>bold</strong></span></div>
-            <div class="help-row"><code>*italic*</code><span><em>italic</em></span></div>
-            <div class="help-row"><code>~~strike~~</code><span><s>strike</s></span></div>
-            <div class="help-row"><code>==highlight==</code><span><mark>highlight</mark></span></div>
-        </div>
-        <div class="help-section">
-            <h3>Code</h3>
-            <div class="help-row"><code>`inline code`</code><span>inline</span></div>
-            <div class="help-row"><code>```js↵code↵```</code><span>fenced block</span></div>
-        </div>
-        <div class="help-section">
-            <h3>Lists</h3>
-            <div class="help-row"><code>- item</code><span>unordered</span></div>
-            <div class="help-row"><code>1. item</code><span>ordered</span></div>
-            <div class="help-row"><code>- [ ] task</code><span>checkbox</span></div>
-        </div>
-        <div class="help-section">
-            <h3>Links &amp; Images</h3>
-            <div class="help-row"><code>[text](url)</code><span>link</span></div>
-            <div class="help-row"><code>![alt](url)</code><span>image</span></div>
-        </div>
-        <div class="help-section">
-            <h3>Blocks</h3>
-            <div class="help-row"><code>&gt; quote</code><span>blockquote</span></div>
-            <div class="help-row"><code>---</code><span>divider</span></div>
-            <div class="help-row"><code>| A | B |↵|---|---|↵| 1 | 2 |</code><span>table</span></div>
-        </div>
-        <div class="help-section">
-            <h3>Math (KaTeX)</h3>
-            <div class="help-row"><code>$E = mc^2$</code><span>inline</span></div>
-            <div class="help-row"><code>$$↵\sum x↵$$</code><span>block</span></div>
-        </div>
-        <div class="help-section">
-            <h3>Callouts</h3>
-            <div class="help-row"><code>&gt; [!note] Title</code><span class="chip note">note</span></div>
-            <div class="help-row"><code>&gt; [!tip]</code><span class="chip tip">tip</span></div>
-            <div class="help-row"><code>&gt; [!warning]</code><span class="chip warning">warning</span></div>
-            <div class="help-row"><code>&gt; [!danger]</code><span class="chip danger">danger</span></div>
-            <div class="help-row muted">Also: info, important, success, question, failure, bug, error</div>
-            <div class="help-row muted">Add content as <code>&gt; text</code> on next lines</div>
-        </div>
-        <div class="help-section">
-            <h3>Keyboard Shortcuts</h3>
-            <div class="help-row"><kbd>Ctrl</kbd>+<kbd>S</kbd><span>Save</span></div>
-            <div class="help-row"><kbd>Ctrl</kbd>+<kbd>B</kbd><span>Bold</span></div>
-            <div class="help-row"><kbd>Ctrl</kbd>+<kbd>I</kbd><span>Italic</span></div>
-            <div class="help-row"><kbd>Ctrl</kbd>+<kbd>/</kbd><span>Toggle help</span></div>
-            <div class="help-row"><kbd>Tab</kbd><span>Indent (4 spaces)</span></div>
-            <div class="help-row"><kbd>Shift</kbd>+<kbd>Tab</kbd><span>Outdent</span></div>
-        </div>
-    </div>
+    <iframe id="help-iframe" src="/help.html" title="Markdown Reference"></iframe>
 </div>
-<!-- Floating help tab (always visible on right edge) -->
 <div class="help-tab" id="help-tab" onclick="toggleHelp()" title="Markdown reference (Ctrl+/)">
     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.756 2.756 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.195l-.006.004a6.24 6.24 0 0 0-.26.16.952.952 0 0 0-.276.245.75.75 0 0 1-1.248-.832c.184-.264.42-.489.692-.661.103-.067.207-.132.313-.195l.007-.004c.1-.061.182-.11.258-.161a.969.969 0 0 0 .277-.245C8.96 6.514 9 6.427 9 6.25a.612.612 0 0 0-.262-.525A1.27 1.27 0 0 0 8 5.5c-.369 0-.595.09-.74.187a1.01 1.01 0 0 0-.34.398ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>
 </div>
 
 <style>
-/* ── Reset main container for editor ── */
-main.container {
-    max-width: 100% !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: visible !important;
-}
+main.container { max-width:100%!important; width:100%!important; margin:0!important; padding:0!important; overflow:visible!important; }
 
-/* ── Editor page: fixed below navbar, fills rest of viewport ── */
 .editor-page {
-    position: fixed;
-    top: 64px;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    flex-direction: column;
-    padding: var(--spacing-xs) var(--spacing-lg) 0;
-    background: var(--bg-gradient);
-    background-attachment: fixed;
-    overflow: hidden;
-    z-index: 1;
+    position:fixed; top:64px; left:0; right:0; bottom:0;
+    display:flex; flex-direction:column;
+    padding:var(--spacing-xs) var(--spacing-lg) 0;
+    background:var(--bg-gradient); background-attachment:fixed;
+    overflow:hidden; z-index:1;
 }
+.editor-page .breadcrumb { margin-bottom:2px; padding:2px 0; flex-shrink:0; }
+.editor-header { display:flex; justify-content:space-between; align-items:center; padding:4px 0 6px; flex-shrink:0; }
+.editor-header h1 { display:flex; align-items:center; gap:var(--spacing-sm); font-size:1.1rem; font-weight:600; }
+.editor-actions { display:flex; align-items:center; gap:var(--spacing-sm); }
 
-/* Tighten breadcrumb inside editor */
-.editor-page .breadcrumb {
-    margin-bottom: 2px;
-    padding: 2px 0;
-    flex-shrink: 0;
-}
+.save-status { font-size:.8125rem; padding:var(--spacing-xs) var(--spacing-sm); border-radius:var(--radius-sm); display:inline-flex; align-items:center; gap:var(--spacing-xs); }
+.save-status.status-saved   { color:var(--success-color); }
+.save-status.status-unsaved { color:var(--warning-color); background:rgba(245,158,11,.1); }
+.save-status.status-saving  { color:var(--text-muted); }
+.save-status.status-error   { color:var(--danger-color); background:rgba(239,68,68,.1); }
 
-.editor-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px 0 6px;
-    flex-shrink: 0;
-}
+/* Action dropdowns */
+.act-dropdown { position:relative; }
+.act-dropdown-menu { display:none; position:absolute; top:calc(100% + 6px); right:0; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); box-shadow:0 8px 32px rgba(0,0,0,.35); z-index:400; min-width:170px; overflow:hidden; }
+.act-dropdown-menu.open { display:block; }
+.act-dropdown-item { display:flex; align-items:center; gap:8px; width:100%; padding:9px 14px; background:none; border:none; text-align:left; font-size:.82rem; color:var(--text-secondary); cursor:pointer; transition:background .1s,color .1s; }
+.act-dropdown-item:hover { background:var(--hover-bg); color:var(--text-color); }
 
-.editor-header h1 {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-size: 1.1rem;
-    font-weight: 600;
-}
+/* Panes */
+.editor-container { flex:1; display:flex; gap:var(--spacing-md); min-height:0; overflow:hidden; padding-bottom:var(--spacing-sm); }
+.editor-pane,.preview-pane { flex:1; display:flex; flex-direction:column; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--card-shadow); min-width:0; }
+.editor-pane:focus-within { border-color:var(--primary-color); box-shadow:0 0 0 3px var(--input-focus-ring); }
+.pane-header { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:var(--divider); border-bottom:1px solid var(--border-color); font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); flex-shrink:0; }
+.pane-header > span { display:flex; align-items:center; gap:6px; }
 
-.editor-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
+/* Font selectors */
+.pane-font-selector { position:relative; }
+.pane-font-btn { display:flex; align-items:center; gap:4px; padding:3px 8px; background:transparent; border:1px solid var(--border-color); border-radius:var(--radius-sm); color:var(--text-muted); font-size:.7rem; font-weight:500; letter-spacing:0; text-transform:none; cursor:pointer; transition:background .12s,color .12s; }
+.pane-font-btn:hover { background:var(--hover-bg); color:var(--text-color); }
+.pane-font-dropdown { display:none; position:absolute; top:calc(100% + 6px); right:0; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); box-shadow:0 8px 32px rgba(0,0,0,.35); z-index:300; min-width:170px; overflow:hidden; }
+.pane-font-dropdown.open { display:block; }
+.pane-font-item { display:block; width:100%; padding:8px 14px; background:none; border:none; text-align:left; font-size:.8rem; color:var(--text-secondary); cursor:pointer; transition:background .1s,color .1s; letter-spacing:0; text-transform:none; font-weight:400; }
+.pane-font-item:hover { background:var(--hover-bg); color:var(--text-color); }
+.pane-font-item.active { color:var(--primary-color); font-weight:500; }
 
-.save-status {
-    font-size: 0.8125rem;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border-radius: var(--radius-sm);
-    display: inline-flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-.save-status.status-saved   { color: var(--success-color); }
-.save-status.status-unsaved { color: var(--warning-color); background: rgba(245,158,11,.1); }
-.save-status.status-saving  { color: var(--text-muted); }
-.save-status.status-error   { color: var(--danger-color); background: rgba(239,68,68,.1); }
+/* Help panel */
+.help-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9998; backdrop-filter:blur(2px); }
+.help-overlay.open { display:block; }
+.help-panel { position:fixed; top:0; right:0; width:720px; max-width:95vw; height:100vh; background:var(--card-bg); border-left:1px solid var(--card-border); box-shadow:-4px 0 32px rgba(0,0,0,.4); z-index:9999; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .22s cubic-bezier(.4,0,.2,1); }
+.help-panel.open { transform:translateX(0); }
+.help-panel iframe { flex:1; border:none; width:100%; min-height:0; }
+.help-tab { position:fixed; right:0; top:50%; transform:translateY(-50%) translateX(0); background:var(--card-bg); border:1px solid var(--card-border); border-right:none; border-radius:var(--radius-sm) 0 0 var(--radius-sm); padding:10px 8px; cursor:pointer; z-index:9997; color:var(--text-muted); display:flex; align-items:center; justify-content:center; box-shadow:-2px 0 10px rgba(0,0,0,.15); transition:color .15s,background .15s,transform .22s cubic-bezier(.4,0,.2,1); }
+.help-tab:hover { color:var(--text-color); background:var(--hover-bg); }
+.help-tab.panel-open { transform:translateY(-50%) translateX(-720px); }
+.help-panel-header { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; background:var(--divider); border-bottom:1px solid var(--border-color); font-size:.8rem; font-weight:600; flex-shrink:0; }
+.help-panel-header > span { display:flex; align-items:center; gap:8px; color:var(--text-color); }
+.help-close-btn { display:flex; align-items:center; justify-content:center; width:28px; height:28px; background:transparent; border:none; border-radius:var(--radius-sm); color:var(--text-muted); cursor:pointer; }
+.help-close-btn:hover { background:var(--hover-bg); color:var(--text-color); }
 
-/* ── Split panes ──────────────────────────────────── */
-.editor-container {
-    flex: 1;
-    display: flex;
-    gap: var(--spacing-md);
-    min-height: 0;
-    overflow: hidden;
-    padding-bottom: var(--spacing-sm);
-}
+/* Toast */
+.toast { position:fixed; bottom:28px; left:50%; transform:translateX(-50%) translateY(16px); background:var(--card-bg); border:1px solid var(--card-border); color:var(--text-color); padding:10px 20px; border-radius:8px; font-size:.85rem; box-shadow:0 4px 20px rgba(0,0,0,.4); z-index:10000; opacity:0; pointer-events:none; white-space:nowrap; transition:opacity .2s,transform .2s; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
-.editor-pane,
-.preview-pane {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: var(--card-shadow);
-    min-width: 0;
-}
+/* Editor textarea */
+.editor-textarea { flex:1; width:100%; padding:24px 28px; background:var(--card-bg); color:var(--text-color); border:none; outline:none; resize:none; overflow-y:auto; font-family:var(--font-mono); font-size:13.5px; line-height:1.65; tab-size:4; }
+.editor-status-bar { display:flex; gap:16px; padding:4px 16px; background:var(--divider); border-top:1px solid var(--border-color); font-size:.7rem; color:var(--text-muted); flex-shrink:0; }
 
-.editor-pane:focus-within {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--input-focus-ring);
-}
+/* Preview */
+.preview-content-wrapper { display:flex; flex:1; overflow:hidden; min-height:0; }
+.toc-sidebar { width:210px; min-width:210px; background:var(--divider); border-right:1px solid var(--border-color); overflow-y:auto; padding:14px 0; flex-shrink:0; display:none; }
+.toc-sidebar.has-headings { display:block; }
+.toc-header { padding:0 14px 10px; font-size:.68rem; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); border-bottom:1px solid var(--border-color); margin-bottom:6px; }
+.toc-list { list-style:none; margin:0; padding:0; }
+.toc-list li { margin:0; }
+.toc-list a { display:block; padding:5px 14px; font-size:.78rem; color:var(--text-muted); text-decoration:none; border-left:2px solid transparent; transition:all .12s ease; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.toc-list a:hover  { color:var(--text-color); background:var(--hover-bg); }
+.toc-list a.active { color:var(--primary-color); border-left-color:var(--primary-color); background:var(--hover-bg); }
+.toc-list .toc-h1 { padding-left:14px; font-weight:600; }
+.toc-list .toc-h2 { padding-left:14px; font-weight:500; }
+.toc-list .toc-h3 { padding-left:26px; }
+.toc-list .toc-h4 { padding-left:38px; font-size:.72rem; }
+.toc-list .toc-h5 { padding-left:50px; font-size:.72rem; }
+.toc-list .toc-h6 { padding-left:62px; font-size:.72rem; }
+.preview-scroll { flex:1; overflow-y:auto; padding:24px 32px; min-width:0; }
 
-.pane-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 16px;
-    background: var(--divider);
-    border-bottom: 1px solid var(--border-color);
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-    flex-shrink: 0;
-}
+/* Viewer presence */
+.viewer-presence { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.viewer-chip { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:var(--primary-color); color:#fff; font-size:.65rem; font-weight:700; text-transform:uppercase; cursor:default; border:2px solid var(--card-bg); box-sizing:content-box; }
+.viewer-chip:nth-child(2) { background:#10b981; } .viewer-chip:nth-child(3) { background:#f59e0b; } .viewer-chip:nth-child(4) { background:#ef4444; } .viewer-chip:nth-child(5) { background:#8b5cf6; }
+.viewer-chip-more { font-size:.65rem; color:var(--text-muted); padding:0 4px; white-space:nowrap; }
 
-.pane-header span {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-/* ── Help panel ──────────────────────────────────── */
-.help-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    z-index: 9998;
-    backdrop-filter: blur(2px);
-}
-.help-overlay.open { display: block; }
-
-.help-panel {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 360px;
-    max-width: 100vw;
-    height: 100vh;
-    background: var(--card-bg);
-    border-left: 1px solid var(--card-border);
-    box-shadow: -4px 0 32px rgba(0,0,0,0.4);
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    transform: translateX(100%);
-    transition: transform 0.22s cubic-bezier(0.4,0,0.2,1);
-}
-.help-panel.open { transform: translateX(0); }
-
-/* Floating help trigger tab on right edge */
-.help-tab {
-    position: fixed;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%) translateX(0);
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-right: none;
-    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-    padding: 10px 8px;
-    cursor: pointer;
-    z-index: 9997;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: -2px 0 10px rgba(0,0,0,0.15);
-    transition: color 0.15s, background 0.15s, transform 0.22s cubic-bezier(0.4,0,0.2,1);
-}
-.help-tab:hover { color: var(--text-color); background: var(--hover-bg); }
-.help-tab.panel-open { transform: translateY(-50%) translateX(-360px); }
-
-.help-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 18px;
-    background: var(--divider);
-    border-bottom: 1px solid var(--border-color);
-    font-size: 0.8rem;
-    font-weight: 600;
-    flex-shrink: 0;
-}
-.help-panel-header > span {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text-color);
-}
-.help-close-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--text-muted);
-    cursor: pointer;
-}
-.help-close-btn:hover { background: var(--hover-bg); color: var(--text-color); }
-
-.help-panel-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.help-section { margin-bottom: 16px; }
-.help-section h3 {
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-    margin: 0 0 8px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid var(--border-color);
-}
-.help-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    padding: 4px 0;
-    font-size: 0.79rem;
-}
-.help-row code {
-    font-family: var(--font-mono);
-    font-size: 0.74rem;
-    background: var(--divider);
-    padding: 2px 6px;
-    border-radius: 4px;
-    color: var(--text-color);
-    white-space: pre;
-    border: 1px solid var(--border-color);
-}
-.help-row > span { color: var(--text-secondary); font-size: 0.78rem; text-align: right; flex-shrink: 0; }
-.help-row kbd {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 6px;
-    background: var(--divider);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    color: var(--text-color);
-}
-.help-row.muted { color: var(--text-muted); font-size: 0.74rem; justify-content: flex-start; gap: 6px; }
-.help-row .chip {
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.72rem;
-    font-weight: 600;
-}
-.help-row .chip.note     { color: #3b82f6; background: rgba(59,130,246,.12); }
-.help-row .chip.tip      { color: #10b981; background: rgba(16,185,129,.12); }
-.help-row .chip.warning  { color: #f59e0b; background: rgba(245,158,11,.12); }
-.help-row .chip.danger   { color: #ef4444; background: rgba(239,68,68,.12); }
-
-/* ── Editor textarea ──────────────────────────────── */
-.editor-textarea {
-    flex: 1;
-    width: 100%;
-    padding: 24px 28px;
-    background: var(--card-bg);
-    color: var(--text-color);
-    border: none;
-    outline: none;
-    resize: none;
-    overflow-y: auto;
-    font-family: var(--font-mono);
-    font-size: 13.5px;
-    line-height: 1.65;
-    tab-size: 4;
-}
-
-.editor-status-bar {
-    display: flex;
-    gap: 16px;
-    padding: 4px 16px;
-    background: var(--divider);
-    border-top: 1px solid var(--border-color);
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    flex-shrink: 0;
-}
-
-/* ── Preview content wrapper with TOC ───────────────── */
-.preview-content-wrapper {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-    min-height: 0;
-}
-
-.toc-sidebar {
-    width: 210px;
-    min-width: 210px;
-    background: var(--divider);
-    border-right: 1px solid var(--border-color);
-    overflow-y: auto;
-    padding: 14px 0;
-    flex-shrink: 0;
-    display: none;
-}
-.toc-sidebar.has-headings { display: block; }
-
-.toc-header {
-    padding: 0 14px 10px;
-    font-size: 0.68rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-muted);
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: 6px;
-}
-
-.toc-list { list-style: none; margin: 0; padding: 0; }
-.toc-list li { margin: 0; }
-.toc-list a {
-    display: block;
-    padding: 5px 14px;
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    text-decoration: none;
-    border-left: 2px solid transparent;
-    transition: all 0.12s ease;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.toc-list a:hover  { color: var(--text-color); background: var(--hover-bg); }
-.toc-list a.active { color: var(--primary-color); border-left-color: var(--primary-color); background: var(--hover-bg); }
-
-.toc-list .toc-h1 { padding-left: 14px; font-weight: 600; }
-.toc-list .toc-h2 { padding-left: 14px; font-weight: 500; }
-.toc-list .toc-h3 { padding-left: 26px; }
-.toc-list .toc-h4 { padding-left: 38px; font-size: 0.72rem; }
-.toc-list .toc-h5 { padding-left: 50px; font-size: 0.72rem; }
-.toc-list .toc-h6 { padding-left: 62px; font-size: 0.72rem; }
-
-.preview-scroll {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px 32px;
-    min-width: 0;
-}
-
-/* ── Viewer presence ──────────────────────────────── */
-.viewer-presence {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-}
-
-.viewer-chip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: var(--primary-color);
-    color: #fff;
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    title: attr(data-username);
-    cursor: default;
-    border: 2px solid var(--card-bg);
-    box-sizing: content-box;
-}
-
-.viewer-chip:nth-child(2) { background: #10b981; }
-.viewer-chip:nth-child(3) { background: #f59e0b; }
-.viewer-chip:nth-child(4) { background: #ef4444; }
-.viewer-chip:nth-child(5) { background: #8b5cf6; }
-.viewer-chip-more {
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    padding: 0 4px;
-    white-space: nowrap;
-}
-
-/* ── Markdown body overrides ──────────────────────── */
-.preview-scroll.markdown-body {
-    background: transparent !important;
-    color: var(--text-color) !important;
-    font-family: var(--font-sans) !important;
-    font-size: 15px;
-    line-height: 1.7;
-}
-
-.markdown-body h1, .markdown-body h2, .markdown-body h3,
-.markdown-body h4, .markdown-body h5, .markdown-body h6 {
-    color: var(--text-color) !important;
-    border-bottom-color: var(--border-color) !important;
-}
-.markdown-body blockquote {
-    border-left-color: var(--border-color) !important;
-    color: var(--text-secondary) !important;
-}
-.markdown-body table tr { background: var(--card-bg) !important; border-top-color: var(--border-color) !important; }
-.markdown-body table tr:nth-child(2n) { background: var(--divider) !important; }
-.markdown-body table th, .markdown-body table td { border-color: var(--border-color) !important; }
-.markdown-body hr { background: var(--border-color) !important; }
-.markdown-body a { color: var(--primary-color) !important; }
-.markdown-body img { max-width: 100%; border-radius: 6px; border: 1px solid var(--border-color); }
+/* Markdown body overrides */
+.preview-scroll.markdown-body { background:transparent!important; color:var(--text-color)!important; font-family:var(--font-sans)!important; font-size:15px; line-height:1.7; }
+.markdown-body h1,.markdown-body h2,.markdown-body h3,.markdown-body h4,.markdown-body h5,.markdown-body h6 { color:var(--text-color)!important; border-bottom-color:var(--border-color)!important; }
+.markdown-body blockquote { border-left-color:var(--border-color)!important; color:var(--text-secondary)!important; }
+.markdown-body table tr { background:var(--card-bg)!important; border-top-color:var(--border-color)!important; }
+.markdown-body table tr:nth-child(2n) { background:var(--divider)!important; }
+.markdown-body table th,.markdown-body table td { border-color:var(--border-color)!important; }
+.markdown-body hr { background:var(--border-color)!important; }
+.markdown-body a { color:var(--primary-color)!important; }
+.markdown-body img { max-width:100%; border-radius:6px; border:1px solid var(--border-color); }
 
 /* Code blocks */
-.markdown-body pre {
-    position: relative;
-    background: var(--input-bg, #1e1e1e) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 8px !important;
-    padding: 0 !important;
-    overflow: hidden;
-    margin: 16px 0;
-}
+.markdown-body pre { position:relative; background:var(--input-bg,#1e1e1e)!important; border:1px solid var(--border-color)!important; border-radius:8px!important; padding:0!important; overflow:hidden; margin:16px 0; }
+.code-copy-btn { position:absolute; top:8px; right:8px; padding:3px 8px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:4px; color:var(--text-muted); font-size:11px; cursor:pointer; opacity:0; transition:opacity .15s; z-index:1; }
+.markdown-body pre:hover .code-copy-btn { opacity:1; }
+.code-copy-btn:hover { background:var(--border-color); color:var(--text-color); }
+.code-copy-btn.copied { color:var(--success-color); }
+.markdown-body pre code { display:block; padding:14px 16px!important; overflow-x:auto; background:transparent!important; font-size:13px; line-height:1.55; }
+.markdown-body code { background:var(--divider)!important; color:var(--text-color)!important; padding:2px 6px; border-radius:4px; font-size:.9em; }
+.code-line { display:block; }
+.line-number { display:inline-block; width:3em; padding-right:1em; text-align:right; color:var(--text-muted); user-select:none; opacity:.45; font-size:12px; }
+.line-content { display:inline; }
 
-.code-copy-btn {
-    position: absolute;
-    top: 8px; right: 8px;
-    padding: 3px 8px;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    color: var(--text-muted);
-    font-size: 11px;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-    z-index: 1;
-}
-.markdown-body pre:hover .code-copy-btn { opacity: 1; }
-.code-copy-btn:hover { background: var(--border-color); color: var(--text-color); }
-.code-copy-btn.copied { color: var(--success-color); }
+/* Mermaid */
+.mermaid { background:var(--divider); border-radius:8px; padding:16px; margin:16px 0; text-align:center; overflow-x:auto; }
+.mermaid-error { color:#ef4444; font-size:.8rem; padding:8px; text-align:center; }
 
-.markdown-body pre code {
-    display: block;
-    padding: 14px 16px !important;
-    overflow-x: auto;
-    background: transparent !important;
-    font-size: 13px;
-    line-height: 1.55;
-}
-
-.markdown-body code {
-    background: var(--divider) !important;
-    color: var(--text-color) !important;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.9em;
-}
-
-/* Line numbers */
-.code-line { display: block; }
-.line-number {
-    display: inline-block;
-    width: 3em;
-    padding-right: 1em;
-    text-align: right;
-    color: var(--text-muted);
-    user-select: none;
-    opacity: 0.45;
-    font-size: 12px;
-}
-.line-content { display: inline; }
+/* Plot containers */
+.plot-container { margin:16px 0; border-radius:8px; overflow:visible; }
+.plot-error { color:#ef4444; font-size:.82rem; padding:12px 16px; background:rgba(239,68,68,.1); border-radius:8px; margin:16px 0; border:1px solid rgba(239,68,68,.2); }
 
 /* Callouts */
-.callout {
-    padding: 12px 16px;
-    margin: 16px 0;
-    border-radius: 8px;
-    border-left: 4px solid;
-    background: var(--divider);
-}
-.callout-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 600;
-    margin-bottom: 8px;
-    font-size: 0.9rem;
-}
-.callout-title svg { width: 16px; height: 16px; flex-shrink: 0; }
-.callout-content p:last-child { margin-bottom: 0; }
+.callout { padding:12px 16px; margin:16px 0; border-radius:8px; border-left:4px solid; background:var(--divider); }
+.callout-title { display:flex; align-items:center; gap:8px; font-weight:600; margin-bottom:8px; font-size:.9rem; }
+.callout-title svg,.callout-title .callout-icon { width:16px; height:16px; flex-shrink:0; }
+.callout-content p:last-child { margin-bottom:0; }
+.callout-note,.callout-info     { border-left-color:#3b82f6; } .callout-note .callout-title,.callout-info .callout-title         { color:#3b82f6; }
+.callout-tip,.callout-success   { border-left-color:#10b981; } .callout-tip .callout-title,.callout-success .callout-title       { color:#10b981; }
+.callout-warning,.callout-question { border-left-color:#f59e0b; } .callout-warning .callout-title,.callout-question .callout-title { color:#f59e0b; }
+.callout-danger,.callout-error,.callout-bug,.callout-failure { border-left-color:#ef4444; }
+.callout-danger .callout-title,.callout-error .callout-title,.callout-bug .callout-title,.callout-failure .callout-title { color:#ef4444; }
+.callout-important,.callout-example { border-left-color:#8b5cf6; } .callout-important .callout-title,.callout-example .callout-title { color:#8b5cf6; }
+.callout-quote,.callout-abstract { border-left-color:#64748b; } .callout-quote .callout-title,.callout-abstract .callout-title { color:#94a3b8; }
 
-.callout-note    { border-left-color: #3b82f6; }
-.callout-note .callout-title    { color: #3b82f6; }
-.callout-tip     { border-left-color: #10b981; }
-.callout-tip .callout-title     { color: #10b981; }
-.callout-warning { border-left-color: #f59e0b; }
-.callout-warning .callout-title { color: #f59e0b; }
-.callout-danger, .callout-error { border-left-color: #ef4444; }
-.callout-danger .callout-title,
-.callout-error .callout-title   { color: #ef4444; }
-.callout-info    { border-left-color: #3b82f6; }
-.callout-info .callout-title    { color: #3b82f6; }
-.callout-important  { border-left-color: #8b5cf6; }
-.callout-important .callout-title { color: #8b5cf6; }
-.callout-success { border-left-color: #10b981; }
-.callout-success .callout-title { color: #10b981; }
-.callout-question { border-left-color: #f59e0b; }
-.callout-question .callout-title { color: #f59e0b; }
-.callout-bug, .callout-failure { border-left-color: #ef4444; }
-.callout-bug .callout-title,
-.callout-failure .callout-title { color: #ef4444; }
-
-/* Highlight/mark */
-mark {
-    background: rgba(245,158,11,.3);
-    color: var(--text-color);
-    padding: 1px 3px;
-    border-radius: 2px;
-}
+/* Highlights */
+mark { background:rgba(245,158,11,.3); color:var(--text-color); padding:1px 3px; border-radius:2px; }
 
 /* Math */
-.math-block  { margin: 20px 0; padding: 16px; text-align: center; overflow-x: auto; }
-.math-inline { display: inline; }
-.math-error  { color: #ef4444; font-family: var(--font-mono); font-size: 12px; }
-.katex-display { margin: 0 !important; }
+.math-block  { margin:20px 0; padding:16px; text-align:center; overflow-x:auto; }
+.math-inline { display:inline; }
+.math-error  { color:#ef4444; font-family:var(--font-mono); font-size:12px; }
+.katex-display { margin:0!important; }
 
 /* Task lists */
-.markdown-body .task-list-item { list-style-type: none; }
-.markdown-body .task-list-item input[type="checkbox"] { margin-right: 8px; accent-color: var(--primary-color); }
+.markdown-body .task-list-item { list-style-type:none; }
+.markdown-body .task-list-item input[type="checkbox"] { margin-right:8px; accent-color:var(--primary-color); }
 
-@media (max-width: 768px) {
-    .editor-container { flex-direction: column; }
-    .toc-sidebar { display: none !important; }
-    .editor-page { padding: var(--spacing-sm); }
+/* Content tabs */
+.tab-group { margin:16px 0; border:1px solid var(--border-color); border-radius:8px; overflow:hidden; }
+.tab-buttons { display:flex; background:var(--divider); border-bottom:1px solid var(--border-color); overflow-x:auto; }
+.tab-btn { padding:8px 16px; background:none; border:none; border-bottom:2px solid transparent; color:var(--text-muted); font-size:.82rem; font-weight:500; cursor:pointer; white-space:nowrap; transition:color .15s,border-color .15s; }
+.tab-btn:hover { color:var(--text-color); }
+.tab-btn.active { color:var(--primary-color); border-bottom-color:var(--primary-color); }
+.tab-content { display:none; padding:0; }
+.tab-content.active { display:block; }
+.tab-content > *:first-child { margin-top:0!important; }
+.tab-content > *:last-child  { margin-bottom:0!important; }
+.tab-content pre { border-radius:0!important; border:none!important; margin:0!important; }
+
+/* Keyboard keys */
+kbd { display:inline-flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:.75em; padding:2px 6px; background:var(--divider); border:1px solid var(--border-color); border-bottom-width:2px; border-radius:4px; color:var(--text-color); white-space:nowrap; }
+.kbd-combo { display:inline-flex; align-items:center; gap:2px; }
+.kbd-sep { color:var(--text-muted); font-size:.75em; padding:0 1px; }
+
+@media (max-width:768px) {
+    .editor-container { flex-direction:column; }
+    .toc-sidebar { display:none!important; }
+    .editor-page { padding:var(--spacing-sm); }
+    .act-dropdown-menu { right:auto; left:0; }
 }
 </style>
 
 <script>
-(function() {
+(function(){
 'use strict';
 
-const DOC_UUID = '{{document_uuid}}';
+const DOC_UUID     = '{{document_uuid}}';
+const DOC_NAME     = '{{document_name}}';
 const CURRENT_USER = '{{username}}';
 
-// ── DOM refs ───────────────────────────────────────────────────────────────
+/* ── Font maps ─────────────────────────────────────────────────── */
+const MONO_FONTS = { system:'', jetbrains:"'JetBrains Mono',monospace", fira:"'Fira Code',monospace", 'source-code':"'Source Code Pro',monospace", 'ibm-mono':"'IBM Plex Mono',monospace" };
+const SANS_FONTS = { system:'', inter:"'Inter',sans-serif", 'open-sans':"'Open Sans',sans-serif", nunito:"'Nunito',sans-serif", 'ibm-sans':"'IBM Plex Sans',sans-serif" };
+
+/* ── DOM refs ───────────────────────────────────────────────────── */
 const editorEl   = document.getElementById('editor');
 const previewEl  = document.getElementById('preview');
 const tocSidebar = document.getElementById('toc-sidebar');
@@ -711,81 +345,172 @@ const statusPos  = document.getElementById('status-pos');
 const statusChars= document.getElementById('status-chars');
 const statusWords= document.getElementById('status-words');
 const viewerEl   = document.getElementById('viewer-presence');
-const previewWrapper = document.getElementById('preview-wrapper');
+const toastEl    = document.getElementById('toast');
 
-// ── State ──────────────────────────────────────────────────────────────────
-let content        = '';
-let lastSaved      = '';
-let renderTimer    = null;
-let saveTimer      = null;
-let viewers        = [];
+/* ── State ──────────────────────────────────────────────────────── */
+let content       = '';
+let lastSaved     = '';
+let mermaidLoaded = false;
+let plotlyLoaded  = false;
+let toastTimer    = null;
 
-// ── Decode content from template ──────────────────────────────────────────
-function decodeContent(encoded) {
-    try { return JSON.parse('"' + encoded + '"'); } catch(e) { return encoded; }
+/* ── Toast ──────────────────────────────────────────────────────── */
+function showToast(msg, duration) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), duration || 2200);
 }
 
-// ── Markdown parsing helpers ───────────────────────────────────────────────
-function parseCallouts(src) {
-    const calloutIcons = {
-        note:'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>',
-        tip: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5c-2.363 0-4 1.69-4 3.75 0 .984.424 1.625.984 2.304l.214.253c.223.264.47.556.673.848.284.411.537.896.621 1.49a.75.75 0 0 1-1.484.211c-.04-.282-.163-.547-.37-.847a8.456 8.456 0 0 0-.542-.68c-.084-.1-.173-.205-.268-.32C3.201 7.75 2.5 6.766 2.5 5.25 2.5 2.31 4.863 0 8 0s5.5 2.31 5.5 5.25c0 1.516-.701 2.5-1.328 3.259-.095.115-.184.22-.268.319-.207.245-.383.453-.541.681-.208.3-.33.565-.37.847a.751.751 0 0 1-1.485-.212c.084-.593.337-1.078.621-1.489.203-.292.45-.584.673-.848.075-.088.147-.173.213-.253.561-.679.985-1.32.985-2.304 0-2.06-1.637-3.75-4-3.75ZM5.75 12h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM6 15.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z"/></svg>',
-        warning:'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>',
-        danger:'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.47.22A.749.749 0 0 1 5 0h6c.199 0 .389.079.53.22l4.25 4.25c.141.14.22.331.22.53v6a.749.749 0 0 1-.22.53l-4.25 4.25A.749.749 0 0 1 11 16H5a.749.749 0 0 1-.53-.22L.22 11.53A.749.749 0 0 1 0 11V5c0-.199.079-.389.22-.53Zm.84 1.28L1.5 5.31v5.38l3.81 3.81h5.38l3.81-3.81V5.31L10.69 1.5ZM8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>',
-        info:'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>',
-        important:'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-9.5a.25.25 0 0 0-.25-.25Zm7 2.25v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 9a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>',
-        success:'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg>',
-        question:'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.756 2.756 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.195l-.006.004a6.24 6.24 0 0 0-.26.16.952.952 0 0 0-.276.245.75.75 0 0 1-1.248-.832c.184-.264.42-.489.692-.661.103-.067.207-.132.313-.195l.007-.004c.1-.061.182-.11.258-.161a.969.969 0 0 0 .277-.245C8.96 6.514 9 6.427 9 6.25a.612.612 0 0 0-.262-.525A1.27 1.27 0 0 0 8 5.5c-.369 0-.595.09-.74.187a1.01 1.01 0 0 0-.34.398ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>',
-        failure:'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg>',
-        bug:'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.72.22a.749.749 0 0 1 1.06 0l.97.97.97-.97a.749.749 0 1 1 1.06 1.06l-.97.97.97.97a.749.749 0 0 1-1.06 1.06L6.75 3.28l-.97.97a.749.749 0 0 1-1.06-1.06l.97-.97-.97-.97a.749.749 0 0 1 0-1.06ZM3.5 8.5a.5.5 0 0 0-1 0v.25H1a.75.75 0 0 0 0 1.5h1.5v1H1a.75.75 0 0 0 0 1.5h1.62c.26 1.31 1.2 2.37 2.45 2.88L3.95 16h8.1l-1.12-.37c1.25-.51 2.19-1.57 2.45-2.88H15a.75.75 0 0 0 0-1.5h-1.5v-1H15a.75.75 0 0 0 0-1.5h-1.5V8.5a.5.5 0 0 0-1 0v.25H3.5V8.5Z"/></svg>',
-        error:'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.47.22A.749.749 0 0 1 5 0h6c.199 0 .389.079.53.22l4.25 4.25c.141.14.22.331.22.53v6a.749.749 0 0 1-.22.53l-4.25 4.25A.749.749 0 0 1 11 16H5a.749.749 0 0 1-.53-.22L.22 11.53A.749.749 0 0 1 0 11V5c0-.199.079-.389.22-.53Zm.84 1.28L1.5 5.31v5.38l3.81 3.81h5.38l3.81-3.81V5.31L10.69 1.5ZM8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>',
-    };
-    return src.replace(/^>\s*\[!(note|tip|warning|danger|error|info|important|success|question|failure|bug)\]([^\n]*)\n((?:>[^\n]*\n?)*)/gim,
+/* ── Content decode (server JSON-escapes into double-quoted string) */
+function decodeContent(s) {
+    try { return JSON.parse('"' + s + '"'); } catch(e) { return s; }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   MARKDOWN PRE-PROCESSING  (runs on raw source before marked.parse)
+   ───────────────────────────────────────────────────────────────── */
+
+/* protect code blocks, apply transform fn, restore */
+function protectCodeBlocks(src, fn) {
+    const saved = [];
+    const protected_ = src.replace(/```[\s\S]*?```|`[^`\n]+`/g, m => { saved.push(m); return '\x00BLOCK' + (saved.length-1) + '\x00'; });
+    const result = fn(protected_);
+    return result.replace(/\x00BLOCK(\d+)\x00/g, (_, i) => saved[+i]);
+}
+
+function preHighlights(src) {
+    return protectCodeBlocks(src, s => s.replace(/==([^=\n]+)==/g, '<mark>$1</mark>'));
+}
+
+function preMath(src) {
+    return protectCodeBlocks(src, s => {
+        s = s.replace(/\$\$([\s\S]+?)\$\$/g, (_, m) => `<div class="math-block" data-math="${encodeURIComponent(m.trim())}"></div>`);
+        s = s.replace(/(?<!\$)\$(?!\$)([^$\n]+?)(?<!\$)\$(?!\$)/g, (_, m) => `<span class="math-inline" data-math="${encodeURIComponent(m.trim())}"></span>`);
+        return s;
+    });
+}
+
+const CALLOUT_ICONS = {
+    note:     '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>',
+    tip:      '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5c-2.363 0-4 1.69-4 3.75 0 .984.424 1.625.984 2.304l.214.253c.223.264.47.556.673.848.284.411.537.896.621 1.49a.75.75 0 0 1-1.484.211c-.04-.282-.163-.547-.37-.847a8.456 8.456 0 0 0-.542-.68c-.084-.1-.173-.205-.268-.32C3.201 7.75 2.5 6.766 2.5 5.25 2.5 2.31 4.863 0 8 0s5.5 2.31 5.5 5.25c0 1.516-.701 2.5-1.328 3.259-.095.115-.184.22-.268.319-.207.245-.383.453-.541.681-.208.3-.33.565-.37.847a.751.751 0 0 1-1.485-.212c.084-.593.337-1.078.621-1.489.203-.292.45-.584.673-.848.075-.088.147-.173.213-.253.561-.679.985-1.32.985-2.304 0-2.06-1.637-3.75-4-3.75ZM5.75 12h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM6 15.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z"/></svg>',
+    warning:  '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>',
+    danger:   '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.47.22A.749.749 0 0 1 5 0h6c.199 0 .389.079.53.22l4.25 4.25c.141.14.22.331.22.53v6a.749.749 0 0 1-.22.53l-4.25 4.25A.749.749 0 0 1 11 16H5a.749.749 0 0 1-.53-.22L.22 11.53A.749.749 0 0 1 0 11V5c0-.199.079-.389.22-.53Zm.84 1.28L1.5 5.31v5.38l3.81 3.81h5.38l3.81-3.81V5.31L10.69 1.5ZM8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>',
+    error:    '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.47.22A.749.749 0 0 1 5 0h6c.199 0 .389.079.53.22l4.25 4.25c.141.14.22.331.22.53v6a.749.749 0 0 1-.22.53l-4.25 4.25A.749.749 0 0 1 11 16H5a.749.749 0 0 1-.53-.22L.22 11.53A.749.749 0 0 1 0 11V5c0-.199.079-.389.22-.53Zm.84 1.28L1.5 5.31v5.38l3.81 3.81h5.38l3.81-3.81V5.31L10.69 1.5ZM8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>',
+    info:     '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>',
+    important:'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-9.5a.25.25 0 0 0-.25-.25Zm7 2.25v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 9a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>',
+    success:  '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg>',
+    question: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.756 2.756 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.195l-.006.004a6.24 6.24 0 0 0-.26.16.952.952 0 0 0-.276.245.75.75 0 0 1-1.248-.832c.184-.264.42-.489.692-.661.103-.067.207-.132.313-.195l.007-.004c.1-.061.182-.11.258-.161a.969.969 0 0 0 .277-.245C8.96 6.514 9 6.427 9 6.25a.612.612 0 0 0-.262-.525A1.27 1.27 0 0 0 8 5.5c-.369 0-.595.09-.74.187a1.01 1.01 0 0 0-.34.398ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>',
+    failure:  '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg>',
+    bug:      '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.72.22a.749.749 0 0 1 1.06 0l.97.97.97-.97a.749.749 0 1 1 1.06 1.06l-.97.97.97.97a.749.749 0 0 1-1.06 1.06L6.75 3.28l-.97.97a.749.749 0 0 1-1.06-1.06l.97-.97-.97-.97a.749.749 0 0 1 0-1.06Z"/></svg>',
+    example:  '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>',
+    quote:    '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25v-8.5C0 2.784.784 2 1.75 2ZM1.5 12.251c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V5.809L8.38 9.397a.75.75 0 0 1-.76 0L1.5 5.809v6.442Zm13-8.181v-.32a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25v.32L8 7.88Z"/></svg>',
+    abstract: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>',
+};
+
+function preCallouts(src) {
+    // protect fenced code blocks so > inside them isn't treated as blockquote
+    return protectCodeBlocks(src, s => s.replace(/^>\s*\[!(note|tip|warning|danger|error|info|important|success|question|failure|bug|example|quote|abstract)\]([^\n]*)\n((?:>[^\n]*\n?)*)/gim,
         (_, type, title, body) => {
             const t = type.toLowerCase();
-            const icon = calloutIcons[t] || calloutIcons.note;
-            const label = title.trim() || (t.charAt(0).toUpperCase() + t.slice(1));
+            const icon = CALLOUT_ICONS[t] || CALLOUT_ICONS.note;
+            const label = title.trim().replace(/^["']|["']$/g, '') || (t.charAt(0).toUpperCase() + t.slice(1));
             const clean = body.split('\n').map(l => l.replace(/^>\s?/, '')).join('\n').trim();
-            return `<div class="callout callout-${t}"><div class="callout-title">${icon}${label}</div><div class="callout-content">\n\n${clean}\n\n</div></div>\n`;
+            return `<div class="callout callout-${t}"><div class="callout-title">${icon}${label}</div><div class="callout-content">\n\n${clean}\n\n</div></div>\n\n`;
+        }));
+}
+
+function preContentTabs(src) {
+    const lines = src.split('\n');
+    const out = [];
+    let i = 0;
+    while (i < lines.length) {
+        const m = lines[i].match(/^===\s*"([^"]+)"\s*$/);
+        if (m) {
+            const tabs = [];
+            while (i < lines.length) {
+                const tm = lines[i].match(/^===\s*"([^"]+)"\s*$/);
+                if (!tm && tabs.length > 0) {
+                    // non-tab line: check for indent (tab content) or empty
+                    if (lines[i].startsWith('    ') || lines[i].startsWith('\t') || lines[i] === '') {
+                        tabs[tabs.length-1].lines.push(lines[i].replace(/^    |\t/, ''));
+                        i++; continue;
+                    } else { break; }
+                }
+                if (tm) {
+                    tabs.push({ title: tm[1], lines: [] }); i++; continue;
+                }
+                break;
+            }
+            if (tabs.length > 0) {
+                const gid = 'tg-' + Math.random().toString(36).slice(2,8);
+                const btns = tabs.map((t,idx) => `<button class="tab-btn${idx===0?' active':''}" data-tab="${gid}-${idx}" onclick="activateTab('${gid}-${idx}')">${t.title}</button>`).join('');
+                const contents = tabs.map((t,idx) => `<div class="tab-content${idx===0?' active':''}" id="${gid}-${idx}">\n\n${t.lines.join('\n')}\n\n</div>`).join('\n');
+                out.push(`<div class="tab-group"><div class="tab-buttons">${btns}</div>${contents}</div>`);
+                continue;
+            }
+        }
+        out.push(lines[i]); i++;
+    }
+    return out.join('\n');
+}
+
+function preKeyboardKeys(src) {
+    return protectCodeBlocks(src, s => {
+        // ++Ctrl+C++ syntax
+        s = s.replace(/\+\+([^+\n][^+\n]*?)\+\+/g, (_, keys) => {
+            const parts = keys.split(/\+(?=[A-Z0-9])/);
+            if (parts.length === 1) return `<kbd>${parts[0]}</kbd>`;
+            return '<span class="kbd-combo">' + parts.map((p,i) => i===0 ? `<kbd>${p}</kbd>` : `<span class="kbd-sep">+</span><kbd>${p}</kbd>`).join('') + '</span>';
         });
+        // [[Cmd+S]] syntax
+        s = s.replace(/\[\[([^\]\n]+?)\]\]/g, (_, keys) => {
+            const parts = keys.split('+');
+            if (parts.length === 1) return `<kbd>${parts[0]}</kbd>`;
+            return '<span class="kbd-combo">' + parts.map((p,i) => i===0 ? `<kbd>${p}</kbd>` : `<span class="kbd-sep">+</span><kbd>${p}</kbd>`).join('') + '</span>';
+        });
+        return s;
+    });
 }
 
-function parseHighlights(src) {
-    const blocks = [];
-    src = src.replace(/```[\s\S]*?```|`[^`]+`/g, m => { blocks.push(m); return `\x00CB${blocks.length-1}\x00`; });
-    src = src.replace(/==([^=\n]+)==/g, '<mark>$1</mark>');
-    return src.replace(/\x00CB(\d+)\x00/g, (_, i) => blocks[+i]);
-}
+/* ─────────────────────────────────────────────────────────────────
+   MARKED SETUP
+   ───────────────────────────────────────────────────────────────── */
+function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-function parseMath(src) {
-    const blocks = [];
-    src = src.replace(/```[\s\S]*?```|`[^`]+`/g, m => { blocks.push(m); return `\x00CB${blocks.length-1}\x00`; });
-    src = src.replace(/\$\$([\s\S]+?)\$\$/g, (_, m) =>
-        `<div class="math-block" data-math="${encodeURIComponent(m.trim())}"></div>`);
-    src = src.replace(/(?<!\$)\$(?!\$)([^$\n]+?)(?<!\$)\$(?!\$)/g, (_, m) =>
-        `<span class="math-inline" data-math="${encodeURIComponent(m.trim())}"></span>`);
-    return src.replace(/\x00CB(\d+)\x00/g, (_, i) => blocks[+i]);
-}
-
-// ── Marked.js initialization ───────────────────────────────────────────────
 function initMarked() {
     if (typeof marked === 'undefined') return;
-    const hlFn = (typeof markedHighlight !== 'undefined')
-        ? (markedHighlight.markedHighlight || markedHighlight)
-        : null;
 
-    if (hlFn && typeof hljs !== 'undefined') {
+    // Register mermaid/plot as known languages so hljs doesn't warn
+    if (typeof hljs !== 'undefined') {
+        hljs.configure({ ignoreUnescapedHTML: true });
+        if (!hljs.getLanguage('mermaid')) hljs.registerLanguage('mermaid', () => ({ name:'mermaid', contains:[] }));
+        if (!hljs.getLanguage('plot'))    hljs.registerLanguage('plot',    () => ({ name:'plot',    contains:[] }));
+    }
+
+    if (typeof markedHighlight !== 'undefined' && typeof hljs !== 'undefined') {
+        const hlFn = markedHighlight.markedHighlight || markedHighlight;
         marked.use(hlFn({
             langPrefix: 'hljs language-',
             highlight(code, lang) {
-                if (!lang) return code;
-                const lines = code.split('\n');
-                return lines.map((line, i) =>
-                    `<span class="code-line"><span class="line-number">${i+1}</span><span class="line-content">${
-                        hljs.getLanguage(lang)
-                            ? hljs.highlight(line, {language: lang, ignoreIllegals: true}).value
-                            : line
-                    }</span></span>`
+                // mermaid/plot blocks: return raw code so postProcess() can handle them
+                if (lang === 'mermaid' || lang === 'plot') return code;
+
+                // Highlight whole block, then wrap each line
+                let highlighted;
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        highlighted = hljs.highlight(code, {language:lang, ignoreIllegals:true}).value;
+                    } catch { highlighted = escapeHtml(code); }
+                } else {
+                    highlighted = escapeHtml(code);
+                }
+
+                // Split into per-line spans for line numbers
+                const rawLines = code.split('\n');
+                const hlLines  = highlighted.split('\n');
+                return rawLines.map((_, idx) =>
+                    `<span class="code-line"><span class="line-number">${idx+1}</span><span class="line-content">${hlLines[idx]||''}</span></span>`
                 ).join('\n');
             }
         }));
@@ -793,321 +518,462 @@ function initMarked() {
     marked.setOptions({ breaks: true, gfm: true });
 }
 
-// ── Render markdown to preview ─────────────────────────────────────────────
-function render() {
-    if (typeof marked === 'undefined') return;
-    let src = editorEl.value;
-    src = parseMath(src);
-    src = parseCallouts(src);
-    src = parseHighlights(src);
+/* ─────────────────────────────────────────────────────────────────
+   POST-PROCESSING (on the temp DOM node before morphdom)
+   ───────────────────────────────────────────────────────────────── */
+function postProcess(container) {
+    // 1. Convert mermaid pre>code blocks → .mermaid divs
+    container.querySelectorAll('pre code.language-mermaid').forEach(code => {
+        const src = code.textContent.trim();
+        const div = document.createElement('div');
+        div.className = 'mermaid';
+        div.setAttribute('data-source', src);
+        div.textContent = src;
+        code.parentElement.replaceWith(div);
+    });
 
-    const newDiv = document.createElement('div');
-    newDiv.innerHTML = marked.parse(src);
+    // 2. Convert plot pre>code blocks → .plot-container divs
+    container.querySelectorAll('pre code.language-plot').forEach(code => {
+        const src = code.textContent.trim();
+        const div = document.createElement('div');
+        div.className = 'plot-container';
+        div.setAttribute('data-source', src);
+        code.parentElement.replaceWith(div);
+    });
 
-    // Add copy buttons to code blocks
-    newDiv.querySelectorAll('pre').forEach(pre => {
+    // 3. Add copy buttons to remaining code blocks
+    container.querySelectorAll('pre').forEach(pre => {
         const btn = document.createElement('button');
         btn.className = 'code-copy-btn';
         btn.textContent = 'Copy';
-        btn.addEventListener('click', function() {
-            const code = pre.querySelector('code');
-            if (!code) return;
-            const text = Array.from(code.querySelectorAll('.line-content')).map(el => el.textContent).join('\n')
-                         || code.textContent;
+        btn.addEventListener('click', () => {
+            const codeEl = pre.querySelector('code');
+            if (!codeEl) return;
+            const lc = codeEl.querySelectorAll('.line-content');
+            const text = lc.length > 0 ? Array.from(lc).map(e => e.textContent).join('\n') : codeEl.textContent;
             navigator.clipboard.writeText(text).then(() => {
-                btn.textContent = 'Copied!';
-                btn.classList.add('copied');
+                btn.textContent = 'Copied!'; btn.classList.add('copied');
                 setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
             });
         });
         pre.appendChild(btn);
     });
-
-    // Patch DOM efficiently
-    if (typeof morphdom !== 'undefined') {
-        morphdom(previewEl, newDiv, {
-            childrenOnly: true,
-            onBeforeElUpdated(from, to) {
-                return !from.isEqualNode(to);
-            }
-        });
-    } else {
-        previewEl.innerHTML = newDiv.innerHTML;
-    }
-
-    renderMath();
-    updateTOC();
 }
 
-// ── Math rendering ─────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────
+   RENDER
+   ───────────────────────────────────────────────────────────────── */
+function render() {
+    if (typeof marked === 'undefined') return;
+    try {
+        let src = editorEl.value;
+        src = preMath(src);
+        src = preCallouts(src);
+        src = preContentTabs(src);
+        src = preKeyboardKeys(src);
+        src = preHighlights(src);
+
+        const tmpDiv = document.createElement('div');
+        tmpDiv.innerHTML = marked.parse(src);
+        postProcess(tmpDiv);
+
+        if (typeof morphdom !== 'undefined') {
+            morphdom(previewEl, tmpDiv, {
+                childrenOnly: true,
+                onBeforeElUpdated(f, t) {
+                    // Clear hljs-processed flag so morphdom can update code blocks
+                    if (f.dataset && f.dataset.highlighted) delete f.dataset.highlighted;
+                    return !f.isEqualNode(t);
+                }
+            });
+        } else {
+            previewEl.innerHTML = tmpDiv.innerHTML;
+        }
+
+        renderMath();
+        renderMermaid();
+        renderPlots();
+        updateTOC();
+    } catch(e) {
+        console.error('render() error:', e);
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   MATH
+   ───────────────────────────────────────────────────────────────── */
 function renderMath() {
     if (typeof katex === 'undefined') return;
     previewEl.querySelectorAll('.math-block:not([data-rendered])').forEach(el => {
-        try {
-            katex.render(decodeURIComponent(el.dataset.math), el, {displayMode:true, throwOnError:false});
-            el.dataset.rendered = '1';
-        } catch(e) { el.innerHTML = `<span class="math-error">${e.message}</span>`; }
+        try { katex.render(decodeURIComponent(el.dataset.math), el, {displayMode:true, throwOnError:false}); el.dataset.rendered='1'; }
+        catch(e) { el.innerHTML = `<span class="math-error">${e.message}</span>`; }
     });
     previewEl.querySelectorAll('.math-inline:not([data-rendered])').forEach(el => {
-        try {
-            katex.render(decodeURIComponent(el.dataset.math), el, {displayMode:false, throwOnError:false});
-            el.dataset.rendered = '1';
-        } catch(e) { el.innerHTML = `<span class="math-error">${e.message}</span>`; }
+        try { katex.render(decodeURIComponent(el.dataset.math), el, {displayMode:false, throwOnError:false}); el.dataset.rendered='1'; }
+        catch(e) { el.innerHTML = `<span class="math-error">${e.message}</span>`; }
     });
 }
 
-// ── Table of Contents ──────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────
+   MERMAID (lazy-loaded)
+   ───────────────────────────────────────────────────────────────── */
+async function renderMermaid() {
+    const divs = previewEl.querySelectorAll('.mermaid:not([data-processed])');
+    if (!divs.length) return;
+    if (!mermaidLoaded) {
+        try {
+            const m = await import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs');
+            window._mermaid = m.default;
+            window._mermaid.initialize({ startOnLoad:false, theme:'dark', securityLevel:'loose' });
+            mermaidLoaded = true;
+        } catch(e) { console.warn('Mermaid load failed', e); return; }
+    }
+    for (const div of divs) {
+        const src = div.getAttribute('data-source') || div.textContent.trim();
+        div.setAttribute('data-processed', '1');
+        try {
+            const id = 'md-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+            const { svg } = await window._mermaid.render(id, src);
+            div.innerHTML = svg;
+        } catch(e) {
+            div.innerHTML = `<div class="mermaid-error">Mermaid error: ${e.message}</div>`;
+        }
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   PLOTS (Plotly.js lazy-loaded)
+   ───────────────────────────────────────────────────────────────── */
+async function loadPlotly() {
+    if (plotlyLoaded || typeof Plotly !== 'undefined') { plotlyLoaded=true; return; }
+    await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.plot.ly/plotly-2.27.0.min.js';
+        s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+    });
+    plotlyLoaded = true;
+}
+
+const PlotHelpers = {
+    sin:Math.sin, cos:Math.cos, tan:Math.tan, asin:Math.asin, acos:Math.acos, atan:Math.atan, atan2:Math.atan2,
+    sinh:Math.sinh, cosh:Math.cosh, tanh:Math.tanh,
+    sqrt:Math.sqrt, abs:Math.abs, exp:Math.exp, log:Math.log, log10:Math.log10, log2:Math.log2,
+    pow:Math.pow, floor:Math.floor, ceil:Math.ceil, round:Math.round,
+    min:Math.min, max:Math.max, sign:Math.sign, random:Math.random,
+    PI:Math.PI, E:Math.E,
+    range(start, end, step=1) { const a=[]; for(let i=start;i<=end;i+=step) a.push(i); return a; },
+    linspace(start, end, n=50) { const a=[],s=(end-start)/(n-1); for(let i=0;i<n;i++) a.push(start+i*s); return a; },
+    meshgrid(x,y) { const X=[],Y=[]; for(let j=0;j<y.length;j++){X.push([...x]);Y.push(Array(x.length).fill(y[j]));} return{X,Y}; },
+
+    // 2D helpers
+    line(fn, xRange=[-10,10], opts={}) {
+        const x=PlotHelpers.linspace(xRange[0],xRange[1],opts.resolution||200);
+        return {type:'scatter',mode:'lines',x,y:x.map(v=>{try{const r=fn(v);return isFinite(r)?r:null;}catch{return null;}}),name:opts.name||'',line:{color:opts.color,width:opts.width||2}};
+    },
+    scatter(pts,opts={}) { return {type:'scatter',mode:opts.mode||'markers',x:pts.map(p=>p[0]),y:pts.map(p=>p[1]),name:opts.name||'',marker:{size:opts.size||8,color:opts.color||'#58a6ff'}}; },
+    polyline(pts,opts={}) { return {type:'scatter',mode:'lines',x:pts.map(p=>p[0]),y:pts.map(p=>p[1]),name:opts.name||'',line:{color:opts.color,width:opts.width||2}}; },
+    bar(labels,values,opts={}) { return {type:'bar',x:labels,y:values,name:opts.name||'',marker:{color:opts.color||'#58a6ff'}}; },
+    parametric2d(fx,fy,tRange=[0,2*Math.PI],steps=200,opts={}) { const t=PlotHelpers.linspace(tRange[0],tRange[1],steps); return {type:'scatter',mode:'lines',x:t.map(fx),y:t.map(fy),name:opts.name||'',line:{color:opts.color,width:opts.width||2}}; },
+    circle(r=1,c=[0,0],opts={}) { const t=PlotHelpers.linspace(0,2*Math.PI,opts.resolution||100); return {type:'scatter',mode:'lines',x:t.map(a=>c[0]+r*Math.cos(a)),y:t.map(a=>c[1]+r*Math.sin(a)),name:opts.name||'',fill:opts.fill?'toself':undefined,line:{color:opts.color,width:opts.width||2}}; },
+    ellipse(a=2,b=1,c=[0,0],opts={}) { const t=PlotHelpers.linspace(0,2*Math.PI,opts.resolution||100); return {type:'scatter',mode:'lines',x:t.map(ang=>c[0]+a*Math.cos(ang)),y:t.map(ang=>c[1]+b*Math.sin(ang)),name:opts.name||'',fill:opts.fill?'toself':undefined,line:{color:opts.color,width:opts.width||2}}; },
+    arc(r=1,sa=0,ea=Math.PI,c=[0,0],opts={}) { const t=PlotHelpers.linspace(sa,ea,opts.resolution||50); return {type:'scatter',mode:'lines',x:t.map(a=>c[0]+r*Math.cos(a)),y:t.map(a=>c[1]+r*Math.sin(a)),name:opts.name||'',line:{color:opts.color,width:opts.width||2}}; },
+    rect(w=2,h=1,c=[0,0],opts={}) { const [cx,cy]=[c[0],c[1]],hw=w/2,hh=h/2; return {type:'scatter',mode:'lines',x:[cx-hw,cx+hw,cx+hw,cx-hw,cx-hw],y:[cy-hh,cy-hh,cy+hh,cy+hh,cy-hh],name:opts.name||'',fill:opts.fill?'toself':undefined,line:{color:opts.color,width:opts.width||2}}; },
+    polygon(verts,opts={}) { const cl=[...verts,verts[0]]; return {type:'scatter',mode:'lines',x:cl.map(v=>v[0]),y:cl.map(v=>v[1]),name:opts.name||'',fill:opts.fill?'toself':undefined,line:{color:opts.color,width:opts.width||2}}; },
+    arrow(s=[0,0],e=[1,1],opts={}) { const [x0,y0]=s,[x1,y1]=e,hs=opts.headSize||0.1,dx=x1-x0,dy=y1-y0,l=Math.sqrt(dx*dx+dy*dy),ux=dx/l,uy=dy/l; return {type:'scatter',mode:'lines',x:[x0,x1,null,x1,x1-hs*(ux+uy*.5),null,x1,x1-hs*(ux-uy*.5)],y:[y0,y1,null,y1,y1-hs*(uy-ux*.5),null,y1,y1-hs*(uy+ux*.5)],name:opts.name||'',line:{color:opts.color||'#f78166',width:opts.width||2}}; },
+    pie(labels,values,opts={}) { return {type:'pie',labels,values,name:opts.name||'',hole:opts.hole||0}; },
+    heatmap(z,opts={}) { return {type:'heatmap',z,x:opts.x,y:opts.y,colorscale:opts.colorscale||'Viridis',showscale:opts.showscale!==false}; },
+
+    // 3D helpers
+    surface(fn,xR=[-5,5],yR=[-5,5],res=50,opts={}) {
+        const x=PlotHelpers.linspace(xR[0],xR[1],res),y=PlotHelpers.linspace(yR[0],yR[1],res),z=[];
+        for(let j=0;j<y.length;j++){const row=[];for(let i=0;i<x.length;i++){try{const v=fn(x[i],y[j]);row.push(isFinite(v)?v:null);}catch{row.push(null);}}z.push(row);}
+        return {type:'surface',x,y,z,colorscale:opts.colorscale||'Viridis',opacity:opts.opacity||1,showscale:opts.showscale!==false};
+    },
+    parametric(fx,fy,fz,tR=[0,2*Math.PI],steps=200,opts={}) { const t=PlotHelpers.linspace(tR[0],tR[1],steps); return {type:'scatter3d',mode:'lines',x:t.map(fx),y:t.map(fy),z:t.map(fz),name:opts.name||'',line:{width:opts.width||3,color:opts.color||'#f78166'}}; },
+    parametricSurface(fx,fy,fz,uR=[0,2*Math.PI],vR=[0,Math.PI],res=30,opts={}) {
+        const u=PlotHelpers.linspace(uR[0],uR[1],res),v=PlotHelpers.linspace(vR[0],vR[1],res),x=[],y=[],z=[];
+        for(let j=0;j<v.length;j++){const xr=[],yr=[],zr=[];for(let i=0;i<u.length;i++){try{xr.push(fx(u[i],v[j]));yr.push(fy(u[i],v[j]));zr.push(fz(u[i],v[j]));}catch{xr.push(null);yr.push(null);zr.push(null);}}x.push(xr);y.push(yr);z.push(zr);}
+        return {type:'surface',x,y,z,colorscale:opts.colorscale||'Viridis',opacity:opts.opacity||1,showscale:opts.showscale!==false};
+    },
+    sphere(r=1,c=[0,0,0],opts={}) { return PlotHelpers.parametricSurface((u,v)=>c[0]+r*Math.sin(v)*Math.cos(u),(u,v)=>c[1]+r*Math.sin(v)*Math.sin(u),(u,v)=>c[2]+r*Math.cos(v),[0,2*Math.PI],[0,Math.PI],opts.resolution||30,{colorscale:opts.colorscale||[[0,opts.color||'#1e90ff'],[1,opts.color||'#1e90ff']],opacity:opts.opacity||0.8,showscale:false}); },
+    cylinder(r=1,h=2,c=[0,0,0],opts={}) {
+        const res=opts.resolution||30,u=PlotHelpers.linspace(0,2*Math.PI,res),v=PlotHelpers.linspace(-h/2,h/2,res),x=[],y=[],z=[];
+        for(let j=0;j<v.length;j++){const xr=[],yr=[],zr=[];for(let i=0;i<u.length;i++){xr.push(c[0]+r*Math.cos(u[i]));yr.push(c[1]+r*Math.sin(u[i]));zr.push(c[2]+v[j]);}x.push(xr);y.push(yr);z.push(zr);}
+        return {type:'surface',x,y,z,colorscale:opts.colorscale||[[0,opts.color||'#2ecc71'],[1,opts.color||'#2ecc71']],opacity:opts.opacity||0.8,showscale:false};
+    },
+    cone(r=1,h=2,c=[0,0,0],opts={}) {
+        const res=opts.resolution||30,u=PlotHelpers.linspace(0,2*Math.PI,res),v=PlotHelpers.linspace(0,1,res),x=[],y=[],z=[];
+        for(let j=0;j<v.length;j++){const rr=r*(1-v[j]),xr=[],yr=[],zr=[];for(let i=0;i<u.length;i++){xr.push(c[0]+rr*Math.cos(u[i]));yr.push(c[1]+rr*Math.sin(u[i]));zr.push(c[2]+v[j]*h);}x.push(xr);y.push(yr);z.push(zr);}
+        return {type:'surface',x,y,z,colorscale:opts.colorscale||[[0,opts.color||'#e74c3c'],[1,opts.color||'#e74c3c']],opacity:opts.opacity||0.8,showscale:false};
+    },
+    box(w=1,h=1,d=1,c=[0,0,0],opts={}) {
+        const [cx,cy,cz]=c,hw=w/2,hh=h/2,hd=d/2,verts=[[cx-hw,cy-hh,cz-hd],[cx+hw,cy-hh,cz-hd],[cx+hw,cy+hh,cz-hd],[cx-hw,cy+hh,cz-hd],[cx-hw,cy-hh,cz+hd],[cx+hw,cy-hh,cz+hd],[cx+hw,cy+hh,cz+hd],[cx-hw,cy+hh,cz+hd]];
+        return {type:'mesh3d',x:verts.map(v=>v[0]),y:verts.map(v=>v[1]),z:verts.map(v=>v[2]),i:[0,0,4,4,0,0,1,1,0,0,3,3],j:[1,2,5,6,1,4,2,5,3,4,2,6],k:[2,3,6,7,4,5,5,6,4,7,6,7],color:opts.color||'#9b59b6',opacity:opts.opacity||0.8};
+    },
+    torus(R=2,r=0.5,c=[0,0,0],opts={}) { return PlotHelpers.parametricSurface((u,v)=>c[0]+(R+r*Math.cos(v))*Math.cos(u),(u,v)=>c[1]+(R+r*Math.cos(v))*Math.sin(u),(u,v)=>c[2]+r*Math.sin(v),[0,2*Math.PI],[0,2*Math.PI],opts.resolution||30,{colorscale:opts.colorscale||'Viridis',opacity:opts.opacity||0.8,showscale:false}); },
+    plane(w=4,h=4,c=[0,0,0],n=[0,0,1],opts={}) { const [cx,cy,cz]=c,hw=w/2,hh=h/2; return {type:'surface',x:[[cx-hw,cx+hw],[cx-hw,cx+hw]],y:[[cy-hh,cy-hh],[cy+hh,cy+hh]],z:[[cz,cz],[cz,cz]],colorscale:[[0,opts.color||'#3498db'],[1,opts.color||'#3498db']],opacity:opts.opacity||0.5,showscale:false}; },
+    scatter3d(pts,opts={}) { return {type:'scatter3d',mode:opts.mode||'markers',x:pts.map(p=>p[0]),y:pts.map(p=>p[1]),z:pts.map(p=>p[2]),name:opts.name||'',marker:{size:opts.size||5,color:opts.color||'#58a6ff'}}; },
+    line3d(pts,opts={}) { return {type:'scatter3d',mode:'lines',x:pts.map(p=>p[0]),y:pts.map(p=>p[1]),z:pts.map(p=>p[2]),name:opts.name||'',line:{width:opts.width||3,color:opts.color||'#f78166'}}; },
+    arrow3d(s,e,opts={}) { return {type:'scatter3d',mode:'lines',x:[s[0],e[0]],y:[s[1],e[1]],z:[s[2],e[2]],name:opts.name||'',line:{width:opts.width||4,color:opts.color||'#f78166'}}; },
+    helix(r=1,pitch=.5,turns=3,c=[0,0,0],opts={}) { const t=PlotHelpers.linspace(0,turns*2*Math.PI,opts.resolution||200); return {type:'scatter3d',mode:'lines',x:t.map(a=>c[0]+r*Math.cos(a)),y:t.map(a=>c[1]+r*Math.sin(a)),z:t.map(a=>c[2]+pitch*a/(2*Math.PI)),name:opts.name||'',line:{width:opts.width||3,color:opts.color||'#f78166'}}; },
+};
+
+function executePlotScript(source) {
+    if (!source) throw new Error('No plot code provided');
+    let code = source.replace(/`+/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").trim();
+    code = code + '\nif(typeof traces!=="undefined")return{traces:Array.isArray(traces)?traces:[traces]};\nif(typeof data!=="undefined")return{traces:Array.isArray(data)?data:[data]};';
+    const keys = Object.keys(PlotHelpers), vals = Object.values(PlotHelpers);
+    const fn = new Function(...keys, code);
+    const res = fn(...vals);
+    let traces, userLayout={};
+    if(Array.isArray(res)) { traces=res; }
+    else if(res&&res.traces) { traces=Array.isArray(res.traces)?res.traces:[res.traces]; userLayout=res.layout||{}; }
+    else if(res&&res.type) { traces=[res]; }
+    else throw new Error('Set traces = [...] with Plotly trace objects');
+    const is3d = traces.some(t=>t.type==='surface'||t.type==='scatter3d'||t.type==='mesh3d');
+    return {traces,layout:userLayout,is3d};
+}
+
+let plotIdx = 0;
+async function renderPlots() {
+    const divs = Array.from(previewEl.querySelectorAll('.plot-container:not([data-processed])'));
+    if (!divs.length) return;
+    try { await loadPlotly(); } catch(e) { divs.forEach(d=>{ d.innerHTML='<div class="plot-error">Failed to load Plotly</div>'; d.setAttribute('data-processed','1'); }); return; }
+    const styles = getComputedStyle(document.documentElement);
+    const bg   = styles.getPropertyValue('--card-bg').trim() || '#161b22';
+    const text = styles.getPropertyValue('--text-color').trim() || '#e6edf3';
+    const grid = styles.getPropertyValue('--border-color').trim() || '#30363d';
+    const is3dTest = /surface|sphere|cylinder|cone|box|torus|plane|scatter3d|line3d|arrow3d|helix|parametric\s*\(|parametricSurface/;
+    divs.filter(d=>!is3dTest.test(d.getAttribute('data-source')||'')).forEach(d=>renderSinglePlot(d,bg,text,grid));
+    divs.filter(d=> is3dTest.test(d.getAttribute('data-source')||'')).forEach((d,i)=>setTimeout(()=>renderSinglePlot(d,bg,text,grid),i*120));
+}
+
+function renderSinglePlot(div, bg, text, grid) {
+    const source = div.getAttribute('data-source') || '';
+    div.setAttribute('data-processed','1');
+    try {
+        const {traces,layout:ul,is3d} = executePlotScript(source);
+        if(!traces||!traces.length) throw new Error('No traces');
+        const pid = 'plot-' + (++plotIdx) + '-' + Date.now();
+        const plotH = is3d ? 420 : 360;
+        // Set explicit height on container so Plotly has a stable size to measure
+        div.style.height = plotH + 'px';
+        div.innerHTML = `<div id="${pid}" style="width:100%;height:100%"></div>`;
+        const layout = is3d ? {
+            paper_bgcolor:bg, plot_bgcolor:bg, font:{color:text},
+            autosize:true, height:plotH,
+            margin:{l:0,r:0,t:ul.title?40:10,b:0},
+            scene:{aspectmode:'cube',xaxis:{gridcolor:grid,backgroundcolor:bg},yaxis:{gridcolor:grid,backgroundcolor:bg},zaxis:{gridcolor:grid,backgroundcolor:bg},bgcolor:bg,camera:{eye:{x:1.5,y:1.5,z:1.2}}},
+            showlegend:traces.length>1, ...ul
+        } : {
+            paper_bgcolor:bg, plot_bgcolor:bg, font:{color:text},
+            autosize:true, height:plotH,
+            margin:{l:50,r:20,t:ul.title?40:20,b:40},
+            xaxis:{gridcolor:grid,zerolinecolor:grid}, yaxis:{gridcolor:grid,zerolinecolor:grid},
+            showlegend:traces.length>1, ...ul
+        };
+        Plotly.newPlot(pid, traces, layout, {responsive:false, displayModeBar:true, displaylogo:false});
+        // Resize after layout settles to correct any initial measurement errors
+        requestAnimationFrame(() => { try { Plotly.Plots.resize(pid); } catch{} });
+        setTimeout(() => { try { Plotly.Plots.resize(pid); } catch{} }, 250);
+    } catch(e) {
+        div.innerHTML = `<div class="plot-error"><strong>Plot error:</strong> ${e.message}<br><small>Example: traces = [line(x => sin(x), [-10,10])]</small></div>`;
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   TOC
+   ───────────────────────────────────────────────────────────────── */
 let headingCounter = 0;
 function updateTOC() {
     const headings = previewEl.querySelectorAll('h1,h2,h3,h4,h5,h6');
     tocList.innerHTML = '';
-    if (headings.length === 0) {
-        tocSidebar.classList.remove('has-headings');
-        return;
-    }
+    if (!headings.length) { tocSidebar.classList.remove('has-headings'); return; }
     headingCounter = 0;
     headings.forEach(h => {
-        if (!h.id) {
-            const slug = h.textContent.trim().toLowerCase().replace(/[^\w\s-]/g,'').replace(/\s+/g,'-');
-            h.id = `h-${slug}-${headingCounter++}`;
-        }
-        const li = document.createElement('li');
-        const a  = document.createElement('a');
-        a.href = '#' + h.id;
-        a.textContent = h.textContent;
-        a.className = 'toc-' + h.tagName.toLowerCase();
-        a.addEventListener('click', e => {
-            e.preventDefault();
-            h.scrollIntoView({behavior:'smooth', block:'start'});
-            tocList.querySelectorAll('a').forEach(l => l.classList.remove('active'));
-            a.classList.add('active');
-        });
-        li.appendChild(a);
-        tocList.appendChild(li);
+        if (!h.id) { const sl = h.textContent.trim().toLowerCase().replace(/[^\w\s-]/g,'').replace(/\s+/g,'-'); h.id = `h-${sl}-${headingCounter++}`; }
+        const li = document.createElement('li'), a = document.createElement('a');
+        a.href='#'+h.id; a.textContent=h.textContent; a.className='toc-'+h.tagName.toLowerCase();
+        a.addEventListener('click', e => { e.preventDefault(); h.scrollIntoView({behavior:'smooth',block:'start'}); tocList.querySelectorAll('a').forEach(l=>l.classList.remove('active')); a.classList.add('active'); });
+        li.appendChild(a); tocList.appendChild(li);
     });
     tocSidebar.classList.add('has-headings');
-    setupTOCScrollSpy();
-}
-
-function setupTOCScrollSpy() {
     previewEl.removeEventListener('scroll', onPreviewScroll);
     previewEl.addEventListener('scroll', onPreviewScroll);
 }
 function onPreviewScroll() {
     const headings = previewEl.querySelectorAll('h1,h2,h3,h4,h5,h6');
     let active = null;
-    headings.forEach(h => {
-        const rect = h.getBoundingClientRect();
-        const preRect = previewEl.getBoundingClientRect();
-        if (rect.top - preRect.top <= 80) active = h;
-    });
-    tocList.querySelectorAll('a').forEach(a => {
-        a.classList.toggle('active', active && a.getAttribute('href') === '#' + active.id);
-    });
+    const r = previewEl.getBoundingClientRect();
+    headings.forEach(h => { if (h.getBoundingClientRect().top - r.top <= 80) active = h; });
+    tocList.querySelectorAll('a').forEach(a => a.classList.toggle('active', active && a.getAttribute('href')==='#'+active.id));
 }
 
-// ── Status bar ─────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────
+   STATUS BAR
+   ───────────────────────────────────────────────────────────────── */
 function updateStatusBar() {
-    const val = editorEl.value;
-    const pos = editorEl.selectionStart;
-    const before = val.substring(0, pos).split('\n');
+    const val = editorEl.value, pos = editorEl.selectionStart;
+    const before = val.substring(0,pos).split('\n');
     statusPos.textContent   = `Ln ${before.length}, Col ${before[before.length-1].length+1}`;
     statusChars.textContent = `${val.length} chars`;
     statusWords.textContent = `${val.trim() ? val.trim().split(/\s+/).length : 0} words`;
 }
 
-// ── Debounce helper ────────────────────────────────────────────────────────
-function debounce(fn, ms) {
-    let t;
-    return function(...args) { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-}
-const debouncedRender = debounce(render, 60);
+function debounce(fn,ms){let t;return function(...a){clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};}
 
-// ── Save ───────────────────────────────────────────────────────────────────
-function setSaveStatus(state, text) {
-    saveStatus.textContent = text;
-    saveStatus.className   = 'save-status status-' + state;
-    if (state === 'unsaved') saveBtn.disabled = false;
-}
+const debouncedRender = debounce(render, 80);
+
+
+/* ─────────────────────────────────────────────────────────────────
+   SAVE / DOWNLOAD
+   ───────────────────────────────────────────────────────────────── */
+function setSaveStatus(state,text){ saveStatus.textContent=text; saveStatus.className='save-status status-'+state; if(state==='unsaved') saveBtn.disabled=false; }
 
 window.saveDocument = async function() {
     if (content === lastSaved) return;
-    saveBtn.disabled = true;
-    setSaveStatus('saving', 'Saving…');
+    saveBtn.disabled = true; setSaveStatus('saving','Saving…');
     try {
-        const r = await fetch(`/api/documents/${DOC_UUID}/content`, {
-            method: 'PUT',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({content})
+        const r = await fetch(`/api/documents/${DOC_UUID}/content`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})});
+        if (r.ok) { lastSaved=content; setSaveStatus('saved','Saved'); showToast('Saved'); }
+        else { setSaveStatus('error','Save failed'); saveBtn.disabled=false; showToast('Save failed',3000); }
+    } catch { setSaveStatus('error','Connection error'); saveBtn.disabled=false; showToast('Connection error',3000); }
+};
+
+window.downloadMd = function() {
+    closeAllDropdowns();
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([content],{type:'text/markdown;charset=utf-8'})); a.download=DOC_NAME+'.md'; a.click(); URL.revokeObjectURL(a.href);
+    showToast('Downloaded as Markdown');
+};
+window.downloadHtml = function() {
+    closeAllDropdowns();
+    const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${DOC_NAME}</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"><style>body{max-width:860px;margin:2rem auto;padding:0 1.5rem}.markdown-body{box-sizing:border-box}</style></head><body class="markdown-body">${previewEl.innerHTML}</body></html>`;
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'})); a.download=DOC_NAME+'.html'; a.click(); URL.revokeObjectURL(a.href);
+    showToast('Downloaded as HTML');
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   DROPDOWNS & FONTS
+   ───────────────────────────────────────────────────────────────── */
+window.toggleActDropdown = function(id) {
+    const menu = document.getElementById(id).querySelector('.act-dropdown-menu');
+    const open = menu.classList.contains('open'); closeAllDropdowns(); if(!open) menu.classList.add('open');
+};
+function closeAllDropdowns() { document.querySelectorAll('.act-dropdown-menu.open,.pane-font-dropdown.open').forEach(m=>m.classList.remove('open')); }
+window.toggleFontDropdown = function(id) { const d=document.getElementById(id),open=d.classList.contains('open'); closeAllDropdowns(); if(!open) d.classList.add('open'); };
+
+function initFontItems() {
+    document.querySelectorAll('.pane-font-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const type=btn.dataset.fontType, font=btn.dataset.font;
+            btn.closest('.pane-font-dropdown').querySelectorAll('.pane-font-item').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            if (type==='mono') editorEl.style.fontFamily = MONO_FONTS[font]||'';
+            else previewEl.style.fontFamily = SANS_FONTS[font]||'';
+            closeAllDropdowns();
         });
-        if (r.ok) {
-            lastSaved = content;
-            setSaveStatus('saved', 'Saved');
-        } else {
-            const d = await r.json().catch(()=>({}));
-            setSaveStatus('error', 'Save failed');
-            saveBtn.disabled = false;
-            console.error('Save error:', d);
-        }
-    } catch(err) {
-        setSaveStatus('error', 'Connection error');
-        saveBtn.disabled = false;
-    }
-};
-
-// ── Help panel ─────────────────────────────────────────────────────────────
-window.toggleHelp = function() {
-    const panel   = document.getElementById('help-panel');
-    const overlay = document.getElementById('help-overlay');
-    const tab     = document.getElementById('help-tab');
-    const isOpen  = panel.classList.contains('open');
-    panel.classList.toggle('open',   !isOpen);
-    overlay.classList.toggle('open', !isOpen);
-    if (tab) tab.classList.toggle('panel-open', !isOpen);
-};
-
-// ── Toolbar insertion helpers ──────────────────────────────────────────────
-window.insertMarkdown = function(before, after='') {
-    const s = editorEl.selectionStart;
-    const e = editorEl.selectionEnd;
-    const sel = editorEl.value.substring(s, e);
-    editorEl.value = editorEl.value.substring(0,s) + before + sel + after + editorEl.value.substring(e);
-    editorEl.selectionStart = sel ? s + before.length : s + before.length;
-    editorEl.selectionEnd   = sel ? s + before.length + sel.length : s + before.length;
-    editorEl.focus();
-    content = editorEl.value;
-    setSaveStatus('unsaved', 'Unsaved changes');
-    debouncedRender();
-    updateStatusBar();
-};
-
-window.insertTable = function() {
-    insertMarkdown('\n| Header 1 | Header 2 | Header 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n');
-};
-window.insertMath = function() {
-    insertMarkdown('$$\n', '\n$$');
-};
-window.insertCallout = function() {
-    insertMarkdown('> [!note] ');
-};
-
-// ── Viewer presence ────────────────────────────────────────────────────────
-async function pingServer() {
-    try {
-        await fetch(`/api/documents/${DOC_UUID}/ping`, {method:'POST'});
-    } catch(_) {}
-}
-
-async function pollViewers() {
-    try {
-        const r = await fetch(`/api/documents/${DOC_UUID}/viewers`);
-        if (!r.ok) return;
-        const data = await r.json();
-        viewers = (data.viewers || []).filter(v => v.username !== CURRENT_USER);
-        renderViewers();
-    } catch(_) {}
-}
-
-function renderViewers() {
-    if (viewers.length === 0) { viewerEl.innerHTML = ''; return; }
-    const max = 4;
-    let html = '';
-    const shown = viewers.slice(0, max);
-    const extra = viewers.length - max;
-    shown.forEach(v => {
-        const letter = v.username.charAt(0).toUpperCase();
-        html += `<span class="viewer-chip" title="${v.username}">${letter}</span>`;
     });
-    if (extra > 0) html += `<span class="viewer-chip-more">+${extra}</span>`;
-    viewerEl.innerHTML = html;
 }
 
-// ── Init ───────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-    // Move help panel/overlay/tab to <body> to escape any stacking context issues
-    const helpPanel   = document.getElementById('help-panel');
-    const helpOverlay = document.getElementById('help-overlay');
-    const helpTab     = document.getElementById('help-tab');
-    if (helpPanel)   document.body.appendChild(helpPanel);
-    if (helpOverlay) document.body.appendChild(helpOverlay);
-    if (helpTab)     document.body.appendChild(helpTab);
+/* ─────────────────────────────────────────────────────────────────
+   CONTENT TABS
+   ───────────────────────────────────────────────────────────────── */
+window.activateTab = function(tabId) {
+    const content = document.getElementById(tabId);
+    if (!content) return;
+    const group = content.closest('.tab-group');
+    if (!group) return;
+    group.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tabId));
+    group.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id===tabId));
+};
 
-    content     = decodeContent('{{content}}');
-    lastSaved   = content;
+/* ─────────────────────────────────────────────────────────────────
+   HELP PANEL
+   ───────────────────────────────────────────────────────────────── */
+window.toggleHelp = function() {
+    const panel=document.getElementById('help-panel'), overlay=document.getElementById('help-overlay'), tab=document.getElementById('help-tab');
+    const open=panel.classList.contains('open');
+    panel.classList.toggle('open',!open); overlay.classList.toggle('open',!open); if(tab) tab.classList.toggle('panel-open',!open);
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   INSERT MARKDOWN
+   ───────────────────────────────────────────────────────────────── */
+window.insertMarkdown = function(before, after='') {
+    const s=editorEl.selectionStart, e=editorEl.selectionEnd, sel=editorEl.value.substring(s,e);
+    editorEl.value=editorEl.value.substring(0,s)+before+sel+after+editorEl.value.substring(e);
+    editorEl.selectionStart=s+before.length; editorEl.selectionEnd=sel?s+before.length+sel.length:s+before.length;
+    editorEl.focus(); content=editorEl.value; setSaveStatus('unsaved','Unsaved changes'); debouncedRender(); updateStatusBar();
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   VIEWER PRESENCE
+   ───────────────────────────────────────────────────────────────── */
+async function pingServer(){ try{ await fetch(`/api/documents/${DOC_UUID}/ping`,{method:'POST'}); }catch{} }
+async function pollViewers(){
+    try {
+        const r=await fetch(`/api/documents/${DOC_UUID}/viewers`); if(!r.ok) return;
+        const d=await r.json(); const vs=(d.viewers||[]).filter(v=>v.username!==CURRENT_USER);
+        if(!vs.length){viewerEl.innerHTML='';return;}
+        const max=4; let html='';
+        vs.slice(0,max).forEach(v=>{html+=`<span class="viewer-chip" title="${v.username}">${v.username.charAt(0).toUpperCase()}</span>`;});
+        if(vs.length>max) html+=`<span class="viewer-chip-more">+${vs.length-max}</span>`;
+        viewerEl.innerHTML=html;
+    }catch{}
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   INIT
+   ───────────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function(){
+    // Move help elements to body (escape any stacking context)
+    ['help-panel','help-overlay','help-tab'].forEach(id=>{const el=document.getElementById(id);if(el) document.body.appendChild(el);});
+
+    // IMPORTANT: load content from double-quoted JSON-escaped string
+    content   = decodeContent("{{content}}");
+    lastSaved = content;
     editorEl.value = content;
 
     initMarked();
+    initFontItems();
     render();
     updateStatusBar();
 
-    // Ping immediately then every 15 seconds
-    pingServer();
-    setInterval(pingServer, 15000);
+    pingServer(); setInterval(pingServer,15000);
+    pollViewers(); setInterval(pollViewers,5000);
 
-    // Poll viewers every 5 seconds
-    pollViewers();
-    setInterval(pollViewers, 5000);
-
-    // Editor input handler
-    editorEl.addEventListener('input', function() {
-        content = editorEl.value;
-        setSaveStatus('unsaved', 'Unsaved changes');
-        debouncedRender();
-        updateStatusBar();
+    editorEl.addEventListener('input', function(){
+        content=editorEl.value; setSaveStatus('unsaved','Unsaved changes'); debouncedRender(); updateStatusBar();
     });
+    const onCursor=()=>{ requestAnimationFrame(updateStatusBar); };
+    editorEl.addEventListener('keyup',onCursor); editorEl.addEventListener('click',onCursor); editorEl.addEventListener('select',onCursor);
 
-    // Cursor move → status bar
-    const onCursor = () => requestAnimationFrame(updateStatusBar);
-    editorEl.addEventListener('keyup',   onCursor);
-    editorEl.addEventListener('click',   onCursor);
-    editorEl.addEventListener('select',  onCursor);
-
-    // Keyboard shortcuts
-    editorEl.addEventListener('keydown', function(e) {
-        if (e.ctrlKey || e.metaKey) {
-            if (e.key === 's') { e.preventDefault(); window.saveDocument(); return; }
-            if (e.key === 'b') { e.preventDefault(); insertMarkdown('**','**'); return; }
-            if (e.key === 'i') { e.preventDefault(); insertMarkdown('*','*'); return; }
-            if (e.key === '/') { e.preventDefault(); window.toggleHelp(); return; }
+    editorEl.addEventListener('keydown', function(e){
+        if(e.ctrlKey||e.metaKey){
+            if(e.key==='s'){e.preventDefault();window.saveDocument();return;}
+            if(e.key==='b'){e.preventDefault();window.insertMarkdown('**','**');return;}
+            if(e.key==='i'){e.preventDefault();window.insertMarkdown('*','*');return;}
+            if(e.key==='/'){e.preventDefault();window.toggleHelp();return;}
         }
-        // Tab / shift-tab indent
-        if (e.key === 'Tab') {
+        if(e.key==='Tab'){
             e.preventDefault();
-            const s = this.selectionStart, en = this.selectionEnd;
-            if (e.shiftKey) {
-                const before = this.value.substring(0, s);
-                const ls = before.lastIndexOf('\n') + 1;
-                const lc = this.value.substring(ls, s);
-                if (lc.startsWith('    ') || lc.startsWith('\t')) {
-                    const n = lc.startsWith('    ') ? 4 : 1;
-                    this.value = this.value.substring(0,ls) + this.value.substring(ls+n);
-                    this.selectionStart = this.selectionEnd = s - n;
-                }
-            } else {
-                this.value = this.value.substring(0,s) + '    ' + this.value.substring(en);
-                this.selectionStart = this.selectionEnd = s + 4;
-            }
-            content = this.value;
-            setSaveStatus('unsaved', 'Unsaved changes');
-            debouncedRender();
-            updateStatusBar();
+            const s=this.selectionStart,en=this.selectionEnd;
+            if(e.shiftKey){const before=this.value.substring(0,s),ls=before.lastIndexOf('\n')+1,lc=this.value.substring(ls,s);if(lc.startsWith('    ')||lc.startsWith('\t')){const n=lc.startsWith('    ')?4:1;this.value=this.value.substring(0,ls)+this.value.substring(ls+n);this.selectionStart=this.selectionEnd=s-n;}}
+            else{this.value=this.value.substring(0,s)+'    '+this.value.substring(en);this.selectionStart=this.selectionEnd=s+4;}
+            content=this.value; setSaveStatus('unsaved','Unsaved changes'); debouncedRender(); updateStatusBar();
         }
     });
 
-    // Close help panel on Escape
-    document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') {
-            const panel = document.getElementById('help-panel');
-            if (panel.classList.contains('open')) window.toggleHelp();
-        }
+    document.addEventListener('keydown',e=>{
+        if(e.key==='Escape'){const p=document.getElementById('help-panel');if(p&&p.classList.contains('open')){window.toggleHelp();return;}closeAllDropdowns();}
     });
-
-    // Warn on leave with unsaved
-    window.addEventListener('beforeunload', e => {
-        if (content !== lastSaved) { e.preventDefault(); e.returnValue = ''; }
+    document.addEventListener('click',e=>{
+        if(!e.target.closest('.act-dropdown')&&!e.target.closest('.pane-font-selector')) closeAllDropdowns();
     });
+    window.addEventListener('beforeunload',e=>{if(content!==lastSaved){e.preventDefault();e.returnValue='';}});
 
-    setSaveStatus('saved', 'Saved');
+    setSaveStatus('saved','Saved');
     editorEl.focus();
 });
 

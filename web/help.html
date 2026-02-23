@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenDocsMD - Help & Syntax Guide</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=IBM+Plex+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Source+Code+Pro:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600&family=Nunito:wght@400;500;600&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- External Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <!-- KaTeX for LaTeX math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <!-- Function Plot for equation graphing -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/function-plot@1/dist/function-plot.min.js"></script>
+  <!-- Plotly.js for 3D plotting -->
+  <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2/plotly.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown.min.css">>
+  
+  <!-- App Styles -->
+  <link rel="stylesheet" href="/css/example.css">
+  <style>
+    .help-container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      padding-bottom: 100px;
+      box-sizing: border-box;
+    }
+    /* When loaded in narrow iframe or mobile */
+    @media (max-width: 700px) {
+      .help-container {
+        padding: 20px 12px;
+        padding-bottom: 60px;
+        max-width: 100%;
+      }
+      .help-header h1 {
+        font-size: 1.8rem;
+      }
+      .help-header p {
+        font-size: 0.95rem;
+      }
+      .toc {
+        padding: 12px;
+      }
+      .toc ul {
+        grid-template-columns: 1fr;
+      }
+      .section {
+        margin-bottom: 32px;
+      }
+      .section h2 {
+        font-size: 1.2rem;
+      }
+      pre {
+        font-size: 12px !important;
+      }
+    }
+    .help-header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .help-header h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+    .help-header p {
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+    }
+
+    .toc {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 40px;
+    }
+    .toc h2 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-size: 1rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .toc ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 8px;
+    }
+    .toc a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .toc a:hover {
+      text-decoration: underline;
+    }
+    .section {
+      margin-bottom: 48px;
+    }
+    .section h2 {
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+      margin-bottom: 20px;
+    }
+    .example-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+    @media (max-width: 768px) {
+      .example-box {
+        grid-template-columns: 1fr;
+      }
+    }
+    @media (max-width: 600px) {
+      .example-box {
+        gap: 12px;
+      }
+    }
+    .example-box > div {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .example-label {
+      background: var(--bg-tertiary);
+      padding: 8px 12px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border-color);
+    }
+    .example-content {
+      padding: 16px;
+    }
+    .example-content pre {
+      margin: 0;
+      background: transparent !important;
+      border: none !important;
+    }
+    .example-content code {
+      font-size: 13px;
+    }
+    .rendered {
+      padding: 16px;
+    }
+    .equation-plot-demo {
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      overflow: hidden;
+      min-height: 250px;
+    }
+    .equation-plot-demo svg {
+      display: block;
+      width: 100%;
+    }
+    .plot3d-demo {
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      overflow: hidden;
+      min-height: 350px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-wrapper">
+        <a href="/" class="help-icon" title="Back to Editor">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06Z"/>
+          </svg>
+        </a>
+        <div class="logo">Open<span>Docs</span>MD</div>
+      </div>
+      <div class="header-actions">
+        <!-- Theme inherited from main app via localStorage -->
+      </div>
+    </header>
+    
+    <div class="main" style="overflow-y: auto;">
+      <div class="help-container markdown-body">
+        <div class="help-header">
+          <h1>📖 Syntax Guide</h1>
+          <p>Everything you can do with OpenDocsMD</p>
+        </div>
+
+        <nav class="toc">
+          <h2>Table of Contents</h2>
+          <ul>
+            <li><a href="#basic-formatting">Basic Formatting</a></li>
+            <li><a href="#headings">Headings</a></li>
+            <li><a href="#lists">Lists</a></li>
+            <li><a href="#links-images">Links & Images</a></li>
+            <li><a href="#code-blocks">Code Blocks</a></li>
+            <li><a href="#tables">Tables</a></li>
+            <li><a href="#blockquotes">Blockquotes</a></li>
+            <li><a href="#callouts">Callouts</a></li>
+            <li><a href="#mermaid">Mermaid Diagrams</a></li>
+            <li><a href="#math">Math Equations</a></li>
+            <li><a href="#plots">Plots</a></li>
+            <li><a href="#tabs">Content Tabs</a></li>
+            <li><a href="#tabs">Content Tabs</a></li>
+            <li><a href="#keyboard">Keyboard Keys</a></li>
+            <li><a href="#highlights">Highlights</a></li>
+            <li><a href="#task-lists">Task Lists</a></li>
+            <li><a href="#horizontal-rules">Horizontal Rules</a></li>
+            <li><a href="#sharing">Sharing URLs</a></li>
+            <li><a href="#credits">Credits & Attributions</a></li>
+          </ul>
+        </nav>
+
+        <!-- Basic Formatting -->
+        <section class="section" id="basic-formatting">
+          <h2>Basic Formatting</h2>
+          <p>Standard text formatting options.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>**Bold text**
+*Italic text*
+***Bold and italic***
+~~Strikethrough~~
+==Highlighted text==</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <p><strong>Bold text</strong></p>
+                <p><em>Italic text</em></p>
+                <p><strong><em>Bold and italic</em></strong></p>
+                <p><del>Strikethrough</del></p>
+                <p><mark>Highlighted text</mark></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Headings -->
+        <section class="section" id="headings">
+          <h2>Headings</h2>
+          <p>Six levels of headings are available.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code># Heading 1
+## Heading 2
+### Heading 3
+#### Heading 4
+##### Heading 5
+###### Heading 6</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <h1 style="font-size: 1.5em; border: none; margin: 0;">Heading 1</h1>
+                <h2 style="font-size: 1.3em; border: none; margin: 0;">Heading 2</h2>
+                <h3 style="font-size: 1.1em; margin: 0;">Heading 3</h3>
+                <h4 style="font-size: 1em; margin: 0;">Heading 4</h4>
+                <h5 style="font-size: 0.9em; margin: 0;">Heading 5</h5>
+                <h6 style="font-size: 0.85em; margin: 0;">Heading 6</h6>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Lists -->
+        <section class="section" id="lists">
+          <h2>Lists</h2>
+          <p>Unordered and ordered lists, including nested lists.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>- Item 1
+- Item 2
+  - Nested item
+  - Another nested
+- Item 3
+
+1. First item
+2. Second item
+3. Third item</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <ul>
+                  <li>Item 1</li>
+                  <li>Item 2
+                    <ul>
+                      <li>Nested item</li>
+                      <li>Another nested</li>
+                    </ul>
+                  </li>
+                  <li>Item 3</li>
+                </ul>
+                <ol>
+                  <li>First item</li>
+                  <li>Second item</li>
+                  <li>Third item</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Links & Images -->
+        <section class="section" id="links-images">
+          <h2>Links & Images</h2>
+          <p>Add hyperlinks and images to your documents.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>[Link text](https://example.com)
+
+[Link with title](https://example.com "Title")
+
+![Image alt text](https://picsum.photos/200/100)
+
+[![Clickable image](https://picsum.photos/100/50)](https://example.com)</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <p><a href="https://example.com">Link text</a></p>
+                <p><a href="https://example.com" title="Title">Link with title</a></p>
+                <p><img src="https://picsum.photos/200/100" alt="Image alt text" style="border-radius: 4px;"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Code Blocks -->
+        <section class="section" id="code-blocks">
+          <h2>Code Blocks</h2>
+          <p>Inline code and fenced code blocks with syntax highlighting.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>Inline `code` in text.
+
+```javascript
+function greet(name) {
+  console.log(`Hello, ${name}!`);
+}
+```
+
+```python
+def greet(name):
+    print(f"Hello, {name}!")
+```</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <p>Inline <code>code</code> in text.</p>
+                <p>Code blocks display with syntax highlighting, line numbers, and a copy button.</p>
+              </div>
+            </div>
+          </div>
+
+          <h3>Supported Languages</h3>
+          <p>Common languages include: <code>javascript</code>, <code>typescript</code>, <code>python</code>, <code>java</code>, <code>c</code>, <code>cpp</code>, <code>csharp</code>, <code>go</code>, <code>rust</code>, <code>ruby</code>, <code>php</code>, <code>swift</code>, <code>kotlin</code>, <code>sql</code>, <code>html</code>, <code>css</code>, <code>json</code>, <code>yaml</code>, <code>bash</code>, <code>shell</code>, <code>markdown</code>, and many more.</p>
+        </section>
+
+        <!-- Tables -->
+        <section class="section" id="tables">
+          <h2>Tables</h2>
+          <p>Create tables with optional alignment.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>| Left | Center | Right |
+|:-----|:------:|------:|
+| L1   |   C1   |    R1 |
+| L2   |   C2   |    R2 |
+| L3   |   C3   |    R3 |</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <table>
+                  <thead>
+                    <tr><th style="text-align:left">Left</th><th style="text-align:center">Center</th><th style="text-align:right">Right</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td style="text-align:left">L1</td><td style="text-align:center">C1</td><td style="text-align:right">R1</td></tr>
+                    <tr><td style="text-align:left">L2</td><td style="text-align:center">C2</td><td style="text-align:right">R2</td></tr>
+                    <tr><td style="text-align:left">L3</td><td style="text-align:center">C3</td><td style="text-align:right">R3</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Blockquotes -->
+        <section class="section" id="blockquotes">
+          <h2>Blockquotes</h2>
+          <p>Quote text with optional nesting.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>> This is a blockquote.
+>
+> It can span multiple lines.
+
+> Nested quotes:
+>> Are also possible
+>>> Even deeper</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <blockquote>
+                  <p>This is a blockquote.</p>
+                  <p>It can span multiple lines.</p>
+                </blockquote>
+                <blockquote>
+                  <p>Nested quotes:</p>
+                  <blockquote>
+                    <p>Are also possible</p>
+                    <blockquote>Even deeper</blockquote>
+                  </blockquote>
+                </blockquote>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Callouts -->
+        <section class="section" id="callouts">
+          <h2>Callouts (Admonitions)</h2>
+          <p>Obsidian-style callouts for highlighting important information.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>> [!NOTE]
+> Useful information.
+
+> [!TIP]
+> Helpful advice.
+
+> [!WARNING]
+> Important warning.
+
+> [!DANGER]
+> Critical alert!
+
+> [!NOTE] Custom Title
+> With a custom title.</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Available Types</div>
+              <div class="rendered">
+                <p><code>NOTE</code> <code>TIP</code> <code>INFO</code> <code>WARNING</code> <code>DANGER</code> <code>ERROR</code> <code>SUCCESS</code> <code>QUESTION</code> <code>FAILURE</code> <code>BUG</code> <code>EXAMPLE</code> <code>QUOTE</code> <code>ABSTRACT</code> <code>IMPORTANT</code></p>
+              </div>
+            </div>
+          </div>
+
+          <h3>Callout Examples</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 16px;">
+            <div class="callout callout-note">
+              <div class="callout-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>Note</div>
+              <div class="callout-content">Useful information.</div>
+            </div>
+            <div class="callout callout-tip">
+              <div class="callout-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5c-2.363 0-4 1.69-4 3.75 0 .984.424 1.625.984 2.304l.214.253c.223.264.47.556.673.848.284.411.537.896.621 1.49a.75.75 0 0 1-1.484.211c-.04-.282-.163-.547-.37-.847a8.456 8.456 0 0 0-.542-.68c-.084-.1-.173-.205-.268-.32C3.201 7.75 2.5 6.766 2.5 5.25 2.5 2.31 4.863 0 8 0s5.5 2.31 5.5 5.25c0 1.516-.701 2.5-1.328 3.259-.095.115-.184.22-.268.319-.207.245-.383.453-.541.681-.208.3-.33.565-.37.847a.751.751 0 0 1-1.485-.212c.084-.593.337-1.078.621-1.489.203-.292.45-.584.673-.848.075-.088.147-.173.213-.253.561-.679.985-1.32.985-2.304 0-2.06-1.637-3.75-4-3.75ZM5.75 12h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM6 15.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z"/></svg>Tip</div>
+              <div class="callout-content">Helpful advice.</div>
+            </div>
+            <div class="callout callout-warning">
+              <div class="callout-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>Warning</div>
+              <div class="callout-content">Important warning.</div>
+            </div>
+            <div class="callout callout-danger">
+              <div class="callout-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M4.47.22A.749.749 0 0 1 5 0h6c.199 0 .389.079.53.22l4.25 4.25c.141.14.22.331.22.53v6a.749.749 0 0 1-.22.53l-4.25 4.25A.749.749 0 0 1 11 16H5a.749.749 0 0 1-.53-.22L.22 11.53A.749.749 0 0 1 0 11V5c0-.199.079-.389.22-.53Zm.84 1.28L1.5 5.31v5.38l3.81 3.81h5.38l3.81-3.81V5.31L10.69 1.5ZM8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>Danger</div>
+              <div class="callout-content">Critical alert!</div>
+            </div>
+            <div class="callout callout-success">
+              <div class="callout-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg>Success</div>
+              <div class="callout-content">Task completed!</div>
+            </div>
+            <div class="callout callout-question">
+              <div class="callout-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.756 2.756 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.195l-.006.004a6.24 6.24 0 0 0-.26.16.952.952 0 0 0-.276.245.75.75 0 0 1-1.248-.832c.184-.264.42-.489.692-.661.103-.067.207-.132.313-.195l.007-.004c.1-.061.182-.11.258-.161a.969.969 0 0 0 .277-.245C8.96 6.514 9 6.427 9 6.25a.612.612 0 0 0-.262-.525A1.27 1.27 0 0 0 8 5.5c-.369 0-.595.09-.74.187a1.01 1.01 0 0 0-.34.398ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>Question</div>
+              <div class="callout-content">Something to consider.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Mermaid Diagrams -->
+        <section class="section" id="mermaid">
+          <h2>Mermaid Diagrams</h2>
+          <p>Create diagrams and flowcharts using Mermaid syntax.</p>
+          
+          <h3>Flowchart</h3>
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>```mermaid
+graph TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[OK]
+    B -->|No| D[Cancel]
+    C --> E[End]
+    D --> E
+```</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <div class="mermaid">
+graph TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[OK]
+    B -->|No| D[Cancel]
+    C --> E[End]
+    D --> E
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h3>Sequence Diagram</h3>
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>```mermaid
+sequenceDiagram
+    Alice->>Bob: Hello!
+    Bob-->>Alice: Hi!
+    Alice->>Bob: How are you?
+    Bob-->>Alice: Great!
+```</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <div class="mermaid">
+sequenceDiagram
+    Alice->>Bob: Hello!
+    Bob-->>Alice: Hi!
+    Alice->>Bob: How are you?
+    Bob-->>Alice: Great!
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h3>Pie Chart</h3>
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>```mermaid
+pie title Browser Share
+    "Chrome" : 65
+    "Firefox" : 15
+    "Safari" : 12
+    "Other" : 8
+```</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <div class="mermaid">
+pie title Browser Share
+    "Chrome" : 65
+    "Firefox" : 15
+    "Safari" : 12
+    "Other" : 8
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h3>More Diagram Types</h3>
+          <p>Mermaid supports many more diagram types: <code>classDiagram</code>, <code>stateDiagram</code>, <code>erDiagram</code>, <code>gantt</code>, <code>journey</code>, <code>gitGraph</code>, and more. See the <a href="https://mermaid.js.org/syntax/flowchart.html" target="_blank">Mermaid documentation</a> for details.</p>
+        </section>
+
+        <!-- Math Equations -->
+        <section class="section" id="math">
+          <h2>Math Equations</h2>
+          <p>Write mathematical equations using LaTeX syntax, powered by KaTeX.</p>
+          
+          <h3>Inline Math</h3>
+          <p>Use single dollar signs for inline equations.</p>
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>The equation $E = mc^2$ revolutionized physics.
+
+The quadratic formula is $x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}$.</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <p>The equation <span id="math-inline-1"></span> revolutionized physics.</p>
+                <p>The quadratic formula is <span id="math-inline-2"></span>.</p>
+              </div>
+            </div>
+          </div>
+
+          <h3>Block Math</h3>
+          <p>Use double dollar signs for centered block equations.</p>
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>$$
+\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}
+$$</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered" style="text-align: center;">
+                <div id="math-block-1"></div>
+              </div>
+            </div>
+          </div>
+
+          <h3>More Examples</h3>
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>$$
+\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}
+$$
+
+$$
+\nabla \times \vec{E} = -\frac{\partial \vec{B}}{\partial t}
+$$</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered" style="text-align: center;">
+                <div id="math-block-2" style="margin-bottom: 16px;"></div>
+                <div id="math-block-3"></div>
+              </div>
+            </div>
+          </div>
+
+          <h3>Common Symbols</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Syntax</th>
+                <th>Result</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>\alpha, \beta, \gamma</code></td><td><span id="math-sym-1"></span></td><td>Greek letters</td></tr>
+              <tr><td><code>\sum, \prod, \int</code></td><td><span id="math-sym-2"></span></td><td>Sum, product, integral</td></tr>
+              <tr><td><code>\frac{a}{b}</code></td><td><span id="math-sym-3"></span></td><td>Fractions</td></tr>
+              <tr><td><code>x^2, x_i</code></td><td><span id="math-sym-4"></span></td><td>Superscript, subscript</td></tr>
+              <tr><td><code>\sqrt{x}, \sqrt[n]{x}</code></td><td><span id="math-sym-5"></span></td><td>Square root, nth root</td></tr>
+              <tr><td><code>\leq, \geq, \neq</code></td><td><span id="math-sym-6"></span></td><td>Comparisons</td></tr>
+              <tr><td><code>\infty, \partial</code></td><td><span id="math-sym-7"></span></td><td>Infinity, partial</td></tr>
+              <tr><td><code>\vec{v}, \hat{i}</code></td><td><span id="math-sym-8"></span></td><td>Vectors, unit vectors</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top: 16px;">See the <a href="https://katex.org/docs/supported.html" target="_blank">KaTeX documentation</a> for all supported functions.</p>
+        </section>
+
+        <!-- Plots -->
+        <section class="section" id="plots">
+          <h2>Plots</h2>
+          <p>Write JavaScript programs to create interactive 2D and 3D visualizations. Use <code>```plot</code> code blocks. Your code runs with math functions and plotting helpers pre-loaded. Set <code>traces</code> to an array of Plotly trace objects.</p>
+          
+          <h3>Basic Examples</h3>
+          <div class="example-box">
+            <div>
+              <div class="example-label">2D Line Plot</div>
+              <div class="example-content">
+<pre><code>```plot
+// Plot y = sin(x) from -10 to 10
+traces = [line(x => sin(x), [-10, 10])]
+```</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">3D Surface</div>
+              <div class="example-content">
+<pre><code>```plot
+// Plot z = sin(x) * cos(y)
+traces = [surface((x, y) => sin(x) * cos(y))]
+```</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <h3>Multiple Traces</h3>
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>```plot
+// Compare trig functions
+traces = [
+  line(x => sin(x), [-10, 10], {name: 'sin(x)'}),
+  line(x => cos(x), [-10, 10], {name: 'cos(x)'}),
+  line(x => tan(x)/5, [-10, 10], {name: 'tan(x)/5'})
+]
+```</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <div id="plot-example-2" class="plot-demo"></div>
+              </div>
+            </div>
+          </div>
+
+          <h3>2D Helper Functions</h3>
+          <table>
+            <thead>
+              <tr><th>Function</th><th>Description</th><th>Example</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>line(fn, xRange, options)</code></td><td>Line from y = f(x)</td><td><code>line(x => x*x, [-5, 5])</code></td></tr>
+              <tr><td><code>scatter(points, options)</code></td><td>Scatter plot</td><td><code>scatter([[1,2], [3,4]])</code></td></tr>
+              <tr><td><code>polyline(points, options)</code></td><td>Connected points</td><td><code>polyline([[0,0], [1,1], [2,0]])</code></td></tr>
+              <tr><td><code>bar(labels, values, options)</code></td><td>Bar chart</td><td><code>bar(['A','B','C'], [10,20,15])</code></td></tr>
+              <tr><td><code>parametric2d(fx, fy, tRange, steps)</code></td><td>Parametric curve</td><td><code>parametric2d(t=>cos(t), t=>sin(t))</code></td></tr>
+              <tr><td><code>circle(radius, center, options)</code></td><td>Circle</td><td><code>circle(2, [0, 0])</code></td></tr>
+              <tr><td><code>ellipse(a, b, center, options)</code></td><td>Ellipse</td><td><code>ellipse(3, 2, [0, 0])</code></td></tr>
+              <tr><td><code>arc(radius, start, end, center)</code></td><td>Circular arc</td><td><code>arc(1, 0, PI/2, [0, 0])</code></td></tr>
+              <tr><td><code>rect(width, height, center, options)</code></td><td>Rectangle</td><td><code>rect(4, 2, [0, 0], {fill: true})</code></td></tr>
+              <tr><td><code>polygon(vertices, options)</code></td><td>Closed polygon</td><td><code>polygon([[0,0], [1,2], [2,0]])</code></td></tr>
+              <tr><td><code>arrow(start, end, options)</code></td><td>2D arrow/vector</td><td><code>arrow([0,0], [2, 1])</code></td></tr>
+              <tr><td><code>pie(labels, values, options)</code></td><td>Pie chart</td><td><code>pie(['A','B','C'], [30,50,20])</code></td></tr>
+              <tr><td><code>heatmap(z, options)</code></td><td>2D heatmap</td><td><code>heatmap([[1,2],[3,4]])</code></td></tr>
+            </tbody>
+          </table>
+
+          <h3>3D Helper Functions</h3>
+          <table>
+            <thead>
+              <tr><th>Function</th><th>Description</th><th>Example</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>surface(fn, xRange, yRange)</code></td><td>Surface z=f(x,y)</td><td><code>surface((x,y) => sin(x)*cos(y))</code></td></tr>
+              <tr><td><code>parametric(fx, fy, fz, tRange, steps)</code></td><td>3D parametric curve</td><td><code>parametric(t=>cos(t), t=>sin(t), t=>t)</code></td></tr>
+              <tr><td><code>parametricSurface(fx, fy, fz, uRange, vRange)</code></td><td>Parametric surface</td><td><code>parametricSurface((u,v)=>..., ...)</code></td></tr>
+              <tr><td><code>sphere(radius, center, options)</code></td><td>Colored sphere</td><td><code>sphere(1.5, [0,0,0], {color: '#1e90ff'})</code></td></tr>
+              <tr><td><code>cylinder(radius, height, center, options)</code></td><td>Cylinder</td><td><code>cylinder(1, 3, [0,0,0])</code></td></tr>
+              <tr><td><code>cone(radius, height, center, options)</code></td><td>Cone</td><td><code>cone(1, 2, [0,0,0])</code></td></tr>
+              <tr><td><code>box(width, height, depth, center)</code></td><td>3D box/cube</td><td><code>box(2, 2, 2, [0,0,0])</code></td></tr>
+              <tr><td><code>torus(R, r, center, options)</code></td><td>Torus (donut)</td><td><code>torus(2, 0.5, [0,0,0])</code></td></tr>
+              <tr><td><code>plane(width, height, center)</code></td><td>Flat plane</td><td><code>plane(4, 4, [0,0,0])</code></td></tr>
+              <tr><td><code>scatter3d(points, options)</code></td><td>3D scatter plot</td><td><code>scatter3d([[1,2,3], [4,5,6]])</code></td></tr>
+              <tr><td><code>line3d(points, options)</code></td><td>3D line path</td><td><code>line3d([[0,0,0], [1,1,1]])</code></td></tr>
+              <tr><td><code>arrow3d(start, end, options)</code></td><td>3D arrow/vector</td><td><code>arrow3d([0,0,0], [1,1,1])</code></td></tr>
+              <tr><td><code>helix(radius, pitch, turns, center)</code></td><td>3D helix spiral</td><td><code>helix(1, 0.5, 3, [0,0,0])</code></td></tr>
+            </tbody>
+          </table>
+
+          <h3>Utility Functions</h3>
+          <table>
+            <thead>
+              <tr><th>Function</th><th>Description</th><th>Example</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>range(start, end, step)</code></td><td>Number sequence</td><td><code>range(0, 10, 0.5)</code></td></tr>
+              <tr><td><code>linspace(start, end, n)</code></td><td>N evenly spaced numbers</td><td><code>linspace(-5, 5, 100)</code></td></tr>
+              <tr><td><code>meshgrid(xs, ys)</code></td><td>2D coordinate grid</td><td><code>meshgrid(linspace(-2,2,20), linspace(-2,2,20))</code></td></tr>
+            </tbody>
+          </table>
+
+          <h3>Math (pre-loaded)</h3>
+          <p><code>PI</code>, <code>E</code>, <code>sin</code>, <code>cos</code>, <code>tan</code>, <code>asin</code>, <code>acos</code>, <code>atan</code>, <code>sinh</code>, <code>cosh</code>, <code>tanh</code>, <code>sqrt</code>, <code>exp</code>, <code>log</code>, <code>log10</code>, <code>log2</code>, <code>abs</code>, <code>pow</code>, <code>floor</code>, <code>ceil</code>, <code>round</code>, <code>sign</code>, <code>min</code>, <code>max</code>, <code>random</code></p>
+
+          <h3>Examples</h3>
+          
+          <h4>Sphere with Orbit</h4>
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>```plot
+// Planet with inclined orbit
+traces = [
+  sphere(1, [0,0,0], {color: '#1e90ff'}),
+  parametric(
+    t => 2*cos(t),
+    t => 2*sin(t)*cos(0.4),
+    t => 2*sin(t)*sin(0.4),
+    [0, 2*PI], 200
+  )
+]
+```</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <div id="plot3d-orbit" class="plot-demo"></div>
+              </div>
+            </div>
+          </div>
+
+          <h4>Custom Plotly Traces</h4>
+          <p>For full control, build raw <a href="https://plotly.com/javascript/" target="_blank">Plotly.js</a> trace objects:</p>
+<pre><code>```plot
+// Custom scatter3d trace
+traces = [{
+  type: 'scatter3d',
+  mode: 'lines+markers',
+  x: range(0, 10, 0.1).map(t => cos(t)),
+  y: range(0, 10, 0.1).map(t => sin(t)),
+  z: range(0, 10, 0.1),
+  marker: { size: 2, color: 'red' }
+}]
+```</code></pre>
+
+          <p><strong>Tip:</strong> Click and drag to rotate 3D plots, scroll to zoom, right-click to pan!</p>
+        </section>
+
+        <!-- Content Tabs -->
+        <section class="section" id="tabs">
+          <h2>Content Tabs</h2>
+          <p>MkDocs Material-style tabbed content.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>=== "Python"
+    ```python
+    print("Hello, World!")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    console.log("Hello, World!");
+    ```
+
+=== "Rust"
+    ```rust
+    fn main() {
+        println!("Hello, World!");
+    }
+    ```</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <div class="content-tabs">
+                  <div class="tab-headers">
+                    <button class="tab-btn active" onclick="showTab(this, 'tab-py')">Python</button>
+                    <button class="tab-btn" onclick="showTab(this, 'tab-js')">JavaScript</button>
+                    <button class="tab-btn" onclick="showTab(this, 'tab-rs')">Rust</button>
+                  </div>
+                  <div class="tab-panels">
+                    <div class="tab-content active" id="tab-py"><code>print("Hello, World!")</code></div>
+                    <div class="tab-content" id="tab-js"><code>console.log("Hello, World!");</code></div>
+                    <div class="tab-content" id="tab-rs"><code>println!("Hello, World!");</code></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Keyboard Keys -->
+        <section class="section" id="keyboard">
+          <h2>Keyboard Keys</h2>
+          <p>Display keyboard shortcuts beautifully.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>Press ++Ctrl+C++ to copy.
+Press ++Ctrl+V++ to paste.
+Press ++Ctrl+Shift+P++ for palette.
+
+Alternative syntax:
+[[Cmd+S]] to save.
+[[Alt+Tab]] to switch.</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <p>Press <kbd>Ctrl+C</kbd> to copy.</p>
+                <p>Press <kbd>Ctrl+V</kbd> to paste.</p>
+                <p>Press <kbd>Ctrl+Shift+P</kbd> for palette.</p>
+                <p>Alternative syntax:</p>
+                <p><kbd>Cmd+S</kbd> to save.</p>
+                <p><kbd>Alt+Tab</kbd> to switch.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Highlights -->
+        <section class="section" id="highlights">
+          <h2>Highlighted Text</h2>
+          <p>Mark important text with highlighting.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>This is ==highlighted text== in a sentence.
+
+You can highlight ==multiple words==
+or even ==entire phrases== for emphasis.</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <p>This is <mark>highlighted text</mark> in a sentence.</p>
+                <p>You can highlight <mark>multiple words</mark> or even <mark>entire phrases</mark> for emphasis.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Task Lists -->
+        <section class="section" id="task-lists">
+          <h2>Task Lists</h2>
+          <p>Create checklists and to-do items.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>- [x] Completed task
+- [x] Another done item
+- [ ] Pending task
+- [ ] Future work
+  - [ ] Nested task
+  - [x] Nested done</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <ul style="list-style: none; padding-left: 0;">
+                  <li><input type="checkbox" checked disabled> Completed task</li>
+                  <li><input type="checkbox" checked disabled> Another done item</li>
+                  <li><input type="checkbox" disabled> Pending task</li>
+                  <li><input type="checkbox" disabled> Future work
+                    <ul style="list-style: none;">
+                      <li><input type="checkbox" disabled> Nested task</li>
+                      <li><input type="checkbox" checked disabled> Nested done</li>
+                    </ul>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Horizontal Rules -->
+        <section class="section" id="horizontal-rules">
+          <h2>Horizontal Rules</h2>
+          <p>Create visual separators.</p>
+          
+          <div class="example-box">
+            <div>
+              <div class="example-label">Markdown</div>
+              <div class="example-content">
+<pre><code>Content above
+
+---
+
+Content below
+
+***
+
+More content
+
+___
+
+Final content</code></pre>
+              </div>
+            </div>
+            <div>
+              <div class="example-label">Result</div>
+              <div class="rendered">
+                <p>Content above</p>
+                <hr>
+                <p>Content below</p>
+                <hr>
+                <p>More content</p>
+                <hr>
+                <p>Final content</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Sharing URLs -->
+        <section class="section" id="sharing">
+          <h2>Sharing URLs</h2>
+          <p>Share your documents via URL.</p>
+          
+          <h3>Editor Mode</h3>
+          <p>The default URL opens in editor mode with both the editor and preview visible:</p>
+          <pre><code>https://your-domain.com/#compressed-content</code></pre>
+          
+          <h3>Viewer Mode</h3>
+          <p>Add <code>?v</code> to create a read-only viewer link:</p>
+          <pre><code>https://your-domain.com/?v#compressed-content</code></pre>
+          
+          <h3>How It Works</h3>
+          <ul>
+            <li>Your content is compressed using DEFLATE algorithm</li>
+            <li>The compressed data is encoded as base64url</li>
+            <li>It's stored in the URL hash (after #)</li>
+            <li>No server needed - everything is client-side!</li>
+          </ul>
+
+          <div class="callout callout-tip" style="margin-top: 20px;">
+            <div class="callout-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5c-2.363 0-4 1.69-4 3.75 0 .984.424 1.625.984 2.304l.214.253c.223.264.47.556.673.848.284.411.537.896.621 1.49a.75.75 0 0 1-1.484.211c-.04-.282-.163-.547-.37-.847a8.456 8.456 0 0 0-.542-.68c-.084-.1-.173-.205-.268-.32C3.201 7.75 2.5 6.766 2.5 5.25 2.5 2.31 4.863 0 8 0s5.5 2.31 5.5 5.25c0 1.516-.701 2.5-1.328 3.259-.095.115-.184.22-.268.319-.207.245-.383.453-.541.681-.208.3-.33.565-.37.847a.751.751 0 0 1-1.485-.212c.084-.593.337-1.078.621-1.489.203-.292.45-.584.673-.848.075-.088.147-.173.213-.253.561-.679.985-1.32.985-2.304 0-2.06-1.637-3.75-4-3.75ZM5.75 12h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM6 15.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z"/></svg>Tip</div>
+            <div class="callout-content">Use the "Copy URL" buttons in the editor to get properly formatted sharing links!</div>
+          </div>
+        </section>
+
+        <div style="text-align: center; margin-top: 60px; padding-top: 40px; border-top: 1px solid var(--border-color);">
+          <a href="/" class="btn btn-primary" style="margin-top: 16px; display: inline-flex;">
+            Start Writing
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-left: 6px;">
+              <path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06Z"/>
+            </svg>
+          </a>
+        </div>
+
+        <!-- Credits & Attributions -->
+        <section id="credits" style="margin-top: 60px; padding-top: 40px; border-top: 1px solid var(--border-color);">
+          <h2>Credits & Attributions</h2>
+          
+          <h3>Created By</h3>
+          <p><strong>Rounak Paul</strong> — Design, development, and maintenance of OpenDocsMD.</p>
+          
+          <h3>Open Source Libraries</h3>
+          <p>OpenDocsMD is built with these amazing open source projects:</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Library</th>
+                <th>License</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><a href="https://marked.js.org/" target="_blank">marked</a></td>
+                <td>MIT</td>
+                <td>Markdown parsing</td>
+              </tr>
+              <tr>
+                <td><a href="https://github.com/nodeca/pako" target="_blank">pako</a></td>
+                <td>MIT</td>
+                <td>URL compression (DEFLATE)</td>
+              </tr>
+              <tr>
+                <td><a href="https://highlightjs.org/" target="_blank">highlight.js</a></td>
+                <td>BSD-3-Clause</td>
+                <td>Code syntax highlighting</td>
+              </tr>
+              <tr>
+                <td><a href="https://github.com/markedjs/marked-highlight" target="_blank">marked-highlight</a></td>
+                <td>MIT</td>
+                <td>Highlight.js integration</td>
+              </tr>
+              <tr>
+                <td><a href="https://mermaid.js.org/" target="_blank">Mermaid</a></td>
+                <td>MIT</td>
+                <td>Diagram rendering</td>
+              </tr>
+              <tr>
+                <td><a href="https://katex.org/" target="_blank">KaTeX</a></td>
+                <td>MIT</td>
+                <td>LaTeX math rendering</td>
+              </tr>
+              <tr>
+                <td><a href="https://mauriciopoppe.github.io/function-plot/" target="_blank">function-plot</a></td>
+                <td>MIT</td>
+                <td>2D equation graphing</td>
+              </tr>
+              <tr>
+                <td><a href="https://plotly.com/javascript/" target="_blank">Plotly.js</a></td>
+                <td>MIT</td>
+                <td>3D plotting and visualization</td>
+              </tr>
+              <tr>
+                <td><a href="https://d3js.org/" target="_blank">D3.js</a></td>
+                <td>ISC</td>
+                <td>Data visualization (for plots)</td>
+              </tr>
+              <tr>
+                <td><a href="https://github.com/patrick-steele-idem/morphdom" target="_blank">morphdom</a></td>
+                <td>MIT</td>
+                <td>Efficient DOM updates</td>
+              </tr>
+              <tr>
+                <td><a href="https://github.com/eKoopmans/html2pdf.js" target="_blank">html2pdf.js</a></td>
+                <td>MIT</td>
+                <td>PDF export</td>
+              </tr>
+              <tr>
+                <td><a href="https://github.com/sindresorhus/github-markdown-css" target="_blank">github-markdown-css</a></td>
+                <td>MIT</td>
+                <td>Markdown styling</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Fonts</h3>
+          <p>Fonts provided by <a href="https://fonts.google.com/" target="_blank">Google Fonts</a> under the <a href="https://scripts.sil.org/OFL" target="_blank">SIL Open Font License</a> and <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank">Apache License 2.0</a>:</p>
+          <ul>
+            <li><strong>Monospace:</strong> JetBrains Mono, Fira Code, Source Code Pro, IBM Plex Mono</li>
+            <li><strong>Sans-serif:</strong> Inter, Open Sans, Nunito, IBM Plex Sans</li>
+          </ul>
+
+          <h3>License</h3>
+          <p>OpenDocsMD is free to use without any limitations. No account required, no data stored on servers.</p>
+          
+          <div style="text-align: center; margin-top: 40px; padding-top: 20px; color: var(--text-secondary); font-size: 0.9rem;">
+            <p>© 2026 Rounak Paul. All rights reserved.</p>
+            <p style="margin-top: 8px;">[Fan Boy]</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Theme Management
+    const THEME_KEY = 'opendocsmd-theme';
+    
+    function loadTheme() {
+      const savedTheme = localStorage.getItem(THEME_KEY) || 'midnight';
+      setTheme(savedTheme, false);
+    }
+    
+    function setTheme(theme, save = true) {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.querySelectorAll('.theme-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.theme === theme);
+      });
+      if (save) {
+        localStorage.setItem(THEME_KEY, theme);
+      }
+      // Reinitialize mermaid with new theme
+      initMermaid();
+    }
+    
+    function initMermaid() {
+      const theme = document.documentElement.getAttribute('data-theme') || 'midnight';
+      const isLight = ['daylight', 'solarized-light'].includes(theme);
+      const styles = getComputedStyle(document.documentElement);
+      
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: isLight ? 'default' : 'dark',
+        themeVariables: {
+          darkMode: !isLight,
+          background: styles.getPropertyValue('--bg-primary').trim(),
+          primaryColor: styles.getPropertyValue('--accent').trim(),
+          primaryTextColor: styles.getPropertyValue('--text-primary').trim(),
+          primaryBorderColor: styles.getPropertyValue('--border-color').trim(),
+          lineColor: styles.getPropertyValue('--text-secondary').trim(),
+          secondaryColor: styles.getPropertyValue('--bg-secondary').trim(),
+          tertiaryColor: styles.getPropertyValue('--bg-secondary').trim()
+        }
+      });
+    }
+    
+    // Theme loaded from localStorage (set by main app)
+    
+    // Font management - load from localStorage to match main editor
+    const FONT_SANS_KEY = 'opendocsmd-font-sans';
+    
+    function loadFonts() {
+      const sansFont = localStorage.getItem(FONT_SANS_KEY) || 'system';
+      document.documentElement.setAttribute('data-font-sans', sansFont);
+    }
+
+    // Tab functionality
+    function showTab(btn, tabId) {
+      const container = btn.closest('.content-tabs');
+      container.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      container.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+    
+    // Initialize
+    loadTheme();
+    loadFonts();
+    
+    // Render math examples with KaTeX
+    function renderMathExamples() {
+      if (typeof katex === 'undefined') return;
+      
+      const mathExamples = [
+        { id: 'math-inline-1', tex: 'E = mc^2', display: false },
+        { id: 'math-inline-2', tex: 'x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}', display: false },
+        { id: 'math-block-1', tex: '\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}', display: true },
+        { id: 'math-block-2', tex: '\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}', display: true },
+        { id: 'math-block-3', tex: '\\nabla \\times \\vec{E} = -\\frac{\\partial \\vec{B}}{\\partial t}', display: true },
+        { id: 'math-sym-1', tex: '\\alpha, \\beta, \\gamma', display: false },
+        { id: 'math-sym-2', tex: '\\sum, \\prod, \\int', display: false },
+        { id: 'math-sym-3', tex: '\\frac{a}{b}', display: false },
+        { id: 'math-sym-4', tex: 'x^2, x_i', display: false },
+        { id: 'math-sym-5', tex: '\\sqrt{x}, \\sqrt[n]{x}', display: false },
+        { id: 'math-sym-6', tex: '\\leq, \\geq, \\neq', display: false },
+        { id: 'math-sym-7', tex: '\\infty, \\partial', display: false },
+        { id: 'math-sym-8', tex: '\\vec{v}, \\hat{i}', display: false },
+      ];
+      
+      mathExamples.forEach(({ id, tex, display }) => {
+        const el = document.getElementById(id);
+        if (el) {
+          try {
+            katex.render(tex, el, { displayMode: display, throwOnError: false });
+          } catch (e) {
+            el.textContent = tex;
+          }
+        }
+      });
+    }
+    
+    renderMathExamples();
+    
+    // Render plot examples
+    function renderPlotExamples() {
+      if (typeof functionPlot === 'undefined') return;
+      
+      const styles = getComputedStyle(document.documentElement);
+      const bgColor = styles.getPropertyValue('--bg-secondary').trim() || '#161b22';
+      const gridColor = styles.getPropertyValue('--border-color').trim() || '#30363d';
+      
+      const plotExamples = [
+        {
+          id: 'plot-example-1',
+          data: [{ fn: 'x^2', color: '#58a6ff' }],
+          xDomain: [-5, 5],
+          yDomain: [-2, 10]
+        },
+        {
+          id: 'plot-example-2',
+          data: [
+            { fn: 'sin(x)', color: '#58a6ff' },
+            { fn: 'cos(x)', color: '#f78166' },
+            { fn: 'tan(x)/5', color: '#7ee787' }
+          ],
+          xDomain: [-2 * Math.PI, 2 * Math.PI],
+          yDomain: [-2, 2]
+        },
+        {
+          id: 'plot-example-3',
+          data: [
+            { fn: 'x^2', color: '#58a6ff' },
+            { fn: '2*x + 1', color: '#f78166' }
+          ],
+          xDomain: [-5, 5],
+          yDomain: [-2, 10]
+        },
+        // Data plot examples
+        {
+          id: 'plot-data-1',
+          data: [
+            { points: [[1,120], [2,150], [3,180], [4,210]], fnType: 'points', graphType: 'polyline', color: '#58a6ff' },
+            { points: [[1,80], [2,95], [3,110], [4,125]], fnType: 'points', graphType: 'polyline', color: '#f78166' }
+          ],
+          xDomain: [0.5, 4.5],
+          yDomain: [0, 250]
+        },
+        {
+          id: 'plot-data-2',
+          data: [
+            { points: [[2020,450], [2021,520], [2022,680], [2023,890], [2024,1050]], fnType: 'points', graphType: 'polyline', color: '#58a6ff' }
+          ],
+          xDomain: [2019, 2025],
+          yDomain: [0, 1200]
+        },
+        {
+          id: 'plot-data-3',
+          data: [
+            { points: [[1,85], [2,90], [3,78], [4,92], [5,88], [6,95], [7,82]], fnType: 'points', graphType: 'scatter', color: '#58a6ff' }
+          ],
+          xDomain: [0, 8],
+          yDomain: [70, 100]
+        }
+      ];
+      
+      plotExamples.forEach(({ id, data, xDomain, yDomain }) => {
+        const el = document.getElementById(id);
+        if (el) {
+          try {
+            functionPlot({
+              target: `#${id}`,
+              width: el.offsetWidth || 400,
+              height: 250,
+              xAxis: { domain: xDomain },
+              yAxis: { domain: yDomain },
+              grid: true,
+              data: data.map(d => d.fnType === 'points' 
+                ? { points: d.points, fnType: 'points', graphType: d.graphType, color: d.color }
+                : { fn: d.fn, color: d.color, graphType: 'polyline' }),
+              disableZoom: false
+            });
+            
+            // Apply theme styling
+            const svg = el.querySelector('svg');
+            if (svg) {
+              svg.style.background = bgColor;
+              svg.querySelectorAll('text').forEach(t => t.style.fill = '#8b949e');
+              svg.querySelectorAll('.axis line, .axis path').forEach(l => l.style.stroke = gridColor);
+              svg.querySelectorAll('.grid line').forEach(l => {
+                l.style.stroke = gridColor;
+                l.style.strokeOpacity = '0.5';
+              });
+            }
+          } catch (e) {
+            el.innerHTML = `<div style="color: #f85149; padding: 12px;">Plot error: ${e.message}</div>`;
+          }
+        }
+      });
+    }
+    
+    renderPlotExamples();
+    
+    // Render 3D plot examples
+    function render3DPlotExamples() {
+      if (typeof Plotly === 'undefined') return;
+      
+      // Helper: generate sphere mesh
+      function generateSphere(radius, cx, cy, cz, resolution = 25) {
+        const xs = [], ys = [], zs = [];
+        for (let i = 0; i <= resolution; i++) {
+          const theta = (i / resolution) * Math.PI;
+          const xRow = [], yRow = [], zRow = [];
+          for (let j = 0; j <= resolution; j++) {
+            const phi = (j / resolution) * 2 * Math.PI;
+            xRow.push(cx + radius * Math.sin(theta) * Math.cos(phi));
+            yRow.push(cy + radius * Math.sin(theta) * Math.sin(phi));
+            zRow.push(cz + radius * Math.cos(theta));
+          }
+          xs.push(xRow); ys.push(yRow); zs.push(zRow);
+        }
+        return { x: xs, y: ys, z: zs };
+      }
+      
+      // Helper: generate parametric curve
+      function generateParametric(fnX, fnY, fnZ, tRange, steps) {
+        const xs = [], ys = [], zs = [];
+        const tStep = (tRange[1] - tRange[0]) / steps;
+        for (let i = 0; i <= steps; i++) {
+          const t = tRange[0] + i * tStep;
+          xs.push(fnX(t)); ys.push(fnY(t)); zs.push(fnZ(t));
+        }
+        return { x: xs, y: ys, z: zs };
+      }
+      
+      const plot3dExamples = [
+        {
+          id: 'plot3d-example-1',
+          type: 'surface',
+          fn: (x, y) => Math.sin(x) * Math.cos(y),
+          xRange: [-3, 3],
+          yRange: [-3, 3]
+        },
+        {
+          id: 'plot3d-example-2',
+          type: 'scatter',
+          data: [[1,1,50], [2,1,75], [3,1,60], [1,2,80], [2,2,95], [3,2,85], [1,3,70], [2,3,110], [3,3,90]],
+          title: 'Sales by Region'
+        },
+        {
+          id: 'plot3d-example-3',
+          type: 'surface',
+          fn: (x, y) => x*x + y*y,
+          xRange: [-3, 3],
+          yRange: [-3, 3],
+          title: 'Paraboloid'
+        },
+        // Sphere with orbit example
+        {
+          id: 'plot3d-orbit',
+          type: 'orbit',
+          title: 'Sphere with Orbit',
+          sphere: { radius: 1, color: '#1e90ff' },
+          parametric: {
+            x: t => 2 * Math.cos(t),
+            y: t => 2 * Math.sin(t) * Math.cos(0.4),
+            z: t => 2 * Math.sin(t) * Math.sin(0.4)
+          },
+          tRange: [0, 2 * Math.PI],
+          steps: 150
+        },
+        // Sphere with orbit
+        {
+          id: 'plot3d-sphere',
+          type: 'orbit',
+          sphere: { radius: 1.5, color: '#1e90ff' },
+          parametric: {
+            x: t => 3 * Math.cos(t),
+            y: t => 2 * Math.sin(t),
+            z: t => 0.5 * Math.sin(t)
+          },
+          tRange: [0, 2 * Math.PI],
+          steps: 150
+        },
+        // Helix
+        {
+          id: 'plot3d-helix',
+          type: 'parametric',
+          title: '3D Helix',
+          parametric: {
+            x: t => Math.cos(t),
+            y: t => Math.sin(t),
+            z: t => t / 5
+          },
+          tRange: [0, 25],
+          steps: 300
+        }
+      ];
+      
+      plot3dExamples.forEach(example => {
+        const el = document.getElementById(example.id);
+        if (!el) return;
+        
+        try {
+          let traces = [];
+          
+          if (example.type === 'surface') {
+            const resolution = 40;
+            const xValues = [], yValues = [], zValues = [];
+            const xStep = (example.xRange[1] - example.xRange[0]) / resolution;
+            const yStep = (example.yRange[1] - example.yRange[0]) / resolution;
+            
+            for (let i = 0; i <= resolution; i++) {
+              const y = example.yRange[0] + i * yStep;
+              yValues.push(y);
+              const zRow = [];
+              for (let j = 0; j <= resolution; j++) {
+                const x = example.xRange[0] + j * xStep;
+                if (i === 0) xValues.push(x);
+                zRow.push(example.fn(x, y));
+              }
+              zValues.push(zRow);
+            }
+            
+            traces.push({
+              type: 'surface',
+              x: xValues,
+              y: yValues,
+              z: zValues,
+              colorscale: 'Viridis',
+              showscale: true
+            });
+          } else if (example.type === 'scatter') {
+            traces.push({
+              type: 'scatter3d',
+              mode: 'markers',
+              x: example.data.map(p => p[0]),
+              y: example.data.map(p => p[1]),
+              z: example.data.map(p => p[2]),
+              marker: { size: 6, color: '#58a6ff' }
+            });
+          } else if (example.type === 'orbit' || example.type === 'parametric') {
+            // Add sphere if specified
+            if (example.sphere) {
+              const sphereData = generateSphere(example.sphere.radius, 0, 0, 0);
+              traces.push({
+                type: 'surface',
+                x: sphereData.x, y: sphereData.y, z: sphereData.z,
+                colorscale: [[0, example.sphere.color], [1, example.sphere.color]],
+                showscale: false,
+                opacity: 0.8,
+                name: 'Planet'
+              });
+            }
+            
+            // Add parametric trajectory
+            if (example.parametric) {
+              const paramData = generateParametric(
+                example.parametric.x, example.parametric.y, example.parametric.z,
+                example.tRange, example.steps
+              );
+              traces.push({
+                type: 'scatter3d',
+                mode: 'lines',
+                x: paramData.x, y: paramData.y, z: paramData.z,
+                line: { width: 4, color: '#f78166' },
+                name: 'Trajectory'
+              });
+              // Start marker
+              traces.push({
+                type: 'scatter3d',
+                mode: 'markers',
+                x: [paramData.x[0]], y: [paramData.y[0]], z: [paramData.z[0]],
+                marker: { size: 6, color: '#7ee787' },
+                name: 'Start'
+              });
+            }
+          }
+          
+          // Determine axis range
+          let maxR = 3;
+          if (example.sphere) maxR = Math.max(maxR, example.sphere.radius * 2.5);
+          if (example.parametric && example.tRange) maxR = Math.max(maxR, 4);
+          
+          const layout = {
+            title: example.title ? { text: example.title, font: { color: '#8b949e' } } : undefined,
+            paper_bgcolor: bgColor,
+            font: { color: '#8b949e' },
+            margin: { l: 0, r: 0, t: example.title ? 40 : 10, b: 0 },
+            scene: {
+              aspectmode: 'cube',
+              xaxis: { title: 'x', gridcolor: gridColor, backgroundcolor: bgColor, range: example.xRange || [-maxR, maxR] },
+              yaxis: { title: 'y', gridcolor: gridColor, backgroundcolor: bgColor, range: example.yRange || [-maxR, maxR] },
+              zaxis: { title: 'z', gridcolor: gridColor, backgroundcolor: bgColor, range: example.zRange || [-maxR, maxR] },
+              bgcolor: bgColor,
+              camera: { eye: { x: 1.5, y: 1.5, z: 1.2 } }
+            },
+            showlegend: traces.length > 2
+          };
+          
+          Plotly.newPlot(example.id, traces, layout, {
+            responsive: true,
+            displayModeBar: true,
+            displaylogo: false
+          });
+        } catch (e) {
+          el.innerHTML = `<div style="color: #f85149; padding: 12px;">3D Plot error: ${e.message}</div>`;
+        }
+      });
+    }
+    
+    render3DPlotExamples();
+    
+    // Listen for theme changes from parent window
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'theme-change') {
+        setTheme(event.data.theme, false);
+      }
+    });
+  </script>
+</body>
+</html>
