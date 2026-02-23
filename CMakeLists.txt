@@ -68,15 +68,16 @@ if(APPLE)
     target_link_libraries(${PROJECT_NAME} "-framework CoreFoundation" "-framework Security")
 endif()
 
-# Copy web assets and config to build directory
+# Symlink web assets into build directory so edits are live without rebuilding
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    COMMAND ${CMAKE_COMMAND} -E remove -f $<TARGET_FILE_DIR:${PROJECT_NAME}>/web
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
         ${CMAKE_SOURCE_DIR}/web
         $<TARGET_FILE_DIR:${PROJECT_NAME}>/web
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_SOURCE_DIR}/config.ini
         $<TARGET_FILE_DIR:${PROJECT_NAME}>/config.ini
-    COMMENT "Copying web assets and config..."
+    COMMENT "Symlinking web assets and copying config..."
 )
 
 # Installation

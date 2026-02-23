@@ -178,6 +178,13 @@ typedef struct {
     int64_t handled_by;
 } ldmd_password_forgot_t;
 
+// Active viewer of a document (ephemeral, tracked via heartbeat)
+typedef struct {
+    char user_uuid[LDMD_UUID_LENGTH];
+    char username[LDMD_MAX_USERNAME];
+    time_t last_seen;
+} ldmd_viewer_t;
+
 // Global application context
 typedef struct {
     ldmd_config_t *config;

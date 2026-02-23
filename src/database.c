@@ -130,6 +130,15 @@ static const char *SCHEMA_SQL =
     "  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
     ");"
 
+    // Active document viewers (ephemeral, keyed by document_uuid + user_uuid)
+    "CREATE TABLE IF NOT EXISTS document_viewers ("
+    "  document_uuid TEXT NOT NULL,"
+    "  user_uuid TEXT NOT NULL,"
+    "  username TEXT NOT NULL,"
+    "  last_seen INTEGER NOT NULL,"
+    "  PRIMARY KEY (document_uuid, user_uuid)"
+    ");"
+
     // Indexes
     "CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);"
     "CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);"
@@ -1658,6 +1667,60 @@ ldmd_error_t db_password_forgot_count_pending(ldmd_database_t *db, int *count) {
     *count = 0;
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         *count = sqlite3_column_int(stmt, 0);
+    }
+    sqlite3_finalize(stmt);
+    return LDMD_OK;
+}
+
+/* Upsert a document viewer heartbeat */
+ldmd_error_t db_document_viewer_ping(ldmd_database_t *db,
+                                     const char *document_uuid,
+                                     const char *user_uuid,
+                                     const char *username) {
+    const char *sql =
+        "INSERT INTO document_viewers (document_uuid, user_uuid, username, last_seen) "
+        "VALUES (?, ?, ?, ?) "
+        "ON CONFLICT(document_uuid, user_uuid) DO UPDATE SET username=excluded.username, last_seen=excluded.last_seen;";
+    sqlite3_stmt *stmt;
+    int rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) return LDMD_ERROR_DATABASE;
+
+    sqlite3_bind_text(stmt, 1, document_uuid, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, user_uuid,     -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, username,      -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(stmt, 4, (sqlite3_int64)time(NULL));
+
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_DONE) ? LDMD_OK : LDMD_ERROR_DATABASE;
+}
+
+/* List viewers active within the last 30 seconds */
+ldmd_error_t db_document_viewers_list(ldmd_database_t *db,
+                                      const char *document_uuid,
+                                      ldmd_viewer_t *viewers,
+                                      int max_viewers,
+                                      int *count) {
+    const char *sql =
+        "SELECT user_uuid, username, last_seen FROM document_viewers "
+        "WHERE document_uuid = ? AND last_seen >= ? "
+        "ORDER BY last_seen DESC;";
+    sqlite3_stmt *stmt;
+    int rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) return LDMD_ERROR_DATABASE;
+
+    sqlite3_bind_text(stmt,  1, document_uuid, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(stmt, 2, (sqlite3_int64)(time(NULL) - 30));
+
+    *count = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW && *count < max_viewers) {
+        ldmd_viewer_t *v = &viewers[*count];
+        const char *uuid = (const char *)sqlite3_column_text(stmt, 0);
+        const char *uname = (const char *)sqlite3_column_text(stmt, 1);
+        if (uuid)  ldmd_strlcpy(v->user_uuid, uuid,  sizeof(v->user_uuid));
+        if (uname) ldmd_strlcpy(v->username,  uname, sizeof(v->username));
+        v->last_seen = (time_t)sqlite3_column_int64(stmt, 2);
+        (*count)++;
     }
     sqlite3_finalize(stmt);
     return LDMD_OK;

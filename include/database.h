@@ -125,4 +125,15 @@ ldmd_error_t db_password_forgot_list_pending(ldmd_database_t *db,
 ldmd_error_t db_password_forgot_update(ldmd_database_t *db, ldmd_password_forgot_t *request);
 ldmd_error_t db_password_forgot_count_pending(ldmd_database_t *db, int *count);
 
+// Document viewer presence (ephemeral heartbeat tracking)
+ldmd_error_t db_document_viewer_ping(ldmd_database_t *db,
+                                     const char *document_uuid,
+                                     const char *user_uuid,
+                                     const char *username);
+ldmd_error_t db_document_viewers_list(ldmd_database_t *db,
+                                      const char *document_uuid,
+                                      ldmd_viewer_t *viewers,
+                                      int max_viewers,
+                                      int *count);
+
 #endif // DATABASE_H

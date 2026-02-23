@@ -25,7 +25,8 @@
                 {{document_name}}
             </h1>
         </div>
-        <div class="actions">
+        <div class="actions" style="display:flex;align-items:center;gap:12px;">
+            <div class="doc-viewer-presence" id="doc-viewer-presence" title="Currently viewing"></div>
             {{#if can_edit}}
             <a href="/editor/{{document_uuid}}" class="btn btn-primary">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -38,7 +39,7 @@
         </div>
     </div>
     
-    <article class="markdown-body">
+    <article class="markdown-body doc-content">
         {{content}}
     </article>
 </div>
@@ -50,7 +51,7 @@
     gap: var(--spacing-sm);
 }
 
-.document-page .markdown-body {
+.document-page .doc-content {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
@@ -58,13 +59,81 @@
     max-width: 100%;
     animation: fadeIn 0.3s ease;
 }
+
+/* Viewer presence chips (shared style) */
+.doc-viewer-presence {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.viewer-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    cursor: default;
+    border: 2px solid var(--card-bg);
+    box-sizing: content-box;
+    transition: transform 0.1s ease;
+}
+.viewer-chip:hover { transform: scale(1.15); }
+.viewer-chip:nth-child(2) { background: #10b981; }
+.viewer-chip:nth-child(3) { background: #f59e0b; }
+.viewer-chip:nth-child(4) { background: #ef4444; }
+.viewer-chip:nth-child(5) { background: #8b5cf6; }
+.viewer-chip-more {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    padding: 0 4px;
+    white-space: nowrap;
+}
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Syntax highlight code blocks
-    document.querySelectorAll('pre code').forEach((block) => {
-        hljs.highlightElement(block);
+(function() {
+    const DOC_UUID     = '{{document_uuid}}';
+    const CURRENT_USER = '{{username}}';
+    const presenceEl   = document.getElementById('doc-viewer-presence');
+
+    // Ping & poll
+    async function ping() {
+        try { await fetch('/api/documents/' + DOC_UUID + '/ping', {method:'POST'}); } catch(_){}
+    }
+    async function pollViewers() {
+        try {
+            const r = await fetch('/api/documents/' + DOC_UUID + '/viewers');
+            if (!r.ok) return;
+            const data = await r.json();
+            const others = (data.viewers || []).filter(v => v.username !== CURRENT_USER);
+            renderChips(others);
+        } catch(_){}
+    }
+    function renderChips(viewers) {
+        if (!viewers.length) { presenceEl.innerHTML = ''; return; }
+        const max = 4, extra = viewers.length - max;
+        let html = viewers.slice(0, max).map(v =>
+            `<span class="viewer-chip" title="${v.username}">${v.username.charAt(0).toUpperCase()}</span>`
+        ).join('');
+        if (extra > 0) html += `<span class="viewer-chip-more">+${extra}</span>`;
+        presenceEl.innerHTML = html;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Syntax highlight code blocks (server-rendered)
+        document.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+
+        ping();
+        pollViewers();
+        setInterval(ping,         15000);
+        setInterval(pollViewers,  5000);
     });
-});
+})();
 </script>
+

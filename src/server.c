@@ -145,7 +145,10 @@ void http_respond_json_with_cookie(struct mg_connection *c, int status, const ch
 }
 
 void http_respond_html(struct mg_connection *c, int status, const char *html) {
-    mg_http_reply(c, status, "Content-Type: text/html; charset=utf-8\r\n", "%s", html);
+    mg_http_reply(c, status,
+        "Content-Type: text/html; charset=utf-8\r\n"
+        "Cache-Control: no-store\r\n",
+        "%s", html);
 }
 
 void http_respond_error(struct mg_connection *c, int status, const char *message) {

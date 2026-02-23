@@ -335,6 +335,16 @@ bool routes_handle(http_request_t *req) {
         route_api_documents_render(req, param1);
         return true;
     }
+
+    if (uri_match(req, "/api/documents/*/ping", param1, NULL) && method_is(req, "POST")) {
+        route_api_documents_ping(req, param1);
+        return true;
+    }
+
+    if (uri_match(req, "/api/documents/*/viewers", param1, NULL) && method_is(req, "GET")) {
+        route_api_documents_viewers(req, param1);
+        return true;
+    }
     
     if (uri_match(req, "/api/documents/*", param1, NULL)) {
         if (method_is(req, "GET")) {
@@ -1932,5 +1942,49 @@ void route_api_admin_reset_user_password(http_request_t *req, const char *user_u
         http_respond_error(req->conn, 500, "Internal error");
     } else {
         http_respond_json(req->conn, 200, "{\"success\":true}");
+    }
+}
+
+void route_api_documents_ping(http_request_t *req, const char *doc_uuid) {
+    if (!require_auth(req)) return;
+
+    ldmd_error_t err = db_document_viewer_ping(req->server->db,
+                                               doc_uuid,
+                                               req->user.uuid,
+                                               req->user.username);
+    if (err != LDMD_OK) {
+        http_respond_json(req->conn, 200, "{\"ok\":false}");
+    } else {
+        http_respond_json(req->conn, 200, "{\"ok\":true}");
+    }
+}
+
+void route_api_documents_viewers(http_request_t *req, const char *doc_uuid) {
+    if (!require_auth(req)) return;
+
+    ldmd_viewer_t viewers[64];
+    int count = 0;
+    db_document_viewers_list(req->server->db, doc_uuid, viewers, 64, &count);
+
+    cJSON *arr = cJSON_CreateArray();
+    for (int i = 0; i < count; i++) {
+        cJSON *v = cJSON_CreateObject();
+        cJSON_AddStringToObject(v, "uuid",      viewers[i].user_uuid);
+        cJSON_AddStringToObject(v, "username",  viewers[i].username);
+        cJSON_AddNumberToObject(v, "last_seen", (double)viewers[i].last_seen);
+        cJSON_AddItemToArray(arr, v);
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "viewers", arr);
+    cJSON_AddNumberToObject(root, "count", count);
+
+    char *body = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (body) {
+        http_respond_json(req->conn, 200, body);
+        free(body);
+    } else {
+        http_respond_error(req->conn, 500, "Internal error");
     }
 }
