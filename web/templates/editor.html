@@ -58,6 +58,10 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
                 Save
             </button>
+            <button onclick="openRenameDoc()" class="btn" title="Rename this document">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                Rename
+            </button>
             <a href="/document/{{document_uuid}}" class="btn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                 View
@@ -978,4 +982,77 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 
 })();
+</script>
+<!-- Rename Document Modal -->
+<div id="rename-doc-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Rename Document</h3>
+            <button onclick="closeModal('rename-doc-modal')" class="btn-close">&times;</button>
+        </div>
+        <form onsubmit="return submitEditorRename(event)">
+            <div class="form-group">
+                <label for="editor-rename-name">New Name</label>
+                <input type="text" id="editor-rename-name" placeholder="e.g., Getting Started.md" required>
+                <small>.md extension will be added if omitted</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('rename-doc-modal')" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="editor-rename-btn">Rename</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const _editorDocUuid = '{{document_uuid}}';
+const _editorDocName = '{{document_name}}';
+let _currentDocName = _editorDocName;
+
+function openRenameDoc() {
+    document.getElementById('editor-rename-name').value = _currentDocName;
+    showModal('rename-doc-modal');
+    setTimeout(() => { document.getElementById('editor-rename-name').select(); }, 50);
+}
+
+async function submitEditorRename(e) {
+    e.preventDefault();
+    let name = document.getElementById('editor-rename-name').value.trim();
+    if (!name) return false;
+    if (!name.toLowerCase().endsWith('.md') && !name.toLowerCase().endsWith('.markdown')) {
+        name += '.md';
+    }
+    const btn = document.getElementById('editor-rename-btn');
+    btn.disabled = true;
+    btn.textContent = 'Renaming...';
+    try {
+        const resp = await fetch(`/api/documents/${_editorDocUuid}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        if (resp.ok) {
+            closeModal('rename-doc-modal');
+            _currentDocName = name;
+            // Update breadcrumb last span
+            const bcSpan = document.querySelector('.breadcrumb span:last-child');
+            if (bcSpan) bcSpan.textContent = name;
+            // Update editor header h1 text (keep SVG icon child)
+            const h1 = document.querySelector('.editor-header h1');
+            if (h1) {
+                const textNode = [...h1.childNodes].find(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+                if (textNode) textNode.textContent = '\n            ' + name + '\n        ';
+            }
+            document.title = `Edit: ${name} - LocalDocsMD`;
+        } else {
+            const data = await resp.json().catch(() => ({}));
+            alert(data.error || 'Failed to rename document');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Rename';
+    return false;
+}
 </script>

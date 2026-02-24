@@ -99,7 +99,8 @@
 
 <script>
 const projectUuid = '{{project_uuid}}';
-const canEdit = '{{can_edit}}' === '1';
+const canEdit = '{{can_edit}}' === 'true';
+const canManage = '{{can_manage}}' === 'true';
 
 document.addEventListener('DOMContentLoaded', function() {
     loadDocuments();
@@ -137,12 +138,11 @@ async function loadDocuments() {
                     </svg>
                     <span class="document-name">${escapeHtml(doc.name)}</span>
                 </a>
-                ${canEdit ? `
-                    <div class="document-actions">
-                        <a href="/editor/${doc.uuid}" class="btn btn-sm">Edit</a>
-                        <button onclick="event.stopPropagation(); deleteDocument('${doc.uuid}', '${escapeHtml(doc.name)}')" class="btn btn-sm btn-danger">Delete</button>
-                    </div>
-                ` : ''}
+                <div class="document-actions">
+                    ${canEdit ? `<a href="/editor/${doc.uuid}" class="btn btn-sm">Edit</a>` : ''}
+                    ${canEdit ? `<button onclick="event.stopPropagation(); renameDocument('${doc.uuid}', '${escapeHtml(doc.name).replace(/'/g, "\\'")}'  )" class="btn btn-sm">Rename</button>` : ''}
+                    ${canManage ? `<button onclick="event.stopPropagation(); deleteDocument('${doc.uuid}', '${escapeHtml(doc.name).replace(/'/g, "\\'")}'  )" class="btn btn-sm btn-danger">Delete</button>` : ''}
+                </div>
             </div>
         `).join('');
     } catch (err) {
@@ -209,11 +209,55 @@ async function deleteDocument(uuid, name) {
         if (response.ok) {
             loadDocuments();
         } else {
-            alert('Failed to delete document');
+            const data = await response.json().catch(() => ({}));
+            alert(data.error || 'Failed to delete document');
         }
     } catch (err) {
         alert('Connection error');
     }
+}
+
+function renameDocument(uuid, currentName) {
+    document.getElementById('rename-doc-uuid').value = uuid;
+    document.getElementById('rename-doc-name').value = currentName;
+    showModal('rename-document-modal');
+}
+
+async function submitRenameDocument(e) {
+    e.preventDefault();
+    const uuid = document.getElementById('rename-doc-uuid').value;
+    let name = document.getElementById('rename-doc-name').value.trim();
+    if (!name) return false;
+
+    // Ensure .md extension
+    if (!name.toLowerCase().endsWith('.md') && !name.toLowerCase().endsWith('.markdown')) {
+        name += '.md';
+    }
+
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.textContent = 'Renaming...';
+
+    try {
+        const response = await fetch(`/api/documents/${uuid}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        if (response.ok) {
+            closeModal('rename-document-modal');
+            loadDocuments();
+        } else {
+            const data = await response.json().catch(() => ({}));
+            alert(data.error || 'Failed to rename document');
+        }
+    } catch (err) {
+        alert('Connection error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Rename';
+    return false;
 }
 
 function showSettings() {
@@ -274,6 +318,28 @@ async function deleteProject() {
     }
 }
 </script>
+
+<!-- Rename Document Modal -->
+<div id="rename-document-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Rename Document</h3>
+            <button onclick="closeModal('rename-document-modal')" class="btn-close">&times;</button>
+        </div>
+        <form onsubmit="return submitRenameDocument(event)">
+            <input type="hidden" id="rename-doc-uuid">
+            <div class="form-group">
+                <label for="rename-doc-name">New Name</label>
+                <input type="text" id="rename-doc-name" placeholder="e.g., Getting Started.md" required>
+                <small>.md extension will be added if omitted</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('rename-document-modal')" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Rename</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <style>
 .empty-state-box {

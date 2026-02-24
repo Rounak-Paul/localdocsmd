@@ -582,6 +582,7 @@ void route_page_project(http_request_t *req, const char *project_uuid) {
     template_set(ctx, "workspace_uuid", workspace.uuid);
     template_set_bool(ctx, "is_admin", req->user.global_role == ROLE_ADMIN);
     template_set_bool(ctx, "can_edit", rbac_can_edit_workspace(req->server->db, req->user.id, workspace.id));
+    template_set_bool(ctx, "can_manage", rbac_is_workspace_admin(req->server->db, req->user.id, workspace.id));
     set_navbar(ctx, req);
     
     char *html = NULL;
@@ -688,6 +689,7 @@ void route_page_editor(http_request_t *req, const char *document_uuid) {
     template_set(ctx, "content", escaped_content ? escaped_content : "");
     template_set(ctx, "project_name", project.name);
     template_set(ctx, "project_uuid", project.uuid);
+    template_set_bool(ctx, "can_manage", rbac_is_workspace_admin(req->server->db, req->user.id, project.workspace_id));
     set_navbar(ctx, req);
     
     free(escaped_content);
@@ -1682,8 +1684,8 @@ void route_api_documents_delete(http_request_t *req, const char *doc_uuid) {
     ldmd_project_t project;
     db_project_get_by_id(req->server->db, doc.project_id, &project);
     
-    if (!rbac_can_edit_workspace(req->server->db, req->user.id, project.workspace_id)) {
-        http_respond_error(req->conn, 403, "Edit access required");
+    if (!rbac_is_workspace_admin(req->server->db, req->user.id, project.workspace_id)) {
+        http_respond_error(req->conn, 403, "Manager access required");
         return;
     }
     
