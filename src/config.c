@@ -162,7 +162,10 @@ ldmd_config_t *config_load(const char *path) {
     ldmd_strlcpy(config->allowed_extensions,
                  ini_get(ini, "storage", "allowed_extensions", ".md,.markdown,.txt,.json,.yaml,.yml"),
                  sizeof(config->allowed_extensions));
-    
+
+    // Threading settings
+    config->num_threads = ini_get_int(ini, "server_threading", "num_threads", 0);
+
     ini_free(ini);
     
     LOG_INFO("Configuration loaded from: %s", path);

@@ -29,6 +29,9 @@ struct ldmd_config {
     char documents_path[LDMD_MAX_PATH];
     size_t max_file_size;
     char allowed_extensions[512];
+
+    // Threading
+    int num_threads;   /* 0 = auto (# CPU cores), 1 = single-threaded, N = N workers */
 };
 
 /**

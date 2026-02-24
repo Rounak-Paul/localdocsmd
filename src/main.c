@@ -105,6 +105,7 @@ int main(int argc, char *argv[]) {
         ldmd_strlcpy(config->documents_path, "data/documents", sizeof(config->documents_path));
         config->max_file_size = 5242880;
         ldmd_strlcpy(config->allowed_extensions, ".md,.markdown,.txt", sizeof(config->allowed_extensions));
+        config->num_threads = 0; /* auto-detect */
     }
     
     // Apply port override

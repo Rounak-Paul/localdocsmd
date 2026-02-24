@@ -463,7 +463,7 @@ function initMarked() {
                 const rawLines = code.split('\n'), hlLines = highlighted.split('\n');
                 return rawLines.map((_, idx) =>
                     `<span class="code-line"><span class="line-number">${idx+1}</span><span class="line-content">${hlLines[idx]||''}</span></span>`
-                ).join('\n');
+                ).join('');
             }
         }));
     }

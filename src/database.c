@@ -185,8 +185,11 @@ ldmd_database_t *db_init(const char *path) {
         return NULL;
     }
     
-    // Enable foreign keys
+    // Enable foreign keys and WAL mode for concurrent read access
     sqlite3_exec(db->db, "PRAGMA foreign_keys = ON;", NULL, NULL, NULL);
+    sqlite3_exec(db->db, "PRAGMA journal_mode = WAL;", NULL, NULL, NULL);
+    sqlite3_exec(db->db, "PRAGMA synchronous = NORMAL;", NULL, NULL, NULL);
+    sqlite3_exec(db->db, "PRAGMA busy_timeout = 5000;", NULL, NULL, NULL);
     
     // Create schema
     char *errmsg = NULL;

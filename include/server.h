@@ -4,17 +4,97 @@
 #include "localdocsmd.h"
 #include "config.h"
 #include "database.h"
+#include "mongoose.h"
+#include <pthread.h>
 
-// Forward declare mongoose types
-struct mg_connection;
-struct mg_http_message;
+/* mongoose.h provides the complete struct mg_http_message, mg_mgr,
+   and mg_connection definitions needed by ldmd_work_item_t. */
 
-// Server structure
+/* ── Thread pool constants ──────────────────────────────────────── */
+#define LDMD_MAX_WORKER_THREADS 64
+#define LDMD_WORK_QUEUE_MAX     4096   /* max queued requests before back-pressure */
+
+/* ── Per-request work item ─────────────────────────────────────── *
+ * All fields that routes need are deep-copied here so the worker
+ * thread never touches Mongoose's internal receive buffers.        */
+typedef struct ldmd_work_item {
+    /* routing key – used to deliver the response */
+    unsigned long  conn_id;       /* mg_connection->id of the requester */
+    struct mg_mgr *mgr;           /* main event-loop manager             */
+
+    /* deep-copied HTTP data */
+    char   method_buf[16];
+    char   uri_buf[LDMD_MAX_PATH];
+    char   query_buf[2048];
+    char  *body_buf;              /* malloc'd, NULL if no body           */
+    size_t body_buf_len;
+
+    /* synthesised mg_http_message whose mg_str fields point to above */
+    struct mg_http_message fake_hm;
+
+    /* auth – resolved on the main thread before dispatch             */
+    ldmd_session_t session;
+    ldmd_user_t    user;
+    bool           authenticated;
+    bool           is_localhost;
+    char           client_ip[64];
+
+    /* response – filled by the worker thread                         */
+    int   resp_status;
+    char  resp_headers[1024];   /* complete header string, e.g.
+                                   "Content-Type: …\r\nSet-Cookie: …\r\n" */
+    char *resp_body;            /* malloc'd, NULL for empty body       */
+    size_t resp_body_len;
+
+    struct ldmd_work_item *next;
+} ldmd_work_item_t;
+
+/* ── Thread-local response capture ────────────────────────────── *
+ * When http_respond_* is called from a worker thread the TLS key
+ * points to one of these; the function populates it instead of
+ * calling mg_http_reply.                                           */
+typedef struct {
+    bool   active;
+    int    status;
+    char   headers[1024];
+    char  *body;       /* malloc'd */
+    size_t body_len;
+} ldmd_resp_capture_t;
+
+/* Thread-local key – defined in server.c, extern here             */
+extern pthread_key_t g_resp_capture_key;
+
+/* ── Thread pool ───────────────────────────────────────────────── */
+typedef struct ldmd_thread_pool {
+    /* pending work */
+    pthread_mutex_t  work_mutex;
+    pthread_cond_t   work_cond;
+    ldmd_work_item_t *work_head, *work_tail;
+    int              work_count;
+
+    /* completed responses waiting to be sent by main thread */
+    pthread_mutex_t  resp_mutex;
+    ldmd_work_item_t *resp_head;
+
+    /* worker threads */
+    pthread_t        threads[LDMD_MAX_WORKER_THREADS];
+    int              num_threads;
+    volatile bool    shutdown;
+
+    /* per-worker DB connections (index == worker slot) */
+    ldmd_database_t *dbs[LDMD_MAX_WORKER_THREADS];
+
+    /* back-reference */
+    struct ldmd_server *server;
+} ldmd_thread_pool_t;
+
+/* ── Server structure ──────────────────────────────────────────── */
 struct ldmd_server {
-    struct mg_mgr *mgr;
-    ldmd_config_t *config;
-    ldmd_database_t *db;
-    bool running;
+    struct mg_mgr      *mgr;
+    ldmd_config_t      *config;
+    ldmd_database_t    *db;       /* main-thread DB connection   */
+    bool                running;
+    ldmd_thread_pool_t *pool;     /* NULL when num_threads == 0  */
 };
 
 /**
@@ -59,14 +139,14 @@ void http_respond_redirect(struct mg_connection *c, const char *location);
 
 // Request context
 typedef struct {
-    struct mg_connection *conn;
+    struct mg_connection   *conn;   /* may be NULL for worker-thread requests */
     struct mg_http_message *hm;
-    ldmd_server_t *server;
-    ldmd_session_t session;
-    ldmd_user_t user;
-    bool authenticated;
-    bool is_localhost;
-    char client_ip[64];
+    ldmd_server_t          *server;
+    ldmd_session_t          session;
+    ldmd_user_t             user;
+    bool                    authenticated;
+    bool                    is_localhost;
+    char                    client_ip[64];
 } http_request_t;
 
 /**
@@ -105,5 +185,10 @@ bool http_get_query_param(http_request_t *req, const char *name, char *value_out
  * @param max_age Max age in seconds
  */
 void http_set_session_cookie(struct mg_connection *c, const char *token, int max_age);
+
+/**
+ * Build Set-Cookie header string into buf, returns buf.
+ */
+char *http_build_cookie_header(char *buf, size_t size, const char *token, int max_age);
 
 #endif // SERVER_H
