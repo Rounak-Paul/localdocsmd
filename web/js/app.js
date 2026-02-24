@@ -39,6 +39,61 @@ async function logout() {
     window.location.href = '/login';
 }
 
+// User menu dropdown
+function toggleUserMenu(e) {
+    e.stopPropagation();
+    const dropdown = document.getElementById('user-dropdown');
+    if (!dropdown) return;
+    const isVisible = dropdown.style.display !== 'none';
+    dropdown.style.display = isVisible ? 'none' : 'block';
+}
+
+// Open change-password modal from user dropdown
+function openChangePassword() {
+    const dropdown = document.getElementById('user-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    const fields = ['cp-current', 'cp-new', 'cp-confirm'];
+    fields.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    showModal('change-password-modal');
+}
+
+async function submitChangePassword(e) {
+    e.preventDefault();
+    const current = document.getElementById('cp-current').value;
+    const newPass = document.getElementById('cp-new').value;
+    const confirm = document.getElementById('cp-confirm').value;
+
+    if (newPass !== confirm) {
+        showToast('New passwords do not match', 'error');
+        return false;
+    }
+
+    const btn = document.getElementById('cp-submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Changing...';
+
+    try {
+        const response = await fetch('/api/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ current_password: current, new_password: newPass })
+        });
+        const data = await response.json();
+        if (response.ok) {
+            closeModal('change-password-modal');
+            showToast(data.message || 'Password changed successfully', 'success');
+        } else {
+            showToast(data.error || 'Failed to change password', 'error');
+        }
+    } catch (err) {
+        showToast('Connection error', 'error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Change Password';
+    return false;
+}
+
 // Close modal on escape key
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
@@ -48,10 +103,15 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// Close modal on backdrop click
+// Close modal on backdrop click; also close user dropdown when clicking outside
 document.addEventListener('click', function(e) {
     if (e.target.classList.contains('modal')) {
         e.target.style.display = 'none';
+    }
+    const menu = document.getElementById('user-menu');
+    if (menu && !menu.contains(e.target)) {
+        const dropdown = document.getElementById('user-dropdown');
+        if (dropdown) dropdown.style.display = 'none';
     }
 });
 

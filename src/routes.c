@@ -10,6 +10,7 @@
 #include "cJSON.h"
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 // Helper to check if method matches
 static bool method_is(http_request_t *req, const char *method) {
@@ -87,17 +88,21 @@ static void set_navbar(template_ctx_t *ctx, http_request_t *req) {
         template_set(ctx, "navbar", "");
         return;
     }
-    
-    char navbar[2048];
-    const char *admin_link = (req->user.global_role == ROLE_ADMIN) 
-        ? "<a href=\"/admin\">Admin</a>" 
+
+    char navbar[8192];
+    const char *admin_link = (req->user.global_role == ROLE_ADMIN)
+        ? "<a href=\"/admin\">Admin</a>"
         : "";
-    
+    const char *role_str = rbac_role_to_string(req->user.global_role);
+    char avatar = (char)toupper((unsigned char)req->user.username[0]);
+    const char *pending_badge = req->user.password_change_pending
+        ? "<div class=\"user-dropdown-pending\">&#9679; Password change pending approval</div>"
+        : "";
+
     snprintf(navbar, sizeof(navbar),
         "<nav class=\"navbar\">"
         "<div class=\"navbar-brand\"><a href=\"/dashboard\">Local<span>Docs</span>MD</a></div>"
         "<div class=\"navbar-menu\">"
-        "<span class=\"navbar-user\">%s</span>"
         "%s"
         "<div class=\"theme-switcher\">"
         "<button class=\"btn\" title=\"Theme\">&#9728;</button>"
@@ -108,11 +113,36 @@ static void set_navbar(template_ctx_t *ctx, http_request_t *req) {
         "<button class=\"theme-option\" onclick=\"setTheme('nord')\"><span class=\"theme-preview\" style=\"background:#2e3440;border-color:#4c566a\"></span>Nord</button>"
         "</div>"
         "</div>"
-        "<a href=\"#\" onclick=\"logout();return false;\" class=\"btn\">Logout</a>"
+        "<div class=\"user-menu\" id=\"user-menu\">"
+        "<button class=\"navbar-user\" onclick=\"toggleUserMenu(event)\">"
+        "<span class=\"user-avatar-sm\">%c</span>"
+        "<span class=\"user-name-text\">%s</span>"
+        "<svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"6 9 12 15 18 9\"></polyline></svg>"
+        "</button>"
+        "<div class=\"user-dropdown\" id=\"user-dropdown\" style=\"display:none\">"
+        "<div class=\"user-dropdown-header\">"
+        "<div class=\"user-avatar-lg\">%c</div>"
+        "<div class=\"user-dropdown-info\">"
+        "<div class=\"user-dropdown-name\">%s</div>"
+        "<div class=\"user-dropdown-email\">%s</div>"
+        "<span class=\"badge badge-%s\">%s</span>"
+        "</div>"
+        "</div>"
+        "%s"
+        "<div class=\"user-dropdown-divider\"></div>"
+        "<button class=\"user-dropdown-item\" onclick=\"openChangePassword()\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\"></rect><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"></path></svg>Change Password</button>"
+        "<div class=\"user-dropdown-divider\"></div>"
+        "<button class=\"user-dropdown-item user-dropdown-item-danger\" onclick=\"logout()\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\"></path><polyline points=\"16 17 21 12 16 7\"></polyline><line x1=\"21\" y1=\"12\" x2=\"9\" y2=\"12\"></line></svg>Logout</button>"
+        "</div>"
+        "</div>"
         "</div>"
         "</nav>",
-        req->user.username, admin_link);
-    
+        admin_link,
+        avatar, req->user.username,
+        avatar, req->user.username, req->user.email,
+        role_str, role_str,
+        pending_badge);
+
     template_set(ctx, "navbar", navbar);
 }
 
