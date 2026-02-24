@@ -1,8 +1,8 @@
 <div class="dashboard">
-    <div class="page-header">
+    <div class="page-header dash-greeting-header">
         <div>
-            <h1>Dashboard</h1>
-            <p class="description">Manage your documentation workspaces</p>
+            <h1><span id="greeting-text">Welcome back,</span> <span class="greeting-username">{{username}}</span></h1>
+            <p class="description" id="greeting-date"></p>
         </div>
         {{#if is_admin}}
         <div class="actions">
@@ -28,6 +28,10 @@
     </div>
     {{/if}}
     
+    <div id="activity-heatmap-section" class="heatmap-section" style="display:none;">
+        <div id="activity-heatmap"></div>
+    </div>
+
     <div class="section">
         <h2>Your Workspaces</h2>
         <div id="workspaces-list" class="grid">
@@ -92,6 +96,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    initGreeting();
     loadWorkspaces();
     
     // Check if password change is required
@@ -100,6 +105,17 @@ document.addEventListener('DOMContentLoaded', function() {
         showModal('change-password-modal');
     }
 });
+
+function initGreeting() {
+    const now = new Date();
+    const h = now.getHours();
+    const prefix = h < 12 ? 'Good morning,' : h < 17 ? 'Good afternoon,' : 'Good evening,';
+    document.getElementById('greeting-text').textContent = prefix;
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('greeting-date').textContent =
+        days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear();
+}
 
 async function loadWorkspaces() {
     try {
@@ -123,27 +139,186 @@ async function loadWorkspaces() {
         }
         
         container.innerHTML = workspaces.map(ws => `
-            <div class="card" onclick="window.location='/workspace/${ws.uuid}'">
+            <div class="card ws-card" onclick="window.location='/workspace/${ws.uuid}'">
                 <div class="card-header">
                     <h3>${escapeHtml(ws.name)}</h3>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.4;">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
+                    <span class="role-badge role-${ws.user_role}">${ws.user_role}</span>
                 </div>
                 <div class="card-body">
-                    <p>${escapeHtml(ws.description || 'No description')}</p>
+                    <p class="card-desc">${escapeHtml(ws.description || 'No description')}</p>
+                    <div class="card-meta">
+                        <span title="Projects">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                            ${ws.project_count} project${ws.project_count !== 1 ? 's' : ''}
+                        </span>
+                        <span title="Members">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                            ${ws.member_count} member${ws.member_count !== 1 ? 's' : ''}
+                        </span>
+                        <span class="meta-muted" title="Last updated">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            ${relativeTime(ws.updated_at)}
+                        </span>
+                    </div>
                 </div>
             </div>
         `).join('');
+
+        renderHeatmap(workspaces);
     } catch (err) {
         console.error('Error loading workspaces:', err);
         document.getElementById('workspaces-list').innerHTML = '<p class="empty-state">Error loading workspaces</p>';
     }
 }
 
+/* ── heatmap ─────────────────────────────────────────────────────── */
+let _hmWorkspaces = [];
+let _hmYear = new Date().getFullYear();
+
+function renderHeatmap(workspaces) {
+    _hmWorkspaces = workspaces;
+    _hmYear = new Date().getFullYear();
+    renderHeatmapForYear(_hmYear);
+}
+
+function renderHeatmapForYear(year) {
+    _hmYear = year;
+    const workspaces = _hmWorkspaces;
+
+    // Build date -> count map
+    const counts = {};
+    workspaces.forEach(w => {
+        if (!w.updated_at) return;
+        const d = new Date(w.updated_at * 1000);
+        const key = d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+        counts[key] = (counts[key] || 0) + 1;
+    });
+
+    // All years that have activity + current year, sorted newest first
+    const currentYear = new Date().getFullYear();
+    const allYears = [...new Set(
+        workspaces
+            .filter(w => w.updated_at)
+            .map(w => new Date(w.updated_at * 1000).getFullYear())
+            .concat([currentYear])
+    )].sort((a, b) => b - a);
+
+    // Day range for the chosen year
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let startDate, endDate;
+    if (year === currentYear) {
+        startDate = new Date(today); startDate.setDate(startDate.getDate() - 364);
+        endDate = today;
+    } else {
+        startDate = new Date(year, 0, 1);
+        endDate = new Date(year, 11, 31);
+    }
+
+    const days = [];
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        const key = d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+        days.push({ date: new Date(d), key, count: counts[key] || 0 });
+    }
+
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    // Group into week columns; pad the first partial week
+    const firstDow = days[0].date.getDay();
+    const cells = Array(firstDow).fill(null).concat(days);
+    const weeks = [];
+    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+    // Build month segments: [{label, colCount}]  (gap:0, each span covers colCount*13px)
+    const CELL = 13; // 11px cell + 2px gap
+    const segs = [];
+    let lastMo = -1;
+    weeks.forEach(week => {
+        const first = week.find(c => c !== null);
+        if (first) {
+            const mo = first.date.getMonth();
+            if (mo !== lastMo) { segs.push({ label: monthNames[mo], cols: 1 }); lastMo = mo; }
+            else segs[segs.length - 1].cols++;
+        } else {
+            // empty leading padding week
+            if (segs.length === 0) segs.push({ label: '', cols: 1 });
+            else segs[segs.length - 1].cols++;
+        }
+    });
+
+    const monthLabelsHtml = segs
+        .map(s => `<span style="width:${s.cols * CELL}px;flex-shrink:0">${s.label}</span>`)
+        .join('');
+
+    const totalActive = days.filter(d => d.count > 0).length;
+    const section = document.getElementById('activity-heatmap-section');
+    const container = document.getElementById('activity-heatmap');
+    section.style.display = '';
+
+    const yearTabsHtml = allYears.length > 1
+        ? `<div class="heatmap-year-tabs">${
+            allYears.map(y =>
+                `<button class="hm-year-btn${y === year ? ' active' : ''}" onclick="renderHeatmapForYear(${y})">${y}</button>`
+            ).join('')
+          }</div>`
+        : '';
+
+    container.innerHTML = `
+        <div class="heatmap-header">
+            <div style="display:flex;align-items:baseline;gap:0.75rem;flex:1">
+                <span class="heatmap-title">Workspace activity</span>
+                <span class="heatmap-sub">${totalActive} active day${totalActive !== 1 ? 's' : ''}</span>
+            </div>
+            ${yearTabsHtml}
+        </div>
+        <div class="heatmap-scroll">
+            <div class="heatmap-inner">
+                <div class="heatmap-days">
+                    <span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
+                </div>
+                <div class="heatmap-cols-wrap">
+                    <div class="heatmap-months">${monthLabelsHtml}</div>
+                    <div class="heatmap-grid">${
+                        weeks.map(week =>
+                            `<div class="hm-col">${
+                                week.map(cell => {
+                                    if (!cell) return '<div class="hm-cell hm-empty"></div>';
+                                    const lvl = cell.count === 0 ? 0 : cell.count <= 2 ? 1 : cell.count <= 4 ? 2 : 3;
+                                    return `<div class="hm-cell hm-l${lvl}" title="${cell.key}: ${cell.count} update${cell.count !== 1 ? 's' : ''}"></div>`;
+                                }).join('')
+                            }</div>`
+                        ).join('')
+                    }</div>
+                </div>
+            </div>
+        </div>
+        <div class="heatmap-legend">
+            <span>Less</span>
+            <div class="hm-cell hm-l0"></div>
+            <div class="hm-cell hm-l1"></div>
+            <div class="hm-cell hm-l2"></div>
+            <div class="hm-cell hm-l3"></div>
+            <span>More</span>
+        </div>
+    `;
+}
+
 function showCreateWorkspace() {
     showModal('create-workspace-modal');
+}
+
+function relativeTime(unixSec) {
+    if (!unixSec) return 'never';
+    const diff = Math.floor(Date.now() / 1000) - unixSec;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) { const m = Math.floor(diff/60); return m + ' minute' + (m>1?'s':'') + ' ago'; }
+    if (diff < 86400) { const h = Math.floor(diff/3600); return h + ' hour' + (h>1?'s':'') + ' ago'; }
+    if (diff < 2592000) { const d = Math.floor(diff/86400); return d + ' day' + (d>1?'s':'') + ' ago'; }
+    if (diff < 31536000) { const mo = Math.floor(diff/2592000); return mo + ' month' + (mo>1?'s':'') + ' ago'; }
+    const y = Math.floor(diff/31536000); return y + ' year' + (y>1?'s':'') + ' ago';
 }
 
 async function createWorkspace(e) {
@@ -225,6 +400,143 @@ async function changePassword(e) {
 </script>
 
 <style>
+/* ── greeting ───────────────────────────────────────────────────── */
+.dash-greeting-header h1 { font-size: 1.6rem; font-weight: 700; }
+.greeting-username { color: var(--accent, #3b82f6); }
+#greeting-date { font-size: 0.9rem; color: var(--text-muted); margin-top: 0.1rem; }
+
+/* ── activity heatmap ───────────────────────────────────────────── */
+.heatmap-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem 0.9rem;
+    margin-bottom: 1.5rem;
+}
+.heatmap-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+}
+.heatmap-title { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
+.heatmap-sub   { font-size: 0.75rem; color: var(--text-muted); }
+
+.heatmap-scroll { overflow-x: auto; }
+
+/* inner = days-column + (months row above grid columns) */
+.heatmap-inner {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 3px;
+    min-width: max-content;
+}
+
+/* left: 7 day-of-week labels, top-padded to sit below the month row */
+.heatmap-days {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 17px; /* matches month label height */
+    flex-shrink: 0;
+}
+.heatmap-days span {
+    height: 11px;
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    line-height: 11px;
+    white-space: nowrap;
+    text-align: right;
+    width: 22px;
+}
+
+/* right wrapper: month labels on top, week columns below */
+.heatmap-cols-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.heatmap-months {
+    display: flex;
+    gap: 0;
+    height: 14px;
+    align-items: flex-end;
+}
+.heatmap-months span {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    overflow: visible;
+    white-space: nowrap;
+    text-align: left;
+}
+
+/* year tabs */
+.heatmap-year-tabs {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+.hm-year-btn {
+    font-size: 0.73rem;
+    padding: 0.1em 0.6em;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    line-height: 1.6;
+}
+.hm-year-btn:hover { background: var(--border-color); }
+.hm-year-btn.active { background: var(--accent, #3b82f6); color: #fff; border-color: var(--accent, #3b82f6); }
+
+.heatmap-grid {
+    display: flex;
+    gap: 2px;
+}
+
+.hm-col {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.hm-cell {
+    width: 11px;
+    height: 11px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.hm-empty { background: transparent; }
+.hm-l0 { background: var(--hm-0, #ebedf0); }
+.hm-l1 { background: var(--hm-1, #9be9a8); }
+.hm-l2 { background: var(--hm-2, #40c463); }
+.hm-l3 { background: var(--hm-3, #216e39); }
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --hm-0: #161b22;
+        --hm-1: #0e4429;
+        --hm-2: #26a641;
+        --hm-3: #39d353;
+    }
+}
+
+.heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 0.5rem;
+    justify-content: flex-end;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+.heatmap-legend span { margin: 0 2px; }
+.heatmap-legend .hm-cell { flex-shrink: 0; }
+
+/* ── workspace cards ────────────────────────────────────────────── */
 .empty-state-box {
     grid-column: 1 / -1;
     display: flex;
@@ -235,5 +547,43 @@ async function changePassword(e) {
     border: 2px dashed var(--border-color);
     border-radius: var(--radius-lg);
     text-align: center;
+}
+.ws-card .card-desc {
+    margin-bottom: 0.75rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+.card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border-color);
+    padding-top: 0.6rem;
+    margin-top: 0.25rem;
+}
+.card-meta span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.card-meta .meta-muted { color: var(--text-muted); margin-left: auto; }
+.role-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.15em 0.55em;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.role-viewer  { background: var(--border-color); color: var(--text-secondary); }
+.role-editor  { background: #dbeafe; color: #1d4ed8; }
+.role-manager { background: #ede9fe; color: #6d28d9; }
+.role-admin   { background: #fee2e2; color: #b91c1c; }
+@media (prefers-color-scheme: dark) {
+    .role-viewer  { background: #2a2a2a; color: var(--text-muted); }
+    .role-editor  { background: #1e3a5f; color: #93c5fd; }
+    .role-manager { background: #2e1a4a; color: #c4b5fd; }
+    .role-admin   { background: #4a1a1a; color: #fca5a5; }
 }
 </style>

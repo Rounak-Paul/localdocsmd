@@ -154,6 +154,35 @@
 .members-list-container .table {
     margin: 0;
 }
+
+.card-desc {
+    margin-bottom: 0.75rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border-color);
+    padding-top: 0.6rem;
+    margin-top: 0.25rem;
+}
+
+.card-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.card-meta .meta-muted {
+    color: var(--text-muted);
+    margin-left: auto;
+}
 </style>
 
 <script>
@@ -192,7 +221,17 @@ async function loadProjects() {
                     </svg>
                 </div>
                 <div class="card-body">
-                    <p>${escapeHtml(p.description || 'No description')}</p>
+                    <p class="card-desc">${escapeHtml(p.description || 'No description')}</p>
+                    <div class="card-meta">
+                        <span title="Documents">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            ${p.document_count} doc${p.document_count !== 1 ? 's' : ''}
+                        </span>
+                        <span class="meta-muted" title="Last updated">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            ${relativeTime(p.updated_at)}
+                        </span>
+                    </div>
                 </div>
             </div>
         `).join('');
@@ -204,6 +243,17 @@ async function loadProjects() {
 
 function showCreateProject() {
     showModal('create-project-modal');
+}
+
+function relativeTime(unixSec) {
+    if (!unixSec) return 'never';
+    const diff = Math.floor(Date.now() / 1000) - unixSec;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) { const m = Math.floor(diff/60); return m + ' minute' + (m>1?'s':'') + ' ago'; }
+    if (diff < 86400) { const h = Math.floor(diff/3600); return h + ' hour' + (h>1?'s':'') + ' ago'; }
+    if (diff < 2592000) { const d = Math.floor(diff/86400); return d + ' day' + (d>1?'s':'') + ' ago'; }
+    if (diff < 31536000) { const mo = Math.floor(diff/2592000); return mo + ' month' + (mo>1?'s':'') + ' ago'; }
+    const y = Math.floor(diff/31536000); return y + ' year' + (y>1?'s':'') + ' ago';
 }
 
 async function createProject(e) {

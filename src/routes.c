@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <sys/stat.h>
 
 // Helper to check if method matches
 static bool method_is(http_request_t *req, const char *method) {
@@ -1027,6 +1028,49 @@ void route_api_workspaces_list(http_request_t *req) {
         cJSON_AddStringToObject(ws, "uuid", workspaces[i].uuid);
         cJSON_AddStringToObject(ws, "name", workspaces[i].name);
         cJSON_AddStringToObject(ws, "description", workspaces[i].description);
+        cJSON_AddNumberToObject(ws, "created_at", (double)workspaces[i].created_at);
+        cJSON_AddNumberToObject(ws, "updated_at", (double)workspaces[i].updated_at);
+
+        /* user's effective role in this workspace */
+        ldmd_role_t ws_role = ROLE_NONE;
+        if (req->user.global_role >= ROLE_ADMIN) {
+            ws_role = ROLE_ADMIN;
+        } else {
+            db_workspace_member_get_role(req->server->db, workspaces[i].id,
+                                        req->user.id, &ws_role);
+        }
+        cJSON_AddStringToObject(ws, "user_role", rbac_workspace_role_to_string(ws_role));
+
+        /* project count */
+        int proj_count = 0;
+        {
+            sqlite3_stmt *cs;
+            if (sqlite3_prepare_v2(req->server->db->db,
+                    "SELECT COUNT(*) FROM projects WHERE workspace_id = ?",
+                    -1, &cs, NULL) == SQLITE_OK) {
+                sqlite3_bind_int64(cs, 1, workspaces[i].id);
+                if (sqlite3_step(cs) == SQLITE_ROW)
+                    proj_count = sqlite3_column_int(cs, 0);
+                sqlite3_finalize(cs);
+            }
+        }
+        cJSON_AddNumberToObject(ws, "project_count", proj_count);
+
+        /* member count */
+        int mem_count = 0;
+        {
+            sqlite3_stmt *cs;
+            if (sqlite3_prepare_v2(req->server->db->db,
+                    "SELECT COUNT(*) FROM workspace_members WHERE workspace_id = ?",
+                    -1, &cs, NULL) == SQLITE_OK) {
+                sqlite3_bind_int64(cs, 1, workspaces[i].id);
+                if (sqlite3_step(cs) == SQLITE_ROW)
+                    mem_count = sqlite3_column_int(cs, 0);
+                sqlite3_finalize(cs);
+            }
+        }
+        cJSON_AddNumberToObject(ws, "member_count", mem_count);
+
         cJSON_AddItemToArray(arr, ws);
     }
     free(workspaces);
@@ -1287,6 +1331,24 @@ void route_api_projects_list(http_request_t *req, const char *ws_uuid) {
         cJSON_AddStringToObject(p, "uuid", projects[i].uuid);
         cJSON_AddStringToObject(p, "name", projects[i].name);
         cJSON_AddStringToObject(p, "description", projects[i].description);
+        cJSON_AddNumberToObject(p, "created_at", (double)projects[i].created_at);
+        cJSON_AddNumberToObject(p, "updated_at", (double)projects[i].updated_at);
+
+        /* document count */
+        int doc_count = 0;
+        {
+            sqlite3_stmt *cs;
+            if (sqlite3_prepare_v2(req->server->db->db,
+                    "SELECT COUNT(*) FROM documents WHERE project_id = ?",
+                    -1, &cs, NULL) == SQLITE_OK) {
+                sqlite3_bind_int64(cs, 1, projects[i].id);
+                if (sqlite3_step(cs) == SQLITE_ROW)
+                    doc_count = sqlite3_column_int(cs, 0);
+                sqlite3_finalize(cs);
+            }
+        }
+        cJSON_AddNumberToObject(p, "document_count", doc_count);
+
         cJSON_AddItemToArray(arr, p);
     }
     free(projects);
@@ -1552,6 +1614,17 @@ void route_api_documents_list(http_request_t *req, const char *project_uuid) {
         cJSON *d = cJSON_CreateObject();
         cJSON_AddStringToObject(d, "uuid", docs[i].uuid);
         cJSON_AddStringToObject(d, "name", docs[i].name);
+        cJSON_AddNumberToObject(d, "created_at", (double)docs[i].created_at);
+        cJSON_AddNumberToObject(d, "updated_at", (double)docs[i].updated_at);
+
+        /* file size from filesystem */
+        struct stat st;
+        if (docs[i].path[0] != '\0' && stat(docs[i].path, &st) == 0) {
+            cJSON_AddNumberToObject(d, "size", (double)st.st_size);
+        } else {
+            cJSON_AddNumberToObject(d, "size", 0);
+        }
+
         cJSON_AddItemToArray(arr, d);
     }
     free(docs);
