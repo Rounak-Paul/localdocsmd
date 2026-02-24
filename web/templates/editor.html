@@ -594,10 +594,13 @@ function render() {
             previewEl.innerHTML = tmpDiv.innerHTML;
         }
 
-        renderMath();
-        renderMermaid();
-        renderPlots();
-        updateTOC();
+        // Defer expensive post-processing so morphdom paint commits first
+        requestAnimationFrame(() => {
+            renderMath();
+            updateTOC();
+            renderMermaid();
+            renderPlots();
+        });
     } catch(e) {
         console.error('render() error:', e);
     }
@@ -799,7 +802,7 @@ function updateTOC() {
         if (!h.id) { const sl = h.textContent.trim().toLowerCase().replace(/[^\w\s-]/g,'').replace(/\s+/g,'-'); h.id = `h-${sl}-${headingCounter++}`; }
         const li = document.createElement('li'), a = document.createElement('a');
         a.href='#'+h.id; a.textContent=h.textContent; a.className='toc-'+h.tagName.toLowerCase();
-        a.addEventListener('click', e => { e.preventDefault(); h.scrollIntoView({behavior:'smooth',block:'start'}); tocList.querySelectorAll('a').forEach(l=>l.classList.remove('active')); a.classList.add('active'); });
+        a.addEventListener('click', e => { e.preventDefault(); const top = h.getBoundingClientRect().top - previewEl.getBoundingClientRect().top + previewEl.scrollTop; previewEl.scrollTo({top, behavior:'smooth'}); tocList.querySelectorAll('a').forEach(l=>l.classList.remove('active')); a.classList.add('active'); });
         li.appendChild(a); tocList.appendChild(li);
     });
     tocSidebar.classList.add('has-headings');
@@ -827,7 +830,7 @@ function updateStatusBar() {
 
 function debounce(fn,ms){let t;return function(...a){clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};}
 
-const debouncedRender = debounce(render, 80);
+const debouncedRender = debounce(render, 400);
 
 
 /* ─────────────────────────────────────────────────────────────────
@@ -941,7 +944,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
     initMarked();
     initFontItems();
-    render();
+    requestAnimationFrame(render); // defer first render so browser paints the shell first
     updateStatusBar();
 
     pingServer(); setInterval(pingServer,15000);
