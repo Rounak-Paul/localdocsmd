@@ -98,6 +98,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     initGreeting();
     loadWorkspaces();
+    loadActivityHeatmap();
     
     // Check if password change is required
     const params = new URLSearchParams(window.location.search);
@@ -164,7 +165,6 @@ async function loadWorkspaces() {
             </div>
         `).join('');
 
-        renderHeatmap(workspaces);
     } catch (err) {
         console.error('Error loading workspaces:', err);
         document.getElementById('workspaces-list').innerHTML = '<p class="empty-state">Error loading workspaces</p>';
@@ -172,24 +172,30 @@ async function loadWorkspaces() {
 }
 
 /* ── heatmap ─────────────────────────────────────────────────────── */
-let _hmWorkspaces = [];
+let _hmTimestamps = [];
 let _hmYear = new Date().getFullYear();
 
-function renderHeatmap(workspaces) {
-    _hmWorkspaces = workspaces;
-    _hmYear = new Date().getFullYear();
-    renderHeatmapForYear(_hmYear);
+async function loadActivityHeatmap() {
+    try {
+        const res = await fetch('/api/activity');
+        const data = await res.json();
+        _hmTimestamps = data.timestamps || [];
+        _hmYear = new Date().getFullYear();
+        renderHeatmapForYear(_hmYear);
+    } catch (err) {
+        console.error('Error loading activity:', err);
+    }
 }
 
 function renderHeatmapForYear(year) {
     _hmYear = year;
-    const workspaces = _hmWorkspaces;
+    const timestamps = _hmTimestamps;
 
     // Build date -> count map
     const counts = {};
-    workspaces.forEach(w => {
-        if (!w.updated_at) return;
-        const d = new Date(w.updated_at * 1000);
+    timestamps.forEach(ts => {
+        if (!ts) return;
+        const d = new Date(ts * 1000);
         const key = d.getFullYear() + '-' +
             String(d.getMonth() + 1).padStart(2, '0') + '-' +
             String(d.getDate()).padStart(2, '0');
@@ -199,9 +205,9 @@ function renderHeatmapForYear(year) {
     // All years that have activity + current year, sorted newest first
     const currentYear = new Date().getFullYear();
     const allYears = [...new Set(
-        workspaces
-            .filter(w => w.updated_at)
-            .map(w => new Date(w.updated_at * 1000).getFullYear())
+        timestamps
+            .filter(ts => !!ts)
+            .map(ts => new Date(ts * 1000).getFullYear())
             .concat([currentYear])
     )].sort((a, b) => b - a);
 
@@ -250,7 +256,7 @@ function renderHeatmapForYear(year) {
     });
 
     const monthLabelsHtml = segs
-        .map(s => `<span style="width:${s.cols * CELL}px;flex-shrink:0">${s.label}</span>`)
+        .map(s => `<span style="width:${s.cols * CELL}px;flex-shrink:0">${s.cols >= 2 ? s.label : ''}</span>`)
         .join('');
 
     const totalActive = days.filter(d => d.count > 0).length;
@@ -269,7 +275,7 @@ function renderHeatmapForYear(year) {
     container.innerHTML = `
         <div class="heatmap-header">
             <div style="display:flex;align-items:baseline;gap:0.75rem;flex:1">
-                <span class="heatmap-title">Workspace activity</span>
+                <span class="heatmap-title">Your activity</span>
                 <span class="heatmap-sub">${totalActive} active day${totalActive !== 1 ? 's' : ''}</span>
             </div>
             ${yearTabsHtml}
@@ -286,8 +292,8 @@ function renderHeatmapForYear(year) {
                             `<div class="hm-col">${
                                 week.map(cell => {
                                     if (!cell) return '<div class="hm-cell hm-empty"></div>';
-                                    const lvl = cell.count === 0 ? 0 : cell.count <= 2 ? 1 : cell.count <= 4 ? 2 : 3;
-                                    return `<div class="hm-cell hm-l${lvl}" title="${cell.key}: ${cell.count} update${cell.count !== 1 ? 's' : ''}"></div>`;
+                                    const lvl = cell.count === 0 ? 0 : cell.count <= 3 ? 1 : cell.count <= 8 ? 2 : 3;
+                                    return `<div class="hm-cell hm-l${lvl}" title="${cell.key}: ${cell.count} edit${cell.count !== 1 ? 's' : ''}"></div>`;
                                 }).join('')
                             }</div>`
                         ).join('')

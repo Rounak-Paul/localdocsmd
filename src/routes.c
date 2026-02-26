@@ -398,6 +398,12 @@ bool routes_handle(http_request_t *req) {
         return true;
     }
     
+    // Activity API (per-user heatmap data)
+    if (uri_match(req, "/api/activity", NULL, NULL) && method_is(req, "GET")) {
+        route_api_activity(req);
+        return true;
+    }
+    
     if (uri_match(req, "/api/admin/password-requests", NULL, NULL) && method_is(req, "GET")) {
         route_api_admin_password_requests(req);
         return true;
@@ -2047,6 +2053,59 @@ void route_api_admin_reset_user_password(http_request_t *req, const char *user_u
         http_respond_error(req->conn, 500, "Internal error");
     } else {
         http_respond_json(req->conn, 200, "{\"success\":true}");
+    }
+}
+
+void route_api_activity(http_request_t *req) {
+    if (!require_auth(req)) return;
+
+    /*
+     * Return every timestamp where this user did something:
+     *   - saved / created a document (updated_at or created_at for docs)
+     *   - created a project
+     *   - created a workspace
+     * One timestamp per event; frontend groups them into a heatmap.
+     */
+    const char *sql =
+        "SELECT updated_at AS ts FROM documents WHERE updated_by = ? "
+        "UNION ALL "
+        "SELECT created_at AS ts FROM documents WHERE created_by = ? AND (updated_by IS NULL OR updated_by = ?) "
+        "UNION ALL "
+        "SELECT updated_at AS ts FROM projects WHERE created_by = ? "
+        "UNION ALL "
+        "SELECT created_at AS ts FROM workspaces WHERE owner_id = ? "
+        "ORDER BY ts DESC LIMIT 10000";
+
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(req->server->db->db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        http_respond_error(req->conn, 500, "DB error");
+        return;
+    }
+
+    int64_t uid = req->user.id;
+    sqlite3_bind_int64(stmt, 1, uid);
+    sqlite3_bind_int64(stmt, 2, uid);
+    sqlite3_bind_int64(stmt, 3, uid);
+    sqlite3_bind_int64(stmt, 4, uid);
+    sqlite3_bind_int64(stmt, 5, uid);
+
+    cJSON *arr = cJSON_CreateArray();
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        int64_t ts = sqlite3_column_int64(stmt, 0);
+        cJSON_AddItemToArray(arr, cJSON_CreateNumber((double)ts));
+    }
+    sqlite3_finalize(stmt);
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "timestamps", arr);
+
+    char *body = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (body) {
+        http_respond_json(req->conn, 200, body);
+        free(body);
+    } else {
+        http_respond_error(req->conn, 500, "Internal error");
     }
 }
 

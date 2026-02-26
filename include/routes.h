@@ -85,6 +85,9 @@ void route_api_admin_handle_forgot(http_request_t *req, const char *request_id);
 // Admin: direct password reset for any user
 void route_api_admin_reset_user_password(http_request_t *req, const char *user_uuid);
 
+// Activity feed (for dashboard heatmap)
+void route_api_activity(http_request_t *req);
+
 // Document viewer presence
 void route_api_documents_ping(http_request_t *req, const char *doc_uuid);
 void route_api_documents_viewers(http_request_t *req, const char *doc_uuid);
