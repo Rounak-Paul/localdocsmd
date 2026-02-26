@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/morphdom@2.7.2/dist/morphdom-umd.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <div class="editor-page">
     <nav class="breadcrumb">
@@ -46,6 +47,10 @@
                     <button class="act-dropdown-item" onclick="downloadHtml()">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.708 5.578L2.061 8.224l2.647 2.646-.708.708-3-3V7.87l3-3 .708.708zm7.292 5.354l2.647-2.646-2.647-2.646.708-.708 3 3v.708l-3 3-.708-.708zM6.417 11.646l2.5-8 .833.417-2.5 8-.833-.417z"/></svg>
                         HTML (.html)
+                    </button>
+                    <button class="act-dropdown-item" onclick="downloadPdf()">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.75 1.5a.25.25 0 0 0-.25.25v11.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V6H9.75A1.75 1.75 0 0 1 8 4.25V1.5Zm5.75.56v2.19c0 .138.112.25.25.25h2.19Zm-7.25-2.06A1.75 1.75 0 0 1 4 1.75v-.56A1.75 1.75 0 0 1 5.75 0h5.086c.464 0 .909.184 1.237.513l3.414 3.414c.329.328.513.773.513 1.237v8.086A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V3.75A1.75 1.75 0 0 1 1.75 1.75h.5Z"/></svg>
+                        PDF (.pdf)
                     </button>
                 </div>
             </div>
@@ -295,6 +300,8 @@ kbd { display:inline-flex; align-items:center; justify-content:center; font-fami
     .editor-page { padding:var(--spacing-sm); }
     .act-dropdown-menu { right:auto; left:0; }
 }
+
+
 </style>
 
 <script>
@@ -851,6 +858,30 @@ window.downloadHtml = function() {
     const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${DOC_NAME}</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"><style>body{max-width:860px;margin:2rem auto;padding:0 1.5rem}.markdown-body{box-sizing:border-box}</style></head><body class="markdown-body">${previewEl.innerHTML}</body></html>`;
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'})); a.download=DOC_NAME.replace(/\.md$/i,'')+'.html'; a.click(); URL.revokeObjectURL(a.href);
     showToast('Downloaded as HTML');
+};
+window.downloadPdf = function() {
+    closeAllDropdowns();
+    if (typeof html2pdf === 'undefined') { showToast('PDF library not loaded', 3000); return; }
+    showToast('Generating PDF…', 60000);
+    const filename = DOC_NAME.replace(/\.md$/i, '') + '.pdf';
+    // Probe to get the fully-resolved card background (avoids empty CSS var reads)
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;background:var(--card-bg)';
+    document.body.appendChild(probe);
+    const bgColor = getComputedStyle(probe).backgroundColor;
+    document.body.removeChild(probe);
+    // Override the !important transparent rule on preview with !important inline
+    previewEl.style.setProperty('background', bgColor, 'important');
+    const opt = {
+        margin:      0,
+        filename:    filename,
+        image:       { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: bgColor },
+        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(previewEl).save()
+        .then(() => { previewEl.style.removeProperty('background'); showToast('Downloaded as PDF'); })
+        .catch(() => { previewEl.style.removeProperty('background'); showToast('PDF generation failed', 3000); });
 };
 
 /* ─────────────────────────────────────────────────────────────────

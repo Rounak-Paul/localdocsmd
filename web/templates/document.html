@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/morphdom@2.7.2/dist/morphdom-umd.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <div class="document-page">
     <nav class="breadcrumb">
@@ -51,6 +52,10 @@
                     <button class="act-dropdown-item" onclick="downloadHtml()">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.708 5.578L2.061 8.224l2.647 2.646-.708.708-3-3V7.87l3-3 .708.708zm7.292 5.354l2.647-2.646-2.647-2.646.708-.708 3 3v.708l-3 3-.708-.708zM6.417 11.646l2.5-8 .833.417-2.5 8-.833-.417z"/></svg>
                         HTML (.html)
+                    </button>
+                    <button class="act-dropdown-item" onclick="downloadPdf()">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.75 1.5a.25.25 0 0 0-.25.25v11.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V6H9.75A1.75 1.75 0 0 1 8 4.25V1.5Zm5.75.56v2.19c0 .138.112.25.25.25h2.19Zm-7.25-2.06A1.75 1.75 0 0 1 4 1.75v-.56A1.75 1.75 0 0 1 5.75 0h5.086c.464 0 .909.184 1.237.513l3.414 3.414c.329.328.513.773.513 1.237v8.086A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V3.75A1.75 1.75 0 0 1 1.75 1.75h.5Z"/></svg>
+                        PDF (.pdf)
                     </button>
                 </div>
             </div>
@@ -341,6 +346,29 @@ window.downloadHtml = function() {
     a.download = DOC_NAME + '.html';
     a.click();
     URL.revokeObjectURL(a.href);
+};
+window.downloadPdf = function() {
+    document.querySelectorAll('.act-dropdown-menu.open').forEach(m => m.classList.remove('open'));
+    if (typeof html2pdf === 'undefined') { alert('PDF library not loaded'); return; }
+    const filename = DOC_NAME.replace(/\.md$/i, '') + '.pdf';
+    // Probe to get the fully-resolved card background
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;background:var(--card-bg)';
+    document.body.appendChild(probe);
+    const bgColor = getComputedStyle(probe).backgroundColor;
+    document.body.removeChild(probe);
+    // Override any !important transparent rules with !important inline
+    contentEl.style.setProperty('background', bgColor, 'important');
+    const opt = {
+        margin:      0,
+        filename:    filename,
+        image:       { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: bgColor },
+        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(contentEl).save()
+        .then(() => { contentEl.style.removeProperty('background'); })
+        .catch(() => { contentEl.style.removeProperty('background'); });
 };
 
 /* ── Tab groups ──────────────────────────────────────────────── */
