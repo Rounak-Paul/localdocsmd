@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LocalDocsMD - Help & Syntax Guide</title>
+  <script>(function(){ const t=localStorage.getItem('ldmd-theme')||'midnight'; document.documentElement.setAttribute('data-theme',t); })()</script>
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,10 +21,11 @@
   <script src="https://cdn.jsdelivr.net/npm/function-plot@1/dist/function-plot.min.js"></script>
   <!-- Plotly.js for 3D plotting -->
   <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2/plotly.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown.min.css">>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown.min.css">
   
   <!-- App Styles -->
   <link rel="stylesheet" href="/css/example.css">
+  <link rel="stylesheet" href="/css/styles.css">
   <style>
     .help-container {
       max-width: 860px;
@@ -77,7 +79,7 @@
     }
 
     .toc {
-      background: var(--bg-secondary);
+      background: var(--card-bg);
       border: 1px solid var(--border-color);
       border-radius: 0;
       padding: 14px;
@@ -100,7 +102,7 @@
       gap: 8px;
     }
     .toc a {
-      color: var(--accent);
+      color: var(--primary-color);
       text-decoration: none;
     }
     .toc a:hover {
@@ -131,13 +133,13 @@
       }
     }
     .example-box > div {
-      background: var(--bg-secondary);
+      background: var(--card-bg);
       border: 1px solid var(--border-color);
       border-radius: 0;
       overflow: hidden;
     }
     .example-label {
-      background: var(--bg-tertiary);
+      background: var(--divider);
       padding: 5px 10px;
       font-size: 0.7rem;
       text-transform: uppercase;
@@ -160,7 +162,7 @@
       padding: 10px;
     }
     .equation-plot-demo {
-      background: var(--bg-secondary);
+      background: var(--card-bg);
       border-radius: 0;
       overflow: hidden;
       min-height: 200px;
@@ -170,11 +172,52 @@
       width: 100%;
     }
     .plot3d-demo {
-      background: var(--bg-secondary);
+      background: var(--card-bg);
       border-radius: 0;
       overflow: hidden;
       min-height: 300px;
     }
+    /* Override example.css page-level styles to match main app */
+    /* Restore help page's own layout (styles.css .container conflicts) */
+    body {
+      background: var(--bg-gradient) !important;
+      background-attachment: fixed !important;
+      color: var(--text-color) !important;
+      height: 100vh !important;
+      overflow: hidden !important;
+      min-height: unset !important;
+    }
+    .container {
+      display: flex !important;
+      flex-direction: column !important;
+      height: 100vh !important;
+      max-width: unset !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    main.container { padding: 0 !important; }
+    header {
+      background: var(--navbar-bg) !important;
+      border-bottom: 1px solid var(--navbar-border) !important;
+      height: 44px;
+      padding: 0 16px;
+    }
+    .logo { color: var(--text-color) !important; font-size: 1rem; font-weight: 600; }
+    .logo span { color: var(--primary-color) !important; }
+    .help-icon { color: var(--text-muted) !important; }
+    .help-icon:hover { color: var(--primary-color) !important; opacity: 1 !important; }
+    .help-header h1 { color: var(--text-color); }
+    .help-header p { color: var(--text-secondary); }
+    .section h2 { color: var(--text-color); }
+    .markdown-body { background: transparent !important; color: var(--text-color) !important; }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3,
+    .markdown-body h4, .markdown-body h5, .markdown-body h6 { color: var(--text-color) !important; border-bottom-color: var(--border-color) !important; }
+    .markdown-body a { color: var(--primary-color) !important; }
+    .markdown-body blockquote { border-left-color: var(--border-color) !important; color: var(--text-secondary) !important; }
+    .markdown-body table tr { background: var(--card-bg) !important; border-top-color: var(--border-color) !important; }
+    .markdown-body table tr:nth-child(2n) { background: var(--divider) !important; }
+    .markdown-body table th, .markdown-body table td { border-color: var(--border-color) !important; }
+    .markdown-body hr { background: var(--border-color) !important; }
   </style>
 </head>
 <body>
@@ -1183,7 +1226,7 @@ Final content</code></pre>
 
   <script>
     // Theme Management
-    const THEME_KEY = 'localdocsmd-theme';
+    const THEME_KEY = 'ldmd-theme';
     
     function loadTheme() {
       const savedTheme = localStorage.getItem(THEME_KEY) || 'midnight';
@@ -1226,11 +1269,10 @@ Final content</code></pre>
     // Theme loaded from localStorage (set by main app)
     
     // Font management - load from localStorage to match main editor
-    const FONT_SANS_KEY = 'localdocsmd-font-sans';
+    const FONT_KEY = 'ldmd-font';
     
     function loadFonts() {
-      const sansFont = localStorage.getItem(FONT_SANS_KEY) || 'system';
-      document.documentElement.setAttribute('data-font-sans', sansFont);
+      // Font is handled by styles.css / app.js in the main app; nothing to do here
     }
 
     // Tab functionality
