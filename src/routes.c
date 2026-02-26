@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdio.h>
 #include <sys/stat.h>
 #include <time.h>
 
@@ -120,6 +121,10 @@ static void set_navbar(template_ctx_t *ctx, http_request_t *req) {
         "<div class=\"navbar-brand\"><a href=\"/dashboard\">Local<span>Docs</span>MD</a></div>"
         "<div class=\"navbar-menu\">"
         "%s"
+        "<a href=\"/search\" class=\"navbar-search-link\" title=\"Search documents\">"
+        "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"></circle><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"></line></svg>"
+        "Search"
+        "</a>"
         "<div class=\"theme-switcher\">"
         "<button class=\"btn\" title=\"Theme\">&#9728;</button>"
         "<div class=\"theme-dropdown\">"
@@ -219,7 +224,13 @@ bool routes_handle(http_request_t *req) {
         route_page_editor(req, param1);
         return true;
     }
-    
+
+    // Search page
+    if (uri_match(req, "/search", NULL, NULL) && method_is(req, "GET")) {
+        route_page_search(req);
+        return true;
+    }
+
     // ============== API Routes ==============
     
     // Auth API
@@ -391,7 +402,25 @@ bool routes_handle(http_request_t *req) {
         route_api_documents_viewers(req, param1);
         return true;
     }
-    
+
+    if (uri_match(req, "/api/documents/*/tags/*", param1, param2)) {
+        if (method_is(req, "DELETE")) {
+            route_api_document_tags_remove(req, param1, param2);
+            return true;
+        }
+    }
+
+    if (uri_match(req, "/api/documents/*/tags", param1, NULL)) {
+        if (method_is(req, "GET")) {
+            route_api_document_tags_list(req, param1);
+            return true;
+        }
+        if (method_is(req, "POST")) {
+            route_api_document_tags_add(req, param1);
+            return true;
+        }
+    }
+
     if (uri_match(req, "/api/documents/*", param1, NULL)) {
         if (method_is(req, "GET")) {
             route_api_documents_get(req, param1);
@@ -407,6 +436,31 @@ bool routes_handle(http_request_t *req) {
         }
     }
     
+    // Tags API
+    if (uri_match(req, "/api/tags/*", param1, NULL)) {
+        if (method_is(req, "DELETE")) {
+            route_api_tags_delete(req, param1);
+            return true;
+        }
+    }
+
+    if (uri_match(req, "/api/tags", NULL, NULL)) {
+        if (method_is(req, "GET")) {
+            route_api_tags_list(req);
+            return true;
+        }
+        if (method_is(req, "POST")) {
+            route_api_tags_create(req);
+            return true;
+        }
+    }
+
+    // Search API
+    if (uri_match(req, "/api/search", NULL, NULL) && method_is(req, "GET")) {
+        route_api_search(req);
+        return true;
+    }
+
     // Admin API
     if (uri_match(req, "/api/admin/stats", NULL, NULL) && method_is(req, "GET")) {
         route_api_admin_stats(req);
@@ -1633,6 +1687,7 @@ void route_api_documents_list(http_request_t *req, const char *project_uuid) {
     document_list(req->server->db, project.id, &docs, &count);
     
     cJSON *arr = cJSON_CreateArray();
+    sqlite3 *raw = req->server->db->db;
     for (int i = 0; i < count; i++) {
         cJSON *d = cJSON_CreateObject();
         cJSON_AddStringToObject(d, "uuid", docs[i].uuid);
@@ -1646,6 +1701,50 @@ void route_api_documents_list(http_request_t *req, const char *project_uuid) {
             cJSON_AddNumberToObject(d, "size", (double)st.st_size);
         } else {
             cJSON_AddNumberToObject(d, "size", 0);
+        }
+
+        /* created_by username */
+        {
+            sqlite3_stmt *su = NULL;
+            if (sqlite3_prepare_v2(raw,
+                    "SELECT username FROM users WHERE id = ?", -1, &su, NULL) == SQLITE_OK) {
+                sqlite3_bind_int64(su, 1, (sqlite3_int64)docs[i].created_by);
+                if (sqlite3_step(su) == SQLITE_ROW) {
+                    const char *uname = (const char *)sqlite3_column_text(su, 0);
+                    cJSON_AddStringToObject(d, "created_by_username", uname ? uname : "");
+                } else {
+                    cJSON_AddStringToObject(d, "created_by_username", "");
+                }
+                sqlite3_finalize(su);
+            } else {
+                cJSON_AddStringToObject(d, "created_by_username", "");
+            }
+        }
+
+        /* tags for this document */
+        {
+            cJSON *tags_arr = cJSON_CreateArray();
+            sqlite3_stmt *st2 = NULL;
+            if (sqlite3_prepare_v2(raw,
+                    "SELECT t.id, t.name, t.color "
+                    "FROM tags t "
+                    "JOIN document_tags dt ON dt.tag_id = t.id "
+                    "JOIN documents doc ON doc.id = dt.document_id "
+                    "WHERE doc.uuid = ? "
+                    "ORDER BY t.name", -1, &st2, NULL) == SQLITE_OK) {
+                sqlite3_bind_text(st2, 1, docs[i].uuid, -1, SQLITE_STATIC);
+                while (sqlite3_step(st2) == SQLITE_ROW) {
+                    cJSON *tag = cJSON_CreateObject();
+                    cJSON_AddNumberToObject(tag, "id", (double)sqlite3_column_int64(st2, 0));
+                    const char *tn = (const char *)sqlite3_column_text(st2, 1);
+                    const char *tc = (const char *)sqlite3_column_text(st2, 2);
+                    cJSON_AddStringToObject(tag, "name", tn ? tn : "");
+                    cJSON_AddStringToObject(tag, "color", tc ? tc : "blue");
+                    cJSON_AddItemToArray(tags_arr, tag);
+                }
+                sqlite3_finalize(st2);
+            }
+            cJSON_AddItemToObject(d, "tags", tags_arr);
         }
 
         cJSON_AddItemToArray(arr, d);
@@ -2138,7 +2237,426 @@ void route_api_activity(http_request_t *req) {
     }
 }
 
-void route_api_documents_ping(http_request_t *req, const char *doc_uuid) {
+/* =========================================================
+   TAGS  –  /api/tags   and   /api/documents/:uuid/tags
+   ========================================================= */
+
+void route_api_tags_list(http_request_t *req) {
+    if (!require_auth(req)) return;
+    sqlite3 *raw = req->server->db->db;
+    sqlite3_stmt *stmt = NULL;
+    cJSON *arr = cJSON_CreateArray();
+    if (sqlite3_prepare_v2(raw,
+            "SELECT id, name, color FROM tags ORDER BY name COLLATE NOCASE",
+            -1, &stmt, NULL) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            cJSON *t = cJSON_CreateObject();
+            cJSON_AddNumberToObject(t, "id",    (double)sqlite3_column_int64(stmt, 0));
+            const char *n = (const char *)sqlite3_column_text(stmt, 1);
+            const char *c = (const char *)sqlite3_column_text(stmt, 2);
+            cJSON_AddStringToObject(t, "name",  n ? n : "");
+            cJSON_AddStringToObject(t, "color", c ? c : "blue");
+            cJSON_AddItemToArray(arr, t);
+        }
+        sqlite3_finalize(stmt);
+    }
+    char *js = cJSON_PrintUnformatted(arr);
+    cJSON_Delete(arr);
+    if (js) { http_respond_json(req->conn, 200, js); free(js); }
+    else      http_respond_error(req->conn, 500, "Internal error");
+}
+
+void route_api_tags_create(http_request_t *req) {
+    if (!require_auth(req)) return;
+    cJSON *json = parse_json_body(req);
+    if (!json) { http_respond_error(req->conn, 400, "Invalid JSON"); return; }
+
+    const char *name  = json_get_string(json, "name");
+    const char *color = json_get_string(json, "color");
+    if (!name || name[0] == '\0') {
+        cJSON_Delete(json);
+        http_respond_error(req->conn, 400, "name required");
+        return;
+    }
+    if (!color || color[0] == '\0') color = "blue";
+
+    sqlite3 *raw = req->server->db->db;
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(raw,
+        "INSERT OR IGNORE INTO tags (name, color, created_at) VALUES (?, ?, ?)",
+        -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        cJSON_Delete(json);
+        http_respond_error(req->conn, 500, "DB prepare error");
+        return;
+    }
+    sqlite3_bind_text (stmt, 1, name,  -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (stmt, 2, color, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(stmt, 3, (int64_t)time(NULL));
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    cJSON_Delete(json);
+
+    /* Return the tag (existing or newly created) */
+    sqlite3_stmt *sel = NULL;
+    if (sqlite3_prepare_v2(raw,
+            "SELECT id, name, color FROM tags WHERE name = ? COLLATE NOCASE",
+            -1, &sel, NULL) != SQLITE_OK) {
+        http_respond_error(req->conn, 500, "DB error");
+        return;
+    }
+    sqlite3_bind_text(sel, 1, name, -1, SQLITE_TRANSIENT);
+    cJSON *resp = cJSON_CreateObject();
+    if (sqlite3_step(sel) == SQLITE_ROW) {
+        cJSON_AddNumberToObject(resp, "id",    (double)sqlite3_column_int64(sel, 0));
+        const char *n = (const char *)sqlite3_column_text(sel, 1);
+        const char *c = (const char *)sqlite3_column_text(sel, 2);
+        cJSON_AddStringToObject(resp, "name",  n ? n : "");
+        cJSON_AddStringToObject(resp, "color", c ? c : "blue");
+    }
+    sqlite3_finalize(sel);
+    char *js = cJSON_PrintUnformatted(resp);
+    cJSON_Delete(resp);
+    if (js) { http_respond_json(req->conn, 201, js); free(js); }
+    else      http_respond_error(req->conn, 500, "Internal error");
+}
+
+void route_api_tags_delete(http_request_t *req, const char *tag_id) {
+    if (!require_auth(req)) return;
+    sqlite3 *raw = req->server->db->db;
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(raw,
+            "DELETE FROM tags WHERE id = ?", -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, (int64_t)atoll(tag_id));
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+    http_respond_json(req->conn, 200, "{\"ok\":true}");
+}
+
+void route_api_document_tags_list(http_request_t *req, const char *doc_uuid) {
+    if (!require_auth(req)) return;
+    sqlite3 *raw = req->server->db->db;
+    cJSON *arr = cJSON_CreateArray();
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(raw,
+            "SELECT t.id, t.name, t.color "
+            "FROM tags t "
+            "JOIN document_tags dt ON dt.tag_id = t.id "
+            "JOIN documents d      ON d.id = dt.document_id "
+            "WHERE d.uuid = ? ORDER BY t.name COLLATE NOCASE",
+            -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, doc_uuid, -1, SQLITE_STATIC);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            cJSON *t = cJSON_CreateObject();
+            cJSON_AddNumberToObject(t, "id",    (double)sqlite3_column_int64(stmt, 0));
+            const char *n = (const char *)sqlite3_column_text(stmt, 1);
+            const char *c = (const char *)sqlite3_column_text(stmt, 2);
+            cJSON_AddStringToObject(t, "name",  n ? n : "");
+            cJSON_AddStringToObject(t, "color", c ? c : "blue");
+            cJSON_AddItemToArray(arr, t);
+        }
+        sqlite3_finalize(stmt);
+    }
+    char *js = cJSON_PrintUnformatted(arr);
+    cJSON_Delete(arr);
+    if (js) { http_respond_json(req->conn, 200, js); free(js); }
+    else      http_respond_error(req->conn, 500, "Internal error");
+}
+
+void route_api_document_tags_add(http_request_t *req, const char *doc_uuid) {
+    if (!require_auth(req)) return;
+
+    /* Check document access (write) */
+    ldmd_document_t doc;
+    if (db_document_get_by_uuid(req->server->db, doc_uuid, &doc) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Document not found");
+        return;
+    }
+    ldmd_project_t proj;
+    if (db_project_get_by_id(req->server->db, doc.project_id, &proj) != LDMD_OK ||
+        !rbac_can_edit_workspace(req->server->db, req->user.id, proj.workspace_id)) {
+        http_respond_error(req->conn, 403, "Edit access required");
+        return;
+    }
+
+    cJSON *json = parse_json_body(req);
+    if (!json) { http_respond_error(req->conn, 400, "Invalid JSON"); return; }
+
+    /* Accept either {"tag_id": N} or {"name": "...", "color": "..."} */
+    int64_t tag_id = 0;
+    cJSON *tid = cJSON_GetObjectItem(json, "tag_id");
+    if (tid && cJSON_IsNumber(tid)) {
+        tag_id = (int64_t)tid->valuedouble;
+    } else {
+        const char *name  = json_get_string(json, "name");
+        const char *color = json_get_string(json, "color");
+        if (!name || name[0] == '\0') {
+            cJSON_Delete(json);
+            http_respond_error(req->conn, 400, "tag_id or name required");
+            return;
+        }
+        if (!color || color[0] == '\0') color = "blue";
+        sqlite3 *raw = req->server->db->db;
+        /* Upsert tag */
+        sqlite3_stmt *ins = NULL;
+        if (sqlite3_prepare_v2(raw,
+                "INSERT OR IGNORE INTO tags (name, color, created_at) VALUES (?, ?, ?)",
+                -1, &ins, NULL) == SQLITE_OK) {
+            sqlite3_bind_text (ins, 1, name,  -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text (ins, 2, color, -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int64(ins, 3, (int64_t)time(NULL));
+            sqlite3_step(ins);
+            sqlite3_finalize(ins);
+        }
+        sqlite3_stmt *sel = NULL;
+        if (sqlite3_prepare_v2(raw,
+                "SELECT id FROM tags WHERE name = ? COLLATE NOCASE",
+                -1, &sel, NULL) == SQLITE_OK) {
+            sqlite3_bind_text(sel, 1, name, -1, SQLITE_TRANSIENT);
+            if (sqlite3_step(sel) == SQLITE_ROW)
+                tag_id = sqlite3_column_int64(sel, 0);
+            sqlite3_finalize(sel);
+        }
+    }
+    cJSON_Delete(json);
+
+    if (tag_id == 0) {
+        http_respond_error(req->conn, 400, "Could not resolve tag");
+        return;
+    }
+
+    sqlite3 *raw = req->server->db->db;
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(raw,
+            "INSERT OR IGNORE INTO document_tags (document_id, tag_id) "
+            "SELECT d.id, ? FROM documents d WHERE d.uuid = ?",
+            -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, tag_id);
+        sqlite3_bind_text (stmt, 2, doc_uuid, -1, SQLITE_STATIC);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+    http_respond_json(req->conn, 200, "{\"ok\":true}");
+}
+
+void route_api_document_tags_remove(http_request_t *req,
+                                     const char *doc_uuid, const char *tag_id) {
+    if (!require_auth(req)) return;
+
+    ldmd_document_t doc;
+    if (db_document_get_by_uuid(req->server->db, doc_uuid, &doc) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Document not found");
+        return;
+    }
+    ldmd_project_t proj;
+    if (db_project_get_by_id(req->server->db, doc.project_id, &proj) != LDMD_OK ||
+        !rbac_can_edit_workspace(req->server->db, req->user.id, proj.workspace_id)) {
+        http_respond_error(req->conn, 403, "Edit access required");
+        return;
+    }
+
+    sqlite3 *raw = req->server->db->db;
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(raw,
+            "DELETE FROM document_tags "
+            "WHERE document_id = (SELECT id FROM documents WHERE uuid = ?) "
+            "AND tag_id = ?",
+            -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text (stmt, 1, doc_uuid, -1, SQLITE_STATIC);
+        sqlite3_bind_int64(stmt, 2, (int64_t)atoll(tag_id));
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+    http_respond_json(req->conn, 200, "{\"ok\":true}");
+}
+
+/* =========================================================
+   SEARCH  –  GET /api/search?q=...
+   Searches document names and file content across all
+   workspaces the requesting user has access to.
+   ========================================================= */
+
+/* Case-insensitive substring helper */
+static bool ci_contains(const char *haystack, const char *needle) {
+    if (!haystack || !needle || needle[0] == '\0') return false;
+    return strcasestr(haystack, needle) != NULL;
+}
+
+/* Read up to max_bytes from a file into a malloc'd buffer (NUL-terminated).
+   Returns NULL on error. Caller must free. */
+static char *read_file_content(const char *path, size_t max_bytes) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    char *buf = malloc(max_bytes + 1);
+    if (!buf) { fclose(f); return NULL; }
+    size_t n = fread(buf, 1, max_bytes, f);
+    fclose(f);
+    buf[n] = '\0';
+    return buf;
+}
+
+/* Extract a short snippet (~120 chars) around the first match of needle */
+static void extract_snippet(const char *text, const char *needle,
+                             char *out, size_t out_size) {
+    if (!text || !needle || needle[0] == '\0' || out_size == 0) {
+        if (out_size > 0) out[0] = '\0';
+        return;
+    }
+    const char *pos = strcasestr(text, needle);
+    if (!pos) {
+        /* no match – return first chars */
+        strncpy(out, text, out_size - 1);
+        out[out_size - 1] = '\0';
+        return;
+    }
+    /* Center around match */
+    int start = (int)(pos - text) - 40;
+    if (start < 0) start = 0;
+    /* skip to word boundary */
+    while (start > 0 && text[start - 1] != ' ' && text[start - 1] != '\n') start--;
+    const char *src = text + start;
+    size_t copy = out_size - 1;
+    strncpy(out, src, copy);
+    out[copy] = '\0';
+    /* trim at newline */
+    char *nl = strchr(out, '\n');
+    if (nl) *nl = '\0';
+}
+
+void route_api_search(http_request_t *req) {
+    if (!require_auth(req)) return;
+
+    char q[256] = "";
+    http_get_query_param(req, "q", q, sizeof(q));
+    if (q[0] == '\0') {
+        http_respond_json(req->conn, 200, "{\"results\":[]}");
+        return;
+    }
+
+    int is_admin = (req->user.global_role == ROLE_ADMIN);
+    sqlite3 *raw  = req->server->db->db;
+
+    /* One query: all documents the user can access, most recently updated first.
+       Access = admin, OR owner of workspace, OR explicit workspace_member. */
+    const char *sql =
+        "SELECT d.uuid, d.name, d.path, d.updated_at, "
+        "       p.uuid AS project_uuid, p.name AS project_name, "
+        "       w.uuid AS workspace_uuid, w.name AS workspace_name, "
+        "       u.username AS created_by "
+        "FROM documents d "
+        "JOIN projects p ON p.id = d.project_id "
+        "JOIN workspaces w ON w.id = p.workspace_id "
+        "JOIN users u ON u.id = d.created_by "
+        "WHERE (?1 = 1 "
+        "  OR w.owner_id = ?2 "
+        "  OR EXISTS(SELECT 1 FROM workspace_members wm "
+        "             WHERE wm.workspace_id = w.id AND wm.user_id = ?2)) "
+        "ORDER BY d.updated_at DESC "
+        "LIMIT 300";
+
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(raw, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        http_respond_error(req->conn, 500, "DB error");
+        return;
+    }
+    sqlite3_bind_int  (stmt, 1, is_admin ? 1 : 0);
+    sqlite3_bind_int64(stmt, 2, (sqlite3_int64)req->user.id);
+
+    cJSON *results = cJSON_CreateArray();
+    int found = 0;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW && found < 50) {
+        const char *d_uuid  = (const char *)sqlite3_column_text(stmt, 0);
+        const char *d_name  = (const char *)sqlite3_column_text(stmt, 1);
+        const char *d_path  = (const char *)sqlite3_column_text(stmt, 2);
+        int64_t d_updated   = sqlite3_column_int64(stmt, 3);
+        const char *p_uuid  = (const char *)sqlite3_column_text(stmt, 4);
+        const char *p_name  = (const char *)sqlite3_column_text(stmt, 5);
+        const char *w_uuid  = (const char *)sqlite3_column_text(stmt, 6);
+        const char *w_name  = (const char *)sqlite3_column_text(stmt, 7);
+        const char *created_by = (const char *)sqlite3_column_text(stmt, 8);
+
+        bool name_match = ci_contains(d_name, q);
+        bool content_match = false;
+        char snippet[200] = "";
+
+        if (!name_match && d_path && d_path[0] != '\0') {
+            char *fc = read_file_content(d_path, 65536); /* read up to 64 KB */
+            if (fc) {
+                content_match = ci_contains(fc, q);
+                if (content_match) {
+                    extract_snippet(fc, q, snippet, sizeof(snippet));
+                }
+                free(fc);
+            }
+        } else if (name_match) {
+            /* For name matches show beginning of file as preview */
+            if (d_path && d_path[0] != '\0') {
+                char *fc = read_file_content(d_path, 300);
+                if (fc) {
+                    char *nl = strchr(fc, '\n');
+                    if (nl) *nl = '\0';
+                    strncpy(snippet, fc, sizeof(snippet) - 1);
+                    snippet[sizeof(snippet) - 1] = '\0';
+                    free(fc);
+                }
+            }
+        }
+
+        if (!name_match && !content_match) continue;
+
+        cJSON *r = cJSON_CreateObject();
+        cJSON_AddStringToObject(r, "uuid",           d_uuid     ? d_uuid     : "");
+        cJSON_AddStringToObject(r, "name",           d_name     ? d_name     : "");
+        cJSON_AddNumberToObject(r, "updated_at",     (double)d_updated);
+        cJSON_AddStringToObject(r, "snippet",        snippet);
+        cJSON_AddStringToObject(r, "match_type",     name_match ? "name" : "content");
+        cJSON_AddStringToObject(r, "project_uuid",   p_uuid     ? p_uuid     : "");
+        cJSON_AddStringToObject(r, "project_name",   p_name     ? p_name     : "");
+        cJSON_AddStringToObject(r, "workspace_uuid", w_uuid     ? w_uuid     : "");
+        cJSON_AddStringToObject(r, "workspace_name", w_name     ? w_name     : "");
+        cJSON_AddStringToObject(r, "created_by",     created_by ? created_by : "");
+        cJSON_AddItemToArray(results, r);
+        found++;
+    }
+    sqlite3_finalize(stmt);
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "results", results);
+    cJSON_AddStringToObject(root, "query", q);
+    cJSON_AddNumberToObject(root, "count", found);
+
+    char *js = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (js) { http_respond_json(req->conn, 200, js); free(js); }
+    else      http_respond_error(req->conn, 500, "Internal error");
+}
+
+/* =========================================================
+   SEARCH PAGE  –  GET /search
+   ========================================================= */
+
+void route_page_search(http_request_t *req) {
+    if (!require_auth(req)) return;
+
+    template_ctx_t *ctx = template_create_context();
+    template_set(ctx, "title", "Search - LocalDocsMD");
+    template_set(ctx, "username", req->user.username);
+    template_set(ctx, "is_admin", req->user.global_role == ROLE_ADMIN ? "true" : "");
+    set_navbar(ctx, req);
+
+    char *html = NULL;
+    ldmd_error_t err = template_render_with_layout(req->server->config->web_root, "search.html", ctx, &html);
+    template_free_context(ctx);
+
+    if (err == LDMD_OK && html) {
+        http_respond_html(req->conn, 200, html);
+        free(html);
+    } else {
+        http_respond_error(req->conn, 500, "Template error");
+    }
+}void route_api_documents_ping(http_request_t *req, const char *doc_uuid) {
     if (!require_auth(req)) return;
 
     ldmd_error_t err = db_document_viewer_ping(req->server->db,

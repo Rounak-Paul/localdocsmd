@@ -42,6 +42,11 @@
     
     <div class="section">
         <h2>Documents</h2>
+        <div id="tag-filter-bar" class="tag-filter-bar" style="display:none">
+            <span class="tag-filter-label">Filter by tag:</span>
+            <div id="tag-filter-chips" class="tag-filter-chips"></div>
+            <button id="tag-filter-clear" onclick="clearTagFilter()" class="btn btn-sm" style="display:none">Clear</button>
+        </div>
         <div id="documents-list" class="documents-grid">
             <div class="loading">Loading documents...</div>
         </div>
@@ -102,6 +107,9 @@ const projectUuid = '{{project_uuid}}';
 const canEdit = '{{can_edit}}' === 'true';
 const canManage = '{{can_manage}}' === 'true';
 
+let _allDocs = [];
+let _activeTagFilter = null;  // tag id (number) or null
+
 document.addEventListener('DOMContentLoaded', function() {
     loadDocuments();
 });
@@ -109,11 +117,51 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadDocuments() {
     try {
         const response = await fetch(`/api/projects/${projectUuid}/documents`);
-        const docs = await response.json();
-        
-        const container = document.getElementById('documents-list');
-        
-        if (docs.length === 0) {
+        _allDocs = await response.json();
+        buildTagFilterBar();
+        renderDocs();
+    } catch (err) {
+        console.error('Error loading documents:', err);
+        document.getElementById('documents-list').innerHTML = '<p class="empty-state">Error loading documents</p>';
+    }
+}
+
+function buildTagFilterBar() {
+    // Collect unique tags from all docs
+    const tagMap = new Map();
+    _allDocs.forEach(doc => (doc.tags || []).forEach(t => tagMap.set(t.id, t)));
+    const bar = document.getElementById('tag-filter-bar');
+    if (tagMap.size === 0) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    const chips = document.getElementById('tag-filter-chips');
+    chips.innerHTML = Array.from(tagMap.values()).map(t =>
+        `<button class="tag-pill tag-${t.color} tag-filter-chip${_activeTagFilter===t.id?' active':''}" data-tag-id="${t.id}" onclick="toggleTagFilter(${t.id})">${escapeHtml(t.name)}</button>`
+    ).join('');
+    document.getElementById('tag-filter-clear').style.display = _activeTagFilter ? '' : 'none';
+}
+
+function toggleTagFilter(tagId) {
+    _activeTagFilter = _activeTagFilter === tagId ? null : tagId;
+    buildTagFilterBar();
+    renderDocs();
+}
+
+function clearTagFilter() {
+    _activeTagFilter = null;
+    buildTagFilterBar();
+    renderDocs();
+}
+
+function renderDocs() {
+    const container = document.getElementById('documents-list');
+    const docs = _activeTagFilter
+        ? _allDocs.filter(d => (d.tags||[]).some(t => t.id === _activeTagFilter))
+        : _allDocs;
+
+    if (docs.length === 0) {
+        if (_activeTagFilter) {
+            container.innerHTML = `<div class="empty-state-box" style="width:100%"><p class="empty-state">No documents with this tag</p></div>`;
+        } else {
             container.innerHTML = `
                 <div class="empty-state-box" style="width: 100%;">
                     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.3; margin-bottom: 1rem;">
@@ -124,11 +172,21 @@ async function loadDocuments() {
                     <p style="color: var(--text-muted); font-size: 0.875rem;">Create a document to start writing</p>
                 </div>
             `;
-            return;
         }
-        
-        container.innerHTML = docs.map(doc => `
-            <div class="document-item">
+        return;
+    }
+
+    container.innerHTML = docs.map(doc => {
+            const tagsHtml = doc.tags && doc.tags.length
+                ? `<div class="doc-tags">${doc.tags.map(t =>
+                    `<span class="tag-pill tag-${t.color}" data-tag-id="${t.id}">${escapeHtml(t.name)}</span>`
+                ).join('')}</div>`
+                : '';
+            const createdBy = doc.created_by_username
+                ? `<span class="doc-created-by">by ${escapeHtml(doc.created_by_username)}</span>`
+                : '';
+            return `
+            <div class="document-item" data-doc-uuid="${doc.uuid}" data-tag-ids="${(doc.tags||[]).map(t=>t.id).join(',')}">
                 <a href="/document/${doc.uuid}" class="document-link">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5; flex-shrink: 0;">
                         <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
@@ -138,20 +196,18 @@ async function loadDocuments() {
                     </svg>
                     <div class="doc-info">
                         <span class="document-name">${escapeHtml(doc.name)}</span>
-                        <span class="doc-meta-inline">${formatSize(doc.size)} &middot; Updated ${relativeTime(doc.updated_at)}</span>
+                        <span class="doc-meta-inline">${formatSize(doc.size)} &middot; Updated ${relativeTime(doc.updated_at)}${createdBy ? ' &middot; ' + createdBy : ''}</span>
+                        ${tagsHtml}
                     </div>
                 </a>
                 <div class="document-actions">
                     ${canEdit ? `<a href="/editor/${doc.uuid}" class="btn btn-sm">Edit</a>` : ''}
+                    ${canEdit ? `<button onclick="event.stopPropagation(); openTagsModal('${doc.uuid}', '${escapeHtml(doc.name).replace(/'/g, "\\'")}')" class="btn btn-sm" title="Manage tags">&#127991;</button>` : ''}
                     ${canEdit ? `<button onclick="event.stopPropagation(); renameDocument('${doc.uuid}', '${escapeHtml(doc.name).replace(/'/g, "\\'")}'  )" class="btn btn-sm">Rename</button>` : ''}
                     ${canManage ? `<button onclick="event.stopPropagation(); deleteDocument('${doc.uuid}', '${escapeHtml(doc.name).replace(/'/g, "\\'")}'  )" class="btn btn-sm btn-danger">Delete</button>` : ''}
                 </div>
-            </div>
-        `).join('');
-    } catch (err) {
-        console.error('Error loading documents:', err);
-        container.innerHTML = '<p class="empty-state">Error loading documents</p>';
-    }
+            </div>`;
+        }).join('');
 }
 
 function showCreateDocument() {
@@ -338,6 +394,68 @@ async function deleteProject() {
         alert('Connection error');
     }
 }
+
+/* ───────── Tag management ───────── */
+let _tagsModalDocUuid = null;
+
+async function openTagsModal(docUuid, docName) {
+    _tagsModalDocUuid = docUuid;
+    document.getElementById('tags-modal-doc-name').textContent = docName;
+    document.getElementById('tags-modal-doc-uuid').value = docUuid;
+    document.getElementById('tags-modal-new-name').value = '';
+    await loadTagsModal();
+    await loadTagSuggestions();
+    showModal('tags-modal');
+}
+
+async function loadTagsModal() {
+    const res = await fetch(`/api/documents/${_tagsModalDocUuid}/tags`);
+    const tags = await res.json();
+    const container = document.getElementById('tags-modal-current');
+    if (!tags.length) {
+        container.innerHTML = '<span style="color:var(--text-muted);font-size:0.8rem">No tags yet</span>';
+        return;
+    }
+    container.innerHTML = tags.map(t =>
+        `<span class="tag-pill tag-${t.color} removable" onclick="removeTagFromModal(${t.id})">${escapeHtml(t.name)}</span>`
+    ).join('');
+}
+
+async function loadTagSuggestions() {
+    const res = await fetch('/api/tags');
+    const tags = await res.json();
+    const box = document.getElementById('tags-modal-suggestions');
+    if (!tags.length) { box.style.display='none'; return; }
+    box.style.display = 'flex';
+    box.innerHTML = '<span style="font-size:0.75rem;color:var(--text-muted);margin-right:0.3rem">All tags:</span>' +
+        tags.map(t =>
+            `<span class="tag-pill tag-suggestion tag-${t.color}" onclick="setTagInput('${escapeHtml(t.name).replace(/'/g,"\\'")}','${t.color}')">${escapeHtml(t.name)}</span>`
+        ).join('');
+}
+
+function setTagInput(name, color) {
+    document.getElementById('tags-modal-new-name').value = name;
+    document.getElementById('tags-modal-new-color').value = color;
+}
+
+async function addTagFromModal() {
+    const name = document.getElementById('tags-modal-new-name').value.trim();
+    const color = document.getElementById('tags-modal-new-color').value;
+    if (!name) return;
+    await fetch(`/api/documents/${_tagsModalDocUuid}/tags`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({name, color})
+    });
+    document.getElementById('tags-modal-new-name').value = '';
+    await loadTagsModal();
+    await loadTagSuggestions();
+}
+
+async function removeTagFromModal(tagId) {
+    await fetch(`/api/documents/${_tagsModalDocUuid}/tags/${tagId}`, {method:'DELETE'});
+    await loadTagsModal();
+}
 </script>
 
 <!-- Rename Document Modal -->
@@ -359,6 +477,40 @@ async function deleteProject() {
                 <button type="submit" class="btn btn-primary">Rename</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Tag Management Modal -->
+<div id="tags-modal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width:480px">
+        <div class="modal-header">
+            <h3>Tags – <span id="tags-modal-doc-name"></span></h3>
+            <button onclick="closeModal('tags-modal')" class="btn-close">&times;</button>
+        </div>
+        <input type="hidden" id="tags-modal-doc-uuid">
+        <div class="form-group" style="margin-top:1rem">
+            <label>Current tags</label>
+            <div id="tags-modal-current" class="doc-tags" style="min-height:2rem;gap:0.4rem;flex-wrap:wrap"></div>
+        </div>
+        <div class="form-group">
+            <label>Add tag</label>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+                <input type="text" id="tags-modal-new-name" placeholder="Tag name" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromModal();}">
+                <select id="tags-modal-new-color" style="width:100px">
+                    <option value="blue">Blue</option>
+                    <option value="green">Green</option>
+                    <option value="red">Red</option>
+                    <option value="purple">Purple</option>
+                    <option value="orange">Orange</option>
+                    <option value="gray">Gray</option>
+                </select>
+                <button onclick="addTagFromModal()" class="btn btn-sm btn-primary">Add</button>
+            </div>
+            <div id="tags-modal-suggestions" class="tags-suggestions" style="display:none;margin-top:0.5rem"></div>
+        </div>
+        <div class="modal-footer">
+            <button onclick="closeModal('tags-modal');loadDocuments();" class="btn">Done</button>
+        </div>
     </div>
 </div>
 
@@ -392,4 +544,55 @@ async function deleteProject() {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+.doc-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.15rem;
+}
+
+.doc-created-by {
+    color: var(--text-muted);
+}
+
+.tag-pill {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    cursor: default;
+    user-select: none;
+}
+.tag-pill.tag-blue   { background:rgba(88,166,255,.18); color:#58a6ff; border:1px solid rgba(88,166,255,.3); }
+.tag-pill.tag-green  { background:rgba(63,185,80,.18);  color:#3fb950; border:1px solid rgba(63,185,80,.3); }
+.tag-pill.tag-red    { background:rgba(248,81,73,.18);  color:#f85149; border:1px solid rgba(248,81,73,.3); }
+.tag-pill.tag-purple { background:rgba(188,140,255,.18);color:#bc8cff; border:1px solid rgba(188,140,255,.3); }
+.tag-pill.tag-orange { background:rgba(255,165,0,.18);  color:#ffa500; border:1px solid rgba(255,165,0,.3); }
+.tag-pill.tag-gray   { background:rgba(139,148,158,.18);color:#8b949e; border:1px solid rgba(139,148,158,.3); }
+
+.tag-pill.removable { cursor:pointer; }
+.tag-pill.removable::after { content:'×'; margin-left:0.3rem; opacity:0.6; }
+
+.tag-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.tag-filter-label { font-size: 0.8rem; color: var(--text-muted); flex-shrink: 0; }
+.tag-filter-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.tag-filter-chip { cursor: pointer; opacity: 0.7; transition: opacity 0.15s; }
+.tag-filter-chip:hover, .tag-filter-chip.active { opacity: 1; }
+.tag-filter-chip.active { outline: 2px solid currentColor; outline-offset: 1px; }
+
+.tags-suggestions { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.tag-suggestion { cursor: pointer; }
+.tag-suggestion:hover { opacity: 0.8; }
 </style>

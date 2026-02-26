@@ -1,0 +1,314 @@
+<div class="search-page">
+    <div class="page-header">
+        <div>
+            <h1>Search</h1>
+            <p class="description">Search document names and content across all your workspaces</p>
+        </div>
+    </div>
+
+    <div class="search-bar-wrap">
+        <div class="search-input-group">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="search-input" class="search-field" placeholder="Search documents by name or content…" autofocus>
+            <kbd class="search-kbd" id="search-clear" style="display:none" onclick="clearSearch()">✕</kbd>
+        </div>
+    </div>
+
+    <div id="search-status" class="search-status"></div>
+    <div id="search-results" class="search-results-container"></div>
+</div>
+
+<script>
+const searchInput = document.getElementById('search-input');
+const searchStatus = document.getElementById('search-status');
+const searchResults = document.getElementById('search-results');
+const clearBtn = document.getElementById('search-clear');
+
+let _debounce = null;
+let _lastQuery = '';
+
+searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim();
+    clearBtn.style.display = q ? '' : 'none';
+    clearTimeout(_debounce);
+    if (!q) { searchStatus.textContent = ''; searchResults.innerHTML = ''; _lastQuery = ''; return; }
+    if (q === _lastQuery) return;
+    searchStatus.textContent = 'Searching…';
+    _debounce = setTimeout(() => runSearch(q), 350);
+});
+
+function clearSearch() {
+    searchInput.value = '';
+    searchInput.focus();
+    clearBtn.style.display = 'none';
+    searchStatus.textContent = '';
+    searchResults.innerHTML = '';
+    _lastQuery = '';
+}
+
+async function runSearch(q) {
+    _lastQuery = q;
+    try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        if (!res.ok) { searchStatus.textContent = 'Search error'; return; }
+        if (q !== searchInput.value.trim()) return; // stale
+        const data = await res.json();
+        renderResults(data);
+    } catch (e) {
+        searchStatus.textContent = 'Connection error';
+    }
+}
+
+function highlight(text, query) {
+    if (!text || !query) return escapeHtml(text || '');
+    const safe = escapeHtml(text);
+    const safeQ = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return safe.replace(new RegExp(`(${safeQ})`, 'gi'), '<mark>$1</mark>');
+}
+
+function renderResults(data) {
+    const q = data.query || '';
+    if (!data.results || data.results.length === 0) {
+        searchStatus.textContent = `No results for "${q}"`;
+        searchResults.innerHTML = `
+            <div class="search-empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.3">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <p>No documents matched your query.</p>
+                <p class="search-hint">Try broader keywords, or search a word from the document content.</p>
+            </div>`;
+        return;
+    }
+
+    searchStatus.textContent = `${data.count} result${data.count !== 1 ? 's' : ''} for "${q}"`;
+
+    // Group by workspace → project
+    const groups = new Map(); // workspace_uuid → { name, projects: Map<uuid, {name, docs:[]}> }
+    data.results.forEach(r => {
+        if (!groups.has(r.workspace_uuid)) {
+            groups.set(r.workspace_uuid, { name: r.workspace_name, uuid: r.workspace_uuid, projects: new Map() });
+        }
+        const ws = groups.get(r.workspace_uuid);
+        if (!ws.projects.has(r.project_uuid)) {
+            ws.projects.set(r.project_uuid, { name: r.project_name, uuid: r.project_uuid, docs: [] });
+        }
+        ws.projects.get(r.project_uuid).docs.push(r);
+    });
+
+    let html = '';
+    groups.forEach(ws => {
+        html += `<div class="search-ws-group">
+            <div class="search-ws-header">
+                <a href="/workspace/${ws.uuid}" class="search-ws-link">${escapeHtml(ws.name)}</a>
+            </div>`;
+        ws.projects.forEach(proj => {
+            html += `<div class="search-proj-group">
+                <div class="search-proj-header">
+                    <a href="/project/${proj.uuid}" class="search-proj-link">${escapeHtml(proj.name)}</a>
+                </div>
+                <div class="search-doc-list">`;
+            proj.docs.forEach(doc => {
+                const matchBadge = doc.match_type === 'name'
+                    ? `<span class="match-badge match-name">name</span>`
+                    : `<span class="match-badge match-content">content</span>`;
+                const snippetHtml = doc.snippet
+                    ? `<div class="search-snippet">${highlight(doc.snippet, q)}</div>`
+                    : '';
+                html += `
+                <a href="/document/${doc.uuid}" class="search-result-item">
+                    <div class="search-result-main">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4;flex-shrink:0">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        <span class="search-doc-name">${highlight(doc.name, q)}</span>
+                        ${matchBadge}
+                    </div>
+                    ${snippetHtml}
+                    <div class="search-doc-meta">
+                        ${doc.created_by ? `by ${escapeHtml(doc.created_by)} · ` : ''}updated ${relativeTime(doc.updated_at)}
+                    </div>
+                </a>`;
+            });
+            html += `</div></div>`;
+        });
+        html += `</div>`;
+    });
+    searchResults.innerHTML = html;
+}
+
+function relativeTime(unixSec) {
+    if (!unixSec) return 'never';
+    const diff = Math.floor(Date.now() / 1000) - unixSec;
+    if (diff < 60) return 'just now';
+    if (diff < 3600)   { const m = Math.floor(diff/60);       return m + ' minute' + (m>1?'s':'') + ' ago'; }
+    if (diff < 86400)  { const h = Math.floor(diff/3600);     return h + ' hour'   + (h>1?'s':'') + ' ago'; }
+    if (diff < 2592000){ const d = Math.floor(diff/86400);    return d + ' day'    + (d>1?'s':'') + ' ago'; }
+    const mo = Math.floor(diff/2592000); return mo + ' month' + (mo>1?'s':'') + ' ago';
+}
+
+// Prefill from URL ?q=
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q');
+    if (q) {
+        searchInput.value = q;
+        clearBtn.style.display = '';
+        runSearch(q);
+    }
+})();
+</script>
+
+<style>
+.search-page { max-width: 860px; margin: 0 auto; }
+
+.search-bar-wrap {
+    margin: 1.5rem 0;
+}
+.search-input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.search-icon {
+    position: absolute;
+    left: 0.9rem;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+.search-field {
+    width: 100%;
+    padding: 0.75rem 2.5rem 0.75rem 2.8rem;
+    font-size: 1rem;
+    background: var(--card-bg);
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s;
+}
+.search-field:focus { border-color: var(--accent); }
+.search-kbd {
+    position: absolute;
+    right: 0.7rem;
+    font-size: 0.8rem;
+    padding: 0.15rem 0.45rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+.search-status {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    min-height: 1.2rem;
+}
+
+.search-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 3rem 1rem;
+    gap: 0.5rem;
+    color: var(--text-muted);
+}
+.search-hint { font-size: 0.85rem; }
+
+.search-results-container { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.search-ws-group {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+.search-ws-header {
+    padding: 0.5rem 0.9rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+.search-ws-link { color: inherit; text-decoration: none; }
+.search-ws-link:hover { color: var(--accent); }
+
+.search-proj-group { padding: 0.5rem 0; }
+.search-proj-header {
+    padding: 0.35rem 1.1rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.search-proj-link { color: inherit; text-decoration: none; }
+.search-proj-link:hover { color: var(--accent); }
+
+.search-doc-list { display: flex; flex-direction: column; }
+
+.search-result-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.6rem 1.1rem;
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: background 0.1s;
+}
+.search-result-item:hover { background: var(--bg-secondary); }
+
+.search-result-main {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.search-doc-name {
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+.search-doc-name mark, .search-snippet mark {
+    background: rgba(255,210,0,.25);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+}
+.search-doc-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.search-snippet {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    padding: 0.25rem 0.4rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    border-left: 2px solid var(--border-color);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.match-badge {
+    font-size: 0.65rem;
+    font-weight: 500;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+.match-name    { background: rgba(88,166,255,.18); color:#58a6ff; border:1px solid rgba(88,166,255,.3); }
+.match-content { background: rgba(63,185,80,.18);  color:#3fb950; border:1px solid rgba(63,185,80,.3); }
+</style>

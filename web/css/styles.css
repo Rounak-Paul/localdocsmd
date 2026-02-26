@@ -338,6 +338,12 @@ body {
     background: rgba(var(--primary-500), 0.1);
 }
 
+.navbar-search-link {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.3rem;
+}
+
 /* User Menu Dropdown
    ======================================== */
 .user-menu {

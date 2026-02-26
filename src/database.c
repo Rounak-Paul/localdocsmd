@@ -148,6 +148,23 @@ static const char *SCHEMA_SQL =
     "  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
     ");"
 
+    // Tags: global tag pool, any authenticated user can create
+    "CREATE TABLE IF NOT EXISTS tags ("
+    "  id         INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "  name       TEXT UNIQUE NOT NULL COLLATE NOCASE,"
+    "  color      TEXT NOT NULL DEFAULT 'blue',"
+    "  created_at INTEGER NOT NULL"
+    ");"
+
+    // Document → Tag mapping
+    "CREATE TABLE IF NOT EXISTS document_tags ("
+    "  document_id INTEGER NOT NULL,"
+    "  tag_id      INTEGER NOT NULL,"
+    "  PRIMARY KEY (document_id, tag_id),"
+    "  FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,"
+    "  FOREIGN KEY (tag_id)      REFERENCES tags(id)      ON DELETE CASCADE"
+    ");"
+
     // Indexes
     "CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);"
     "CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);"
@@ -163,7 +180,10 @@ static const char *SCHEMA_SQL =
     "CREATE INDEX IF NOT EXISTS idx_workspace_members_user ON workspace_members(user_id);"
     "CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id);"
     "CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id);"
-    "CREATE INDEX IF NOT EXISTS idx_activity_log_user_ts ON activity_log(user_id, ts);";
+    "CREATE INDEX IF NOT EXISTS idx_activity_log_user_ts ON activity_log(user_id, ts);"
+    "CREATE INDEX IF NOT EXISTS idx_document_tags_doc    ON document_tags(document_id);"
+    "CREATE INDEX IF NOT EXISTS idx_document_tags_tag    ON document_tags(tag_id);"
+    "CREATE INDEX IF NOT EXISTS idx_tags_name            ON tags(name);";
 
 ldmd_database_t *db_init(const char *path) {
     ldmd_database_t *db = calloc(1, sizeof(ldmd_database_t));

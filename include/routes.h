@@ -92,4 +92,20 @@ void route_api_activity(http_request_t *req);
 void route_api_documents_ping(http_request_t *req, const char *doc_uuid);
 void route_api_documents_viewers(http_request_t *req, const char *doc_uuid);
 
+// Tags (global tag pool)
+void route_api_tags_list(http_request_t *req);
+void route_api_tags_create(http_request_t *req);
+void route_api_tags_delete(http_request_t *req, const char *tag_id);
+
+// Document ↔ Tag associations
+void route_api_document_tags_list(http_request_t *req, const char *doc_uuid);
+void route_api_document_tags_add(http_request_t *req, const char *doc_uuid);
+void route_api_document_tags_remove(http_request_t *req, const char *doc_uuid, const char *tag_id);
+
+// Search (cross-workspace, name + content)
+void route_api_search(http_request_t *req);
+
+// Search page
+void route_page_search(http_request_t *req);
+
 #endif // ROUTES_H

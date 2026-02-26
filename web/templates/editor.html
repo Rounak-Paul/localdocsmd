@@ -96,6 +96,7 @@
                 <span id="status-pos">Ln 1, Col 1</span>
                 <span id="status-chars">0 chars</span>
                 <span id="status-words">0 words</span>
+                <span id="status-wpm" title="Words per minute (60-second window)">-- wpm</span>
             </div>
         </div>
 
@@ -348,6 +349,12 @@ const saveStatus = document.getElementById('save-status');
 const statusPos  = document.getElementById('status-pos');
 const statusChars= document.getElementById('status-chars');
 const statusWords= document.getElementById('status-words');
+const statusWpm  = document.getElementById('status-wpm');
+
+/* WPM tracking – sliding 60-second window of word-deltas */
+const WPM_WINDOW = 60 * 1000; // 60 s
+let _wpmLog = [];          // [{ts, words}]  – snapshot per keystroke
+let _lastWordCount = 0;
 const viewerEl   = document.getElementById('viewer-presence');
 const toastEl    = document.getElementById('toast');
 
@@ -825,7 +832,27 @@ function updateStatusBar() {
     const before = val.substring(0,pos).split('\n');
     statusPos.textContent   = `Ln ${before.length}, Col ${before[before.length-1].length+1}`;
     statusChars.textContent = `${val.length} chars`;
-    statusWords.textContent = `${val.trim() ? val.trim().split(/\s+/).length : 0} words`;
+    const wordCount = val.trim() ? val.trim().split(/\s+/).length : 0;
+    statusWords.textContent = `${wordCount} words`;
+    /* WPM: track word count changes in a sliding 60-s window */
+    const now = Date.now();
+    const cutoff = now - WPM_WINDOW;
+    if (wordCount !== _lastWordCount) {
+        _wpmLog.push({ts: now, words: wordCount});
+        _lastWordCount = wordCount;
+    }
+    // Prune old entries
+    _wpmLog = _wpmLog.filter(e => e.ts >= cutoff);
+    if (_wpmLog.length >= 2) {
+        const oldest = _wpmLog[0], newest = _wpmLog[_wpmLog.length - 1];
+        const elapsed = (newest.ts - oldest.ts) / 60000; // minutes
+        if (elapsed > 0) {
+            const wpm = Math.round(Math.abs(newest.words - oldest.words) / elapsed);
+            statusWpm.textContent = `${wpm} wpm`;
+        }
+    } else {
+        statusWpm.textContent = '-- wpm';
+    }
 }
 
 function debounce(fn,ms){let t;return function(...a){clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};}
