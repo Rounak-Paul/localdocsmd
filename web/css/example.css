@@ -151,7 +151,7 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
+  padding: 8px 16px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
@@ -197,17 +197,17 @@ header {
 
 /* Buttons */
 .btn {
-  padding: 6px 14px;
-  border-radius: 6px;
+  padding: 4px 10px;
+  border-radius: 0;
   border: 1px solid var(--border-color);
   background: var(--bg-tertiary);
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s ease;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .btn:hover {
@@ -235,18 +235,18 @@ header {
   position: absolute;
   top: 100%;
   right: 0;
-  margin-top: 4px;
+  margin-top: 2px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 4px;
-  min-width: 150px;
+  border-radius: 0;
+  padding: 2px;
+  min-width: 140px;
   opacity: 0;
   visibility: hidden;
-  transform: translateY(-8px);
+  transform: translateY(-6px);
   transition: all 0.15s ease;
   z-index: 100;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
 
 .dropdown.open .dropdown-menu {
@@ -260,13 +260,13 @@ header {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border: none;
   background: transparent;
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 0;
   text-align: left;
 }
 
@@ -376,13 +376,13 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: 5px 14px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.68rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.08em;
   color: var(--text-secondary);
   flex-shrink: 0;
 }
@@ -397,15 +397,16 @@ header {
 }
 
 .pane-font-btn {
+.pane-font-btn {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: 3px;
+  padding: 3px 6px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 0;
   color: var(--text-secondary);
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 500;
   text-transform: none;
   letter-spacing: normal;
@@ -428,16 +429,16 @@ header {
   position: absolute;
   top: 100%;
   right: 0;
-  margin-top: 4px;
-  min-width: 160px;
+  margin-top: 2px;
+  min-width: 150px;
   background: #1e1e1e !important;
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: 0;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   z-index: 1000;
   opacity: 0;
   visibility: hidden;
-  transform: translateY(-8px);
+  transform: translateY(-6px);
   transition: all 0.15s ease;
 }
 
@@ -473,8 +474,8 @@ header {
 #editor {
   flex: 1;
   width: 100%;
-  padding: 32px;
-  padding-bottom: calc(20px + 5lh);
+  padding: 16px 20px;
+  padding-bottom: calc(16px + 5lh);
   background: var(--bg-primary);
   color: var(--text-primary);
   border: none;
@@ -482,8 +483,8 @@ header {
   resize: none;
   overflow-y: auto;
   font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 #editor::placeholder {
@@ -494,8 +495,8 @@ header {
 #preview {
   flex: 1;
   overflow-y: auto;
-  padding: 32px;
-  padding-bottom: calc(20px + 5lh);
+  padding: 16px 20px;
+  padding-bottom: calc(16px + 5lh);
   background: var(--bg-primary);
 }
 
@@ -508,12 +509,12 @@ header {
 
 /* Table of Contents Sidebar */
 .toc-sidebar {
-  width: 220px;
-  min-width: 220px;
+  width: 190px;
+  min-width: 190px;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   overflow-y: auto;
-  padding: 16px 0;
+  padding: 10px 0;
   flex-shrink: 0;
   display: none;
 }
@@ -623,9 +624,9 @@ header {
 /* Images */
 .markdown-body img {
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: 0;
   border: 1px solid var(--border-color);
-  margin: 16px 0;
+  margin: 12px 0;
 }
 
 /* Code Blocks with Syntax Highlighting */
@@ -633,7 +634,7 @@ header {
   position: relative;
   background: var(--bg-secondary) !important;
   border: 1px solid var(--border-color) !important;
-  border-radius: 8px !important;
+  border-radius: 0 !important;
   padding: 0 !important;
   overflow: hidden;
 }
@@ -641,14 +642,14 @@ header {
 /* Copy button for code blocks */
 .code-copy-btn {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  padding: 4px 8px;
+  top: 6px;
+  right: 6px;
+  padding: 3px 7px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 0;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s ease, background 0.15s ease;
@@ -714,10 +715,10 @@ header {
 
 /* Obsidian-style Callouts */
 .callout {
-  padding: 12px 16px;
-  margin: 16px 0;
-  border-radius: 8px;
-  border-left: 4px solid;
+  padding: 10px 14px;
+  margin: 12px 0;
+  border-radius: 0;
+  border-left: 3px solid;
   background: var(--bg-secondary);
 }
 
@@ -875,9 +876,9 @@ header {
 .mermaid {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 16px;
-  margin: 16px 0;
+  border-radius: 0;
+  padding: 14px;
+  margin: 14px 0;
   text-align: center;
 }
 
@@ -897,8 +898,8 @@ header {
 
 /* Math / LaTeX */
 .math-block {
-  margin: 20px 0;
-  padding: 16px;
+  margin: 14px 0;
+  padding: 12px;
   text-align: center;
   overflow-x: auto;
 }
@@ -924,10 +925,10 @@ header {
 
 /* Equation Plots */
 .equation-plot {
-  margin: 20px 0;
+  margin: 14px 0;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -1031,9 +1032,9 @@ header {
 
 /* Content Tabs */
 .content-tabs {
-  margin: 16px 0;
+  margin: 12px 0;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -1044,11 +1045,11 @@ header {
 }
 
 .tab-btn {
-  padding: 10px 16px;
+  padding: 7px 14px;
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -1082,14 +1083,14 @@ header {
 /* Keyboard Keys */
 kbd {
   display: inline-block;
-  padding: 3px 8px;
-  font-size: 12px;
+  padding: 2px 6px;
+  font-size: 11px;
   font-family: var(--font-mono);
   line-height: 1.4;
   color: var(--text-primary);
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 0;
   box-shadow: inset 0 -1px 0 var(--border-color);
 }
 
@@ -1097,8 +1098,8 @@ kbd {
 mark {
   background: rgba(210, 153, 34, 0.3);
   color: var(--text-primary);
-  padding: 2px 4px;
-  border-radius: 2px;
+  padding: 1px 3px;
+  border-radius: 0;
 }
 
 /* Better Task Lists */
@@ -1114,14 +1115,14 @@ mark {
 /* Toast Notifications */
 .toast {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 12px 20px;
+  bottom: 16px;
+  right: 16px;
+  padding: 9px 16px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 0;
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: 0.825rem;
   transform: translateY(100px);
   opacity: 0;
   transition: all 0.3s ease;
@@ -1173,11 +1174,11 @@ body.viewer-mode .toc-sidebar {
   top: 0;
   height: fit-content;
   max-height: calc(100vh - 60px);
-  width: 240px;
-  min-width: 240px;
+  width: 220px;
+  min-width: 220px;
   margin-left: 20px;
   margin-top: 20px;
-  border-radius: 8px;
+  border-radius: 0;
   border: 1px solid var(--border-color);
 }
 
@@ -1222,10 +1223,10 @@ body.viewer-mode .status-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 4px 16px;
+  padding: 3px 14px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--text-secondary);
   flex-shrink: 0;
 }
@@ -1433,12 +1434,12 @@ body.viewer-mode .status-bar {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 28px;
-  height: 48px;
+  width: 22px;
+  height: 40px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-left: none;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;

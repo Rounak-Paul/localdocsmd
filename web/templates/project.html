@@ -488,25 +488,27 @@ async function removeTagFromModal(tagId) {
             <button onclick="closeModal('tags-modal')" class="btn-close">&times;</button>
         </div>
         <input type="hidden" id="tags-modal-doc-uuid">
-        <div class="form-group" style="margin-top:1rem">
-            <label>Current tags</label>
-            <div id="tags-modal-current" class="doc-tags" style="min-height:2rem;gap:0.4rem;flex-wrap:wrap"></div>
-        </div>
-        <div class="form-group">
-            <label>Add tag</label>
-            <div style="display:flex;gap:0.5rem;align-items:center">
-                <input type="text" id="tags-modal-new-name" placeholder="Tag name" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromModal();}">
-                <select id="tags-modal-new-color" style="width:100px">
-                    <option value="blue">Blue</option>
-                    <option value="green">Green</option>
-                    <option value="red">Red</option>
-                    <option value="purple">Purple</option>
-                    <option value="orange">Orange</option>
-                    <option value="gray">Gray</option>
-                </select>
-                <button onclick="addTagFromModal()" class="btn btn-sm btn-primary">Add</button>
+        <div class="modal-body" style="padding-top:0;padding-bottom:0">
+            <div class="form-group" style="margin-bottom:var(--spacing-md)">
+                <label>Current tags</label>
+                <div id="tags-modal-current" class="doc-tags" style="min-height:1.8rem;gap:0.4rem;flex-wrap:wrap"></div>
             </div>
-            <div id="tags-modal-suggestions" class="tags-suggestions" style="display:none;margin-top:0.5rem"></div>
+            <div class="form-group" style="margin-bottom:0">
+                <label>Add tag</label>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                    <input type="text" id="tags-modal-new-name" placeholder="Tag name" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromModal();}">
+                    <select id="tags-modal-new-color" style="width:100px;flex-shrink:0">
+                        <option value="blue">Blue</option>
+                        <option value="green">Green</option>
+                        <option value="red">Red</option>
+                        <option value="purple">Purple</option>
+                        <option value="orange">Orange</option>
+                        <option value="gray">Gray</option>
+                    </select>
+                    <button onclick="addTagFromModal()" class="btn btn-sm btn-primary" style="flex-shrink:0">Add</button>
+                </div>
+                <div id="tags-modal-suggestions" class="tags-suggestions" style="display:none;margin-top:0.5rem"></div>
+            </div>
         </div>
         <div class="modal-footer">
             <button onclick="closeModal('tags-modal');loadDocuments();" class="btn">Done</button>

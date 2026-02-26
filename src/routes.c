@@ -2614,7 +2614,7 @@ void route_api_search(http_request_t *req) {
                 }
             }
         }
-
+    
         if (!name_match && !content_match) continue;
 
         cJSON *r = cJSON_CreateObject();
