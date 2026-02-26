@@ -139,6 +139,15 @@ static const char *SCHEMA_SQL =
     "  PRIMARY KEY (document_uuid, user_uuid)"
     ");"
 
+    // Activity log: one row per user action, used for the dashboard heatmap
+    "CREATE TABLE IF NOT EXISTS activity_log ("
+    "  id      INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "  user_id INTEGER NOT NULL,"
+    "  action  TEXT NOT NULL,"
+    "  ts      INTEGER NOT NULL,"
+    "  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+    ");"
+
     // Indexes
     "CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);"
     "CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);"
@@ -153,7 +162,8 @@ static const char *SCHEMA_SQL =
     "CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace ON workspace_members(workspace_id);"
     "CREATE INDEX IF NOT EXISTS idx_workspace_members_user ON workspace_members(user_id);"
     "CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id);"
-    "CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id);";
+    "CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id);"
+    "CREATE INDEX IF NOT EXISTS idx_activity_log_user_ts ON activity_log(user_id, ts);";
 
 ldmd_database_t *db_init(const char *path) {
     ldmd_database_t *db = calloc(1, sizeof(ldmd_database_t));

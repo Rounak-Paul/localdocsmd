@@ -12,6 +12,21 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <sys/stat.h>
+#include <time.h>
+
+// Insert one row into activity_log for the current user
+static void activity_log_insert(ldmd_database_t *db, int64_t user_id, const char *action) {
+    sqlite3_stmt *stmt;
+    const char *sql =
+        "INSERT INTO activity_log (user_id, action, ts) VALUES (?, ?, ?)";
+    if (sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, user_id);
+        sqlite3_bind_text (stmt, 2, action, -1, SQLITE_STATIC);
+        sqlite3_bind_int64(stmt, 3, (int64_t)time(NULL));
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+}
 
 // Helper to check if method matches
 static bool method_is(http_request_t *req, const char *method) {
@@ -1403,7 +1418,9 @@ void route_api_projects_create(http_request_t *req, const char *ws_uuid) {
         http_respond_error(req->conn, 500, "Failed to create project");
         return;
     }
-    
+
+    activity_log_insert(req->server->db, req->user.id, "project_create");
+
     cJSON *resp = cJSON_CreateObject();
     cJSON_AddStringToObject(resp, "uuid", project.uuid);
     cJSON_AddStringToObject(resp, "name", project.name);
@@ -1679,7 +1696,9 @@ void route_api_documents_create(http_request_t *req, const char *project_uuid) {
         http_respond_error(req->conn, 500, "Failed to create document");
         return;
     }
-    
+
+    activity_log_insert(req->server->db, req->user.id, "doc_create");
+
     cJSON *resp = cJSON_CreateObject();
     cJSON_AddStringToObject(resp, "uuid", doc.uuid);
     cJSON_AddStringToObject(resp, "name", doc.name);
@@ -1818,6 +1837,7 @@ void route_api_documents_content(http_request_t *req, const char *doc_uuid) {
         
         doc.updated_by = req->user.id;
         document_update(req->server->db, &doc);
+        activity_log_insert(req->server->db, req->user.id, "doc_save");
         
         cJSON_Delete(json);
         http_respond_json(req->conn, 200, "{\"success\":true}");
@@ -2060,20 +2080,33 @@ void route_api_activity(http_request_t *req) {
     if (!require_auth(req)) return;
 
     /*
-     * Return every timestamp where this user did something:
-     *   - saved / created a document (updated_at or created_at for docs)
-     *   - created a project
-     *   - created a workspace
-     * One timestamp per event; frontend groups them into a heatmap.
+     * Primary source: activity_log (one row per event, deployed going forward).
+     * Historical fallback: for events that predate activity_log, pull from
+     * documents/projects/workspaces tables but ONLY for timestamps strictly
+     * before the earliest activity_log entry for this user — this prevents
+     * double-counting once activity_log starts filling in.
+     *
+     * Uses SQLite named parameter ?1 so a single bind covers all occurrences.
      */
     const char *sql =
-        "SELECT updated_at AS ts FROM documents WHERE updated_by = ? "
+        "WITH cutoff AS ("
+        "  SELECT COALESCE(MIN(ts), 32503680000) AS t"
+        "  FROM activity_log WHERE user_id = ?1"
+        ")"
+        "SELECT ts FROM activity_log WHERE user_id = ?1 "
         "UNION ALL "
-        "SELECT created_at AS ts FROM documents WHERE created_by = ? AND (updated_by IS NULL OR updated_by = ?) "
+        "SELECT updated_at FROM documents "
+        "  WHERE updated_by = ?1 AND updated_at < (SELECT t FROM cutoff) "
         "UNION ALL "
-        "SELECT updated_at AS ts FROM projects WHERE created_by = ? "
+        "SELECT created_at FROM documents "
+        "  WHERE created_by = ?1 AND (updated_by IS NULL OR updated_by = ?1) "
+        "  AND created_at < (SELECT t FROM cutoff) "
         "UNION ALL "
-        "SELECT created_at AS ts FROM workspaces WHERE owner_id = ? "
+        "SELECT updated_at FROM projects "
+        "  WHERE created_by = ?1 AND updated_at < (SELECT t FROM cutoff) "
+        "UNION ALL "
+        "SELECT created_at FROM workspaces "
+        "  WHERE owner_id = ?1 AND created_at < (SELECT t FROM cutoff) "
         "ORDER BY ts DESC LIMIT 10000";
 
     sqlite3_stmt *stmt;
@@ -2083,11 +2116,7 @@ void route_api_activity(http_request_t *req) {
     }
 
     int64_t uid = req->user.id;
-    sqlite3_bind_int64(stmt, 1, uid);
-    sqlite3_bind_int64(stmt, 2, uid);
-    sqlite3_bind_int64(stmt, 3, uid);
-    sqlite3_bind_int64(stmt, 4, uid);
-    sqlite3_bind_int64(stmt, 5, uid);
+    sqlite3_bind_int64(stmt, 1, uid);  /* ?1 covers all occurrences */
 
     cJSON *arr = cJSON_CreateArray();
     while (sqlite3_step(stmt) == SQLITE_ROW) {
