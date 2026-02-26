@@ -1,18 +1,64 @@
 // LocalDocsMD - Application JavaScript
 
+// Nerd Font stacks
+const NERD_FONTS = {
+    'departure-mono': "'DepartureMono Nerd Font','DepartureMono NF','Departure Mono',monospace",
+    'cascadia-cove':  "'CaskaydiaCove Nerd Font','CaskaydiaCove NF','Cascadia Code',monospace",
+    'jetbrains-mono': "'JetBrainsMono Nerd Font','JetBrainsMono NF','JetBrains Mono',monospace",
+};
+
 // Theme management
 function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('ldmd-theme', theme);
+    document.querySelectorAll('.nav-theme-item').forEach(b =>
+        b.classList.toggle('active', b.dataset.theme === theme));
 }
 
-// Initialize theme from localStorage
-(function() {
-    const saved = localStorage.getItem('ldmd-theme');
-    if (saved) {
-        document.documentElement.setAttribute('data-theme', saved);
+// Nav popup toggle (click-based)
+function toggleNavPopup(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const wasOpen = el.classList.contains('open');
+    document.querySelectorAll('.nav-popup-menu.open').forEach(m => m.classList.remove('open'));
+    document.querySelectorAll('.nav-popup-btn.active').forEach(b => b.classList.remove('active'));
+    if (!wasOpen) {
+        el.classList.add('open');
+        el.previousElementSibling.classList.add('active');
     }
+}
+
+// Global font setter
+function setAppFont(key) {
+    const stack = NERD_FONTS[key] || NERD_FONTS['departure-mono'];
+    document.documentElement.style.setProperty('--font-ui', stack);
+    localStorage.setItem('ldmd-font', key);
+    document.querySelectorAll('.nav-font-item').forEach(b =>
+        b.classList.toggle('active', b.dataset.font === key));
+}
+
+// Initialize theme and font from localStorage
+(function() {
+    const savedTheme = localStorage.getItem('ldmd-theme');
+    if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+    const savedFont = localStorage.getItem('ldmd-font') || 'departure-mono';
+    const stack = NERD_FONTS[savedFont];
+    if (stack) document.documentElement.style.setProperty('--font-ui', stack);
 })();
+
+// Mark active theme/font once the DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    const savedTheme = localStorage.getItem('ldmd-theme');
+    if (savedTheme) {
+        document.querySelectorAll('.nav-theme-item').forEach(b =>
+            b.classList.toggle('active', b.dataset.theme === savedTheme));
+    }
+    const savedFont = localStorage.getItem('ldmd-font') || 'departure-mono';
+    document.querySelectorAll('.nav-font-item').forEach(b =>
+        b.classList.toggle('active', b.dataset.font === savedFont));
+});
 
 // Helper functions
 function escapeHtml(text) {
@@ -103,7 +149,7 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// Close modal on backdrop click; also close user dropdown when clicking outside
+// Close modal on backdrop click; also close user dropdown and nav popups when clicking outside
 document.addEventListener('click', function(e) {
     if (e.target.classList.contains('modal')) {
         e.target.style.display = 'none';
@@ -112,6 +158,10 @@ document.addEventListener('click', function(e) {
     if (menu && !menu.contains(e.target)) {
         const dropdown = document.getElementById('user-dropdown');
         if (dropdown) dropdown.style.display = 'none';
+    }
+    if (!e.target.closest('.nav-popup-wrap')) {
+        document.querySelectorAll('.nav-popup-menu.open').forEach(m => m.classList.remove('open'));
+        document.querySelectorAll('.nav-popup-btn.active').forEach(b => b.classList.remove('active'));
     }
 });
 

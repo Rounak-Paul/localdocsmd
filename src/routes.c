@@ -106,7 +106,7 @@ static void set_navbar(template_ctx_t *ctx, http_request_t *req) {
         return;
     }
 
-    char navbar[8192];
+    char navbar[16384];
     const char *admin_link = (req->user.global_role == ROLE_ADMIN)
         ? "<a href=\"/admin\">Admin</a>"
         : "";
@@ -125,13 +125,24 @@ static void set_navbar(template_ctx_t *ctx, http_request_t *req) {
         "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"></circle><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"></line></svg>"
         "Search"
         "</a>"
-        "<div class=\"theme-switcher\">"
-        "<button class=\"btn\" title=\"Theme\">&#9728;</button>"
-        "<div class=\"theme-dropdown\">"
-        "<button class=\"theme-option\" onclick=\"setTheme('midnight')\"><span class=\"theme-preview\" style=\"background:#0d1117;border-color:#30363d\"></span>Midnight</button>"
-        "<button class=\"theme-option\" onclick=\"setTheme('daylight')\"><span class=\"theme-preview\" style=\"background:#fff;border-color:#d0d7de\"></span>Daylight</button>"
-        "<button class=\"theme-option\" onclick=\"setTheme('dracula')\"><span class=\"theme-preview\" style=\"background:#282a36;border-color:#6272a4\"></span>Dracula</button>"
-        "<button class=\"theme-option\" onclick=\"setTheme('nord')\"><span class=\"theme-preview\" style=\"background:#2e3440;border-color:#4c566a\"></span>Nord</button>"
+        "<div class=\"nav-popup-wrap\">"
+        "<button class=\"nav-popup-btn\" onclick=\"toggleNavPopup('theme-dd')\" title=\"Theme\">"
+        "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"5\"></circle><line x1=\"12\" y1=\"1\" x2=\"12\" y2=\"3\"></line><line x1=\"12\" y1=\"21\" x2=\"12\" y2=\"23\"></line><line x1=\"4.22\" y1=\"4.22\" x2=\"5.64\" y2=\"5.64\"></line><line x1=\"18.36\" y1=\"18.36\" x2=\"19.78\" y2=\"19.78\"></line><line x1=\"1\" y1=\"12\" x2=\"3\" y2=\"12\"></line><line x1=\"21\" y1=\"12\" x2=\"23\" y2=\"12\"></line><line x1=\"4.22\" y1=\"19.78\" x2=\"5.64\" y2=\"18.36\"></line><line x1=\"18.36\" y1=\"5.64\" x2=\"19.78\" y2=\"4.22\"></line></svg>"
+        "</button>"
+        "<div class=\"nav-popup-menu\" id=\"theme-dd\">"
+        "<div class=\"nav-popup-hdr\">Theme</div>"
+        "<button class=\"nav-popup-item nav-theme-item\" data-theme=\"midnight\" onclick=\"setTheme('midnight')\"><span class=\"theme-swatch\" style=\"background:#0d1117;border-color:#30363d\"></span>Midnight</button>"
+        "<button class=\"nav-popup-item nav-theme-item\" data-theme=\"daylight\" onclick=\"setTheme('daylight')\"><span class=\"theme-swatch\" style=\"background:#f8fafc;border-color:#e2e8f0\"></span>Daylight</button>"
+        "<button class=\"nav-popup-item nav-theme-item\" data-theme=\"catppuccin\" onclick=\"setTheme('catppuccin')\"><span class=\"theme-swatch\" style=\"background:#1e1e2e;border-color:#cba6f7\"></span>Catppuccin</button>"
+        "</div>"
+        "</div>"
+        "<div class=\"nav-popup-wrap\">"
+        "<button class=\"nav-popup-btn\" onclick=\"toggleNavPopup('font-dd')\" title=\"Font\">Aa</button>"
+        "<div class=\"nav-popup-menu\" id=\"font-dd\">"
+        "<div class=\"nav-popup-hdr\">Font</div>"
+        "<button class=\"nav-popup-item nav-font-item\" data-font=\"departure-mono\" onclick=\"setAppFont('departure-mono')\">Departure Mono NF</button>"
+        "<button class=\"nav-popup-item nav-font-item\" data-font=\"cascadia-cove\" onclick=\"setAppFont('cascadia-cove')\">CaskaydiaCove NF</button>"
+        "<button class=\"nav-popup-item nav-font-item\" data-font=\"jetbrains-mono\" onclick=\"setAppFont('jetbrains-mono')\">JetBrainsMono NF</button>"
         "</div>"
         "</div>"
         "<div class=\"user-menu\" id=\"user-menu\">"

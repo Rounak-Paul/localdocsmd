@@ -76,20 +76,6 @@
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.6"><path d="M14.85 3c.63 0 1.15.52 1.14 1.15v7.7c0 .63-.51 1.15-1.15 1.15H1.15C.52 13 0 12.48 0 11.84V4.15C0 3.52.52 3 1.15 3ZM9 11V5H7L5.5 7 4 5H2v6h2V8l1.5 1.92L7 8v3Zm2.99.5L14.5 8H13V5h-2v3H9.5Z"/></svg>
                     Markdown
                 </span>
-                <div class="pane-font-selector">
-                    <button class="pane-font-btn" onclick="toggleFontDropdown('editor-font-dropdown')">
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M6.71 10H2.332l-.874 2.498a.75.75 0 0 1-1.415-.496l3.39-9.688a1.217 1.217 0 0 1 2.302.018l3.227 9.681a.75.75 0 0 1-1.423.474ZM6.21 8.5 4.574 3.594 2.857 8.5Z"/><path d="M15.09 12.5h-3.181l-.51 1.458a.75.75 0 0 1-1.413-.495l2.09-5.965a1 1 0 0 1 1.886-.003l2.09 5.965a.75.75 0 0 1-1.415.496ZM13.5 11l-.787-2.248L11.93 11Z"/></svg>
-                        <span>Font</span>
-                        <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4.427 7.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z"/></svg>
-                    </button>
-                    <div class="pane-font-dropdown" id="editor-font-dropdown">
-                        <button class="pane-font-item active" data-font-type="mono" data-font="system">System Default</button>
-                        <button class="pane-font-item" data-font-type="mono" data-font="jetbrains">JetBrains Mono</button>
-                        <button class="pane-font-item" data-font-type="mono" data-font="fira">Fira Code</button>
-                        <button class="pane-font-item" data-font-type="mono" data-font="source-code">Source Code Pro</button>
-                        <button class="pane-font-item" data-font-type="mono" data-font="ibm-mono">IBM Plex Mono</button>
-                    </div>
-                </div>
             </div>
             <textarea id="editor" class="editor-textarea" placeholder="# Start writing..."></textarea>
             <div class="editor-status-bar">
@@ -106,23 +92,7 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                     Preview
                 </span>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <div class="viewer-presence" id="viewer-presence"></div>
-                    <div class="pane-font-selector">
-                        <button class="pane-font-btn" onclick="toggleFontDropdown('preview-font-dropdown')">
-                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M6.71 10H2.332l-.874 2.498a.75.75 0 0 1-1.415-.496l3.39-9.688a1.217 1.217 0 0 1 2.302.018l3.227 9.681a.75.75 0 0 1-1.423.474ZM6.21 8.5 4.574 3.594 2.857 8.5Z"/><path d="M15.09 12.5h-3.181l-.51 1.458a.75.75 0 0 1-1.413-.495l2.09-5.965a1 1 0 0 1 1.886-.003l2.09 5.965a.75.75 0 0 1-1.415.496ZM13.5 11l-.787-2.248L11.93 11Z"/></svg>
-                            <span>Font</span>
-                            <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4.427 7.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z"/></svg>
-                        </button>
-                        <div class="pane-font-dropdown" id="preview-font-dropdown">
-                            <button class="pane-font-item active" data-font-type="sans" data-font="system">System Default</button>
-                            <button class="pane-font-item" data-font-type="sans" data-font="inter">Inter</button>
-                            <button class="pane-font-item" data-font-type="sans" data-font="open-sans">Open Sans</button>
-                            <button class="pane-font-item" data-font-type="sans" data-font="nunito">Nunito</button>
-                            <button class="pane-font-item" data-font-type="sans" data-font="ibm-sans">IBM Plex Sans</button>
-                        </div>
-                    </div>
-                </div>
+                <div class="viewer-presence" id="viewer-presence"></div>
             </div>
             <div class="preview-content-wrapper" id="preview-wrapper">
                 <nav class="toc-sidebar" id="toc-sidebar">
@@ -334,10 +304,6 @@ kbd { display:inline-flex; align-items:center; justify-content:center; font-fami
 const DOC_UUID     = '{{document_uuid}}';
 const DOC_NAME     = '{{document_name}}';
 const CURRENT_USER = '{{username}}';
-
-/* ── Font maps ─────────────────────────────────────────────────── */
-const MONO_FONTS = { system:'', jetbrains:"'JetBrains Mono',monospace", fira:"'Fira Code',monospace", 'source-code':"'Source Code Pro',monospace", 'ibm-mono':"'IBM Plex Mono',monospace" };
-const SANS_FONTS = { system:'', inter:"'Inter',sans-serif", 'open-sans':"'Open Sans',sans-serif", nunito:"'Nunito',sans-serif", 'ibm-sans':"'IBM Plex Sans',sans-serif" };
 
 /* ── DOM refs ───────────────────────────────────────────────────── */
 const editorEl   = document.getElementById('editor');
@@ -894,21 +860,7 @@ window.toggleActDropdown = function(id) {
     const menu = document.getElementById(id).querySelector('.act-dropdown-menu');
     const open = menu.classList.contains('open'); closeAllDropdowns(); if(!open) menu.classList.add('open');
 };
-function closeAllDropdowns() { document.querySelectorAll('.act-dropdown-menu.open,.pane-font-dropdown.open').forEach(m=>m.classList.remove('open')); }
-window.toggleFontDropdown = function(id) { const d=document.getElementById(id),open=d.classList.contains('open'); closeAllDropdowns(); if(!open) d.classList.add('open'); };
-
-function initFontItems() {
-    document.querySelectorAll('.pane-font-item').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const type=btn.dataset.fontType, font=btn.dataset.font;
-            btn.closest('.pane-font-dropdown').querySelectorAll('.pane-font-item').forEach(b=>b.classList.remove('active'));
-            btn.classList.add('active');
-            if (type==='mono') editorEl.style.fontFamily = MONO_FONTS[font]||'';
-            else previewEl.style.fontFamily = SANS_FONTS[font]||'';
-            closeAllDropdowns();
-        });
-    });
-}
+function closeAllDropdowns() { document.querySelectorAll('.act-dropdown-menu.open').forEach(m=>m.classList.remove('open')); }
 
 /* ─────────────────────────────────────────────────────────────────
    CONTENT TABS
@@ -970,7 +922,6 @@ document.addEventListener('DOMContentLoaded', function(){
     editorEl.value = content;
 
     initMarked();
-    initFontItems();
     requestAnimationFrame(render); // defer first render so browser paints the shell first
     updateStatusBar();
 
@@ -1003,7 +954,7 @@ document.addEventListener('DOMContentLoaded', function(){
         if(e.key==='Escape'){const p=document.getElementById('help-panel');if(p&&p.classList.contains('open')){window.toggleHelp();return;}closeAllDropdowns();}
     });
     document.addEventListener('click',e=>{
-        if(!e.target.closest('.act-dropdown')&&!e.target.closest('.pane-font-selector')) closeAllDropdowns();
+        if(!e.target.closest('.act-dropdown')) closeAllDropdowns();
     });
     window.addEventListener('beforeunload',e=>{if(content!==lastSaved){e.preventDefault();e.returnValue='';}});
 
