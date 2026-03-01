@@ -1,11 +1,31 @@
 // LocalDocsMD - Application JavaScript
 
-// Nerd Font stacks
-const NERD_FONTS = {
+const UI_MONO_FONTS = {
     'departure-mono': "'DepartureMono Nerd Font','DepartureMono NF','Departure Mono',monospace",
     'cascadia-cove':  "'CaskaydiaCove Nerd Font','CaskaydiaCove NF','Cascadia Code',monospace",
     'jetbrains-mono': "'JetBrainsMono Nerd Font','JetBrainsMono NF','JetBrains Mono',monospace",
 };
+
+const READING_FONTS = {
+    'inter': "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif",
+    'ibm-plex-sans': "'IBM Plex Sans','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif",
+    'open-sans': "'Open Sans','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif",
+    'nunito': "'Nunito','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif",
+    'source-serif': "'Source Serif 4','Iowan Old Style','Palatino Linotype','Book Antiqua',Palatino,serif",
+    'departure-mono': "'DepartureMono Nerd Font','DepartureMono NF','Departure Mono',monospace",
+    'cascadia-cove': "'CaskaydiaCove Nerd Font','CaskaydiaCove NF','Cascadia Code',monospace",
+    'jetbrains-mono': "'JetBrainsMono Nerd Font','JetBrainsMono NF','JetBrains Mono',monospace",
+};
+
+function applyUiMonoFont(stack) {
+    document.documentElement.style.setProperty('--font-ui', stack);
+    document.documentElement.style.setProperty('--font-mono', stack);
+}
+
+function applyReadingFont(stack) {
+    document.documentElement.style.setProperty('--font-sans', stack);
+    document.documentElement.style.setProperty('--font-reading', stack);
+}
 
 // Theme management
 function setTheme(theme) {
@@ -30,12 +50,24 @@ function toggleNavPopup(id) {
 
 // Global font setter
 function setAppFont(key) {
-    const stack = NERD_FONTS[key] || NERD_FONTS['departure-mono'];
-    document.documentElement.style.setProperty('--font-ui', stack);
+    const stack = UI_MONO_FONTS[key] || UI_MONO_FONTS['departure-mono'];
+    applyUiMonoFont(stack);
     localStorage.setItem('ldmd-font', key);
     document.querySelectorAll('.nav-font-item').forEach(b =>
         b.classList.toggle('active', b.dataset.font === key));
 }
+
+function setReadingFont(key) {
+    const stack = READING_FONTS[key] || READING_FONTS['inter'];
+    applyReadingFont(stack);
+    localStorage.setItem('ldmd-reading-font', key);
+    document.querySelectorAll('.nav-reading-font-item').forEach(b =>
+        b.classList.toggle('active', b.dataset.readingFont === key));
+}
+
+window.setTheme = setTheme;
+window.setAppFont = setAppFont;
+window.setReadingFont = setReadingFont;
 
 // Initialize theme and font from localStorage
 (function() {
@@ -44,8 +76,12 @@ function setAppFont(key) {
         document.documentElement.setAttribute('data-theme', savedTheme);
     }
     const savedFont = localStorage.getItem('ldmd-font') || 'departure-mono';
-    const stack = NERD_FONTS[savedFont];
-    if (stack) document.documentElement.style.setProperty('--font-ui', stack);
+    const monoStack = UI_MONO_FONTS[savedFont] || UI_MONO_FONTS['departure-mono'];
+    applyUiMonoFont(monoStack);
+
+    const savedReadingFont = localStorage.getItem('ldmd-reading-font') || 'inter';
+    const readingStack = READING_FONTS[savedReadingFont] || READING_FONTS['inter'];
+    applyReadingFont(readingStack);
 })();
 
 // Mark active theme/font once the DOM is ready
@@ -58,6 +94,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const savedFont = localStorage.getItem('ldmd-font') || 'departure-mono';
     document.querySelectorAll('.nav-font-item').forEach(b =>
         b.classList.toggle('active', b.dataset.font === savedFont));
+
+    const savedReadingFont = localStorage.getItem('ldmd-reading-font') || 'inter';
+    document.querySelectorAll('.nav-reading-font-item').forEach(b =>
+        b.classList.toggle('active', b.dataset.readingFont === savedReadingFont));
 });
 
 // Helper functions

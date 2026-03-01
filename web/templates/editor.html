@@ -30,8 +30,6 @@
             {{document_name}}
         </h1>
         <div class="editor-actions">
-            <span id="save-status" class="save-status"></span>
-
             <!-- Download dropdown -->
             <div class="act-dropdown" id="download-dropdown">
                 <button class="btn" id="download-btn" onclick="toggleActDropdown('download-dropdown')">
@@ -59,10 +57,6 @@
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.756 2.756 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.195l-.006.004a6.24 6.24 0 0 0-.26.16.952.952 0 0 0-.276.245.75.75 0 0 1-1.248-.832c.184-.264.42-.489.692-.661.103-.067.207-.132.313-.195l.007-.004c.1-.061.182-.11.258-.161a.969.969 0 0 0 .277-.245C8.96 6.514 9 6.427 9 6.25a.612.612 0 0 0-.262-.525A1.27 1.27 0 0 0 8 5.5c-.369 0-.595.09-.74.187a1.01 1.01 0 0 0-.34.398ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>
                 Help
             </button>
-            <button onclick="saveDocument()" class="btn btn-primary" id="save-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                Save
-            </button>
             <button onclick="openRenameDoc()" class="btn" title="Rename this document">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                 Rename
@@ -88,6 +82,7 @@
                 <span id="status-chars">0 chars</span>
                 <span id="status-words">0 words</span>
                 <span id="status-wpm" title="Words per minute (60-second window)">-- wpm</span>
+                <span id="save-status" class="save-status"></span>
             </div>
         </div>
 
@@ -149,6 +144,7 @@ main.container { max-width:100%!important; width:100%!important; margin:0!import
 .save-status.status-unsaved { color:var(--warning-color); background:rgba(245,158,11,.1); }
 .save-status.status-saving  { color:var(--text-muted); }
 .save-status.status-error   { color:var(--danger-color); background:rgba(239,68,68,.1); }
+.editor-status-bar .save-status { margin-left:auto; font-size:inherit; padding:0; border-radius:0; background:transparent; }
 
 /* Action dropdowns */
 .act-dropdown { position:relative; }
@@ -221,7 +217,7 @@ main.container { max-width:100%!important; width:100%!important; margin:0!import
 .viewer-chip-more { font-size:.65rem; color:var(--text-muted); padding:0 4px; white-space:nowrap; }
 
 /* Markdown body overrides */
-.preview-scroll.markdown-body { background:transparent!important; color:var(--text-color)!important; font-family:var(--font-sans)!important; font-size:15px; line-height:1.7; }
+.preview-scroll.markdown-body { background:transparent!important; color:var(--text-color)!important; font-family:var(--font-reading,var(--font-sans))!important; font-size:15px; line-height:1.7; }
 .markdown-body h1,.markdown-body h2,.markdown-body h3,.markdown-body h4,.markdown-body h5,.markdown-body h6 { color:var(--text-color)!important; border-bottom-color:var(--border-color)!important; }
 .markdown-body blockquote { border-left-color:var(--border-color)!important; color:var(--text-secondary)!important; }
 .markdown-body table tr { background:var(--card-bg)!important; border-top-color:var(--border-color)!important; }
@@ -317,7 +313,6 @@ const editorEl   = document.getElementById('editor');
 const previewEl  = document.getElementById('preview');
 const tocSidebar = document.getElementById('toc-sidebar');
 const tocList    = document.getElementById('toc-list');
-const saveBtn    = document.getElementById('save-btn');
 const saveStatus = document.getElementById('save-status');
 const statusPos  = document.getElementById('status-pos');
 const statusChars= document.getElementById('status-chars');
@@ -337,6 +332,11 @@ let lastSaved     = '';
 let mermaidLoaded = false;
 let plotlyLoaded  = false;
 let toastTimer    = null;
+let saveInProgress = false;
+let saveQueued     = false;
+let autosaveTimer  = null;
+
+const AUTOSAVE_DELAY_MS = 1000;
 
 /* ── Toast ──────────────────────────────────────────────────────── */
 function showToast(msg, duration) {
@@ -836,16 +836,72 @@ const debouncedRender = debounce(render, 400);
 /* ─────────────────────────────────────────────────────────────────
    SAVE / DOWNLOAD
    ───────────────────────────────────────────────────────────────── */
-function setSaveStatus(state,text){ saveStatus.textContent=text; saveStatus.className='save-status status-'+state; if(state==='unsaved') saveBtn.disabled=false; }
+function setSaveStatus(state,text){ saveStatus.textContent=text; saveStatus.className='save-status status-'+state; }
 
-window.saveDocument = async function() {
-    if (content === lastSaved) return;
-    saveBtn.disabled = true; setSaveStatus('saving','Saving…');
+async function persistDocument(showSuccessToast) {
+    if (content === lastSaved) {
+        setSaveStatus('saved', 'Saved');
+        return;
+    }
+
+    if (saveInProgress) {
+        saveQueued = true;
+        return;
+    }
+
+    const contentToSave = content;
+    saveInProgress = true;
+    setSaveStatus('saving', 'Saving…');
+
     try {
-        const r = await fetch(`/api/documents/${DOC_UUID}/content`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})});
-        if (r.ok) { lastSaved=content; setSaveStatus('saved','Saved'); showToast('Saved'); }
-        else { setSaveStatus('error','Save failed'); saveBtn.disabled=false; showToast('Save failed',3000); }
-    } catch { setSaveStatus('error','Connection error'); saveBtn.disabled=false; showToast('Connection error',3000); }
+        const r = await fetch(`/api/documents/${DOC_UUID}/content`, {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({content: contentToSave})
+        });
+
+        if (!r.ok) {
+            setSaveStatus('error', 'Save failed');
+            showToast('Save failed', 3000);
+            return;
+        }
+
+        lastSaved = contentToSave;
+
+        if (content !== lastSaved) {
+            saveQueued = true;
+            setSaveStatus('unsaved', 'Unsaved changes');
+        } else {
+            setSaveStatus('saved', 'Saved');
+            if (showSuccessToast) showToast('Saved');
+        }
+    } catch {
+        setSaveStatus('error', 'Connection error');
+        showToast('Connection error', 3000);
+    } finally {
+        saveInProgress = false;
+        if (saveQueued) {
+            saveQueued = false;
+            clearTimeout(autosaveTimer);
+            autosaveTimer = setTimeout(() => { persistDocument(false); }, AUTOSAVE_DELAY_MS);
+        }
+    }
+}
+
+function scheduleAutosave() {
+    if (content === lastSaved) {
+        setSaveStatus('saved', 'Saved');
+        return;
+    }
+
+    setSaveStatus('unsaved', 'Unsaved changes');
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => { persistDocument(false); }, AUTOSAVE_DELAY_MS);
+}
+
+window.saveDocument = function() {
+    clearTimeout(autosaveTimer);
+    persistDocument(true);
 };
 
 window.downloadMd = function() {
@@ -960,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', function(){
     pollViewers(); setInterval(pollViewers,5000);
 
     editorEl.addEventListener('input', function(){
-        content=editorEl.value; setSaveStatus('unsaved','Unsaved changes'); debouncedRender(); updateStatusBar();
+        content=editorEl.value; scheduleAutosave(); debouncedRender(); updateStatusBar();
     });
     const onCursor=()=>{ requestAnimationFrame(updateStatusBar); };
     editorEl.addEventListener('keyup',onCursor); editorEl.addEventListener('click',onCursor); editorEl.addEventListener('select',onCursor);
@@ -977,7 +1033,7 @@ document.addEventListener('DOMContentLoaded', function(){
             const s=this.selectionStart,en=this.selectionEnd;
             if(e.shiftKey){const before=this.value.substring(0,s),ls=before.lastIndexOf('\n')+1,lc=this.value.substring(ls,s);if(lc.startsWith('    ')||lc.startsWith('\t')){const n=lc.startsWith('    ')?4:1;this.value=this.value.substring(0,ls)+this.value.substring(ls+n);this.selectionStart=this.selectionEnd=s-n;}}
             else{this.value=this.value.substring(0,s)+'    '+this.value.substring(en);this.selectionStart=this.selectionEnd=s+4;}
-            content=this.value; setSaveStatus('unsaved','Unsaved changes'); debouncedRender(); updateStatusBar();
+            content=this.value; scheduleAutosave(); debouncedRender(); updateStatusBar();
         }
     });
 

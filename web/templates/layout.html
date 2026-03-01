@@ -7,14 +7,39 @@
     <title>{{title}}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Nunito:wght@400;500;600&family=Open+Sans:wght@400;500;600&family=Source+Serif+4:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script>
-        // Apply saved theme before page renders to prevent flash
+        // Apply saved theme/font before page renders to prevent flash
         (function() {
             const theme = localStorage.getItem('ldmd-theme') || 'midnight';
             document.documentElement.setAttribute('data-theme', theme);
+
+            const monoKey = localStorage.getItem('ldmd-font') || 'departure-mono';
+            const monoMap = {
+                'departure-mono': "'DepartureMono Nerd Font','DepartureMono NF','Departure Mono',monospace",
+                'cascadia-cove':  "'CaskaydiaCove Nerd Font','CaskaydiaCove NF','Cascadia Code',monospace",
+                'jetbrains-mono': "'JetBrainsMono Nerd Font','JetBrainsMono NF','JetBrains Mono',monospace"
+            };
+            const monoStack = monoMap[monoKey] || monoMap['departure-mono'];
+            document.documentElement.style.setProperty('--font-ui', monoStack);
+            document.documentElement.style.setProperty('--font-mono', monoStack);
+
+            const readingKey = localStorage.getItem('ldmd-reading-font') || 'inter';
+            const readingMap = {
+                'inter': "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif",
+                'ibm-plex-sans': "'IBM Plex Sans','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif",
+                'open-sans': "'Open Sans','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif",
+                'nunito': "'Nunito','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif",
+                'source-serif': "'Source Serif 4','Iowan Old Style','Palatino Linotype','Book Antiqua',Palatino,serif",
+                'departure-mono': "'DepartureMono Nerd Font','DepartureMono NF','Departure Mono',monospace",
+                'cascadia-cove': "'CaskaydiaCove Nerd Font','CaskaydiaCove NF','Cascadia Code',monospace",
+                'jetbrains-mono': "'JetBrainsMono Nerd Font','JetBrainsMono NF','JetBrains Mono',monospace"
+            };
+            const readingStack = readingMap[readingKey] || readingMap['inter'];
+            document.documentElement.style.setProperty('--font-sans', readingStack);
+            document.documentElement.style.setProperty('--font-reading', readingStack);
         })();
     </script>
 </head>
@@ -54,6 +79,6 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script src="/js/app.js"></script>
+    <script src="/js/app.js?v=20260302b"></script>
 </body>
 </html>

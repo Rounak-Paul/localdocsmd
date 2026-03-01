@@ -179,39 +179,41 @@
 /* Catppuccin Mocha Theme */
 [data-theme="catppuccin"] {
     --primary-color: #cba6f7;
-    --primary-hover: #d6acf8;
-    --accent-color: #89dceb;
-    --accent-glow: rgba(203, 166, 247, 0.4);
+    --primary-hover: #f0d8ff;
+    --accent-color: #a8e9dd;
+    --accent-glow: rgba(203, 166, 247, 0.5);
 
-    --bg-color: #1e1e2e;
-    --bg-gradient: linear-gradient(180deg, #1e1e2e 0%, #181825 100%);
-    --card-bg: rgba(49, 50, 68, 0.8);
-    --card-bg-elevated: rgba(54, 55, 76, 0.9);
-    --card-border: rgba(108, 112, 134, 0.3);
+    --bg-color: #090b12;
+    --bg-gradient: linear-gradient(180deg, #090b12 0%, #0b0d16 36%, #070910 100%);
+    --card-bg: rgba(16, 18, 28, 0.97);
+    --card-bg-elevated: rgba(20, 23, 36, 0.99);
+    --card-border: rgba(215, 220, 243, 0.34);
+    --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.68), inset 0 1px 0 rgba(203, 166, 247, 0.12);
+    --card-shadow-hover: 0 16px 38px rgba(0, 0, 0, 0.74), 0 0 0 1px rgba(203, 166, 247, 0.38);
 
-    --text-color: #cdd6f4;
-    --text-secondary: #bac2de;
-    --text-muted: #a6adc8;
-    --text-disabled: #6c7086;
+    --text-color: #f4f6ff;
+    --text-secondary: #e4e8fb;
+    --text-muted: #c6cdea;
+    --text-disabled: #8d95b5;
 
-    --border-color: rgba(108, 112, 134, 0.4);
-    --border-hover: rgba(108, 112, 134, 0.6);
-    --divider: rgba(49, 50, 68, 0.7);
+    --border-color: rgba(215, 220, 243, 0.38);
+    --border-hover: rgba(203, 166, 247, 0.56);
+    --divider: rgba(255, 255, 255, 0.13);
 
-    --input-bg: rgba(30, 30, 46, 0.8);
-    --input-border: rgba(108, 112, 134, 0.4);
+    --input-bg: rgba(10, 12, 21, 0.98);
+    --input-border: rgba(215, 220, 243, 0.4);
     --input-focus: #cba6f7;
-    --input-focus-ring: rgba(203, 166, 247, 0.3);
+    --input-focus-ring: rgba(203, 166, 247, 0.48);
 
-    --overlay-bg: rgba(0, 0, 0, 0.75);
-    --glass-bg: rgba(30, 30, 46, 0.9);
-    --glass-border: rgba(108, 112, 134, 0.2);
+    --overlay-bg: rgba(0, 0, 0, 0.88);
+    --glass-bg: rgba(11, 13, 22, 0.95);
+    --glass-border: rgba(215, 220, 243, 0.28);
 
-    --navbar-bg: rgba(24, 24, 37, 0.9);
-    --navbar-border: rgba(108, 112, 134, 0.15);
+    --navbar-bg: rgba(7, 9, 16, 0.98);
+    --navbar-border: rgba(203, 166, 247, 0.34);
 
-    --code-bg: #181825;
-    --code-border: rgba(108, 112, 134, 0.3);
+    --code-bg: #0b0e19;
+    --code-border: rgba(215, 220, 243, 0.34);
 
     --danger-color: #f38ba8;
     --success-color: #a6e3a1;

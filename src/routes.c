@@ -116,7 +116,8 @@ static void set_navbar(template_ctx_t *ctx, http_request_t *req) {
         ? "<div class=\"user-dropdown-pending\">&#9679; Password change pending approval</div>"
         : "";
 
-    snprintf(navbar, sizeof(navbar),
+    size_t nav_len = 0;
+    int n = snprintf(navbar, sizeof(navbar),
         "<nav class=\"navbar\">"
         "<div class=\"navbar-brand\"><a href=\"/dashboard\">Local<span>Docs</span>MD</a></div>"
         "<div class=\"navbar-menu\">"
@@ -128,7 +129,15 @@ static void set_navbar(template_ctx_t *ctx, http_request_t *req) {
         "<div class=\"nav-popup-wrap\">"
         "<button class=\"nav-popup-btn\" onclick=\"toggleNavPopup('theme-dd')\" title=\"Theme\">"
         "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"5\"></circle><line x1=\"12\" y1=\"1\" x2=\"12\" y2=\"3\"></line><line x1=\"12\" y1=\"21\" x2=\"12\" y2=\"23\"></line><line x1=\"4.22\" y1=\"4.22\" x2=\"5.64\" y2=\"5.64\"></line><line x1=\"18.36\" y1=\"18.36\" x2=\"19.78\" y2=\"19.78\"></line><line x1=\"1\" y1=\"12\" x2=\"3\" y2=\"12\"></line><line x1=\"21\" y1=\"12\" x2=\"23\" y2=\"12\"></line><line x1=\"4.22\" y1=\"19.78\" x2=\"5.64\" y2=\"18.36\"></line><line x1=\"18.36\" y1=\"5.64\" x2=\"19.78\" y2=\"4.22\"></line></svg>"
-        "</button>"
+        "</button>",
+        admin_link
+    );
+
+    if (n < 0) n = 0;
+    nav_len = (size_t)n;
+    if (nav_len >= sizeof(navbar)) nav_len = sizeof(navbar) - 1;
+
+    n = snprintf(navbar + nav_len, sizeof(navbar) - nav_len,
         "<div class=\"nav-popup-menu\" id=\"theme-dd\">"
         "<div class=\"nav-popup-hdr\">Theme</div>"
         "<button class=\"nav-popup-item nav-theme-item\" data-theme=\"midnight\" onclick=\"setTheme('midnight')\"><span class=\"theme-swatch\" style=\"background:#0d1117;border-color:#30363d\"></span>Midnight</button>"
@@ -139,12 +148,27 @@ static void set_navbar(template_ctx_t *ctx, http_request_t *req) {
         "<div class=\"nav-popup-wrap\">"
         "<button class=\"nav-popup-btn\" onclick=\"toggleNavPopup('font-dd')\" title=\"Font\">Aa</button>"
         "<div class=\"nav-popup-menu\" id=\"font-dd\">"
-        "<div class=\"nav-popup-hdr\">Font</div>"
+        "<div class=\"nav-popup-hdr\">UI / Editor Font</div>"
         "<button class=\"nav-popup-item nav-font-item\" data-font=\"departure-mono\" onclick=\"setAppFont('departure-mono')\">Departure Mono NF</button>"
         "<button class=\"nav-popup-item nav-font-item\" data-font=\"cascadia-cove\" onclick=\"setAppFont('cascadia-cove')\">CaskaydiaCove NF</button>"
         "<button class=\"nav-popup-item nav-font-item\" data-font=\"jetbrains-mono\" onclick=\"setAppFont('jetbrains-mono')\">JetBrainsMono NF</button>"
+        "<div class=\"nav-popup-hdr\" style=\"margin-top:6px;border-top:1px solid var(--border-color);padding-top:6px\">Reading Font</div>"
+        "<button class=\"nav-popup-item nav-reading-font-item\" data-reading-font=\"inter\" onclick=\"setReadingFont('inter')\">Inter</button>"
+        "<button class=\"nav-popup-item nav-reading-font-item\" data-reading-font=\"ibm-plex-sans\" onclick=\"setReadingFont('ibm-plex-sans')\">IBM Plex Sans</button>"
+        "<button class=\"nav-popup-item nav-reading-font-item\" data-reading-font=\"open-sans\" onclick=\"setReadingFont('open-sans')\">Open Sans</button>"
+        "<button class=\"nav-popup-item nav-reading-font-item\" data-reading-font=\"nunito\" onclick=\"setReadingFont('nunito')\">Nunito</button>"
+        "<button class=\"nav-popup-item nav-reading-font-item\" data-reading-font=\"source-serif\" onclick=\"setReadingFont('source-serif')\">Source Serif 4</button>"
+        "<button class=\"nav-popup-item nav-reading-font-item\" data-reading-font=\"departure-mono\" onclick=\"setReadingFont('departure-mono')\">Departure Mono NF</button>"
+        "<button class=\"nav-popup-item nav-reading-font-item\" data-reading-font=\"cascadia-cove\" onclick=\"setReadingFont('cascadia-cove')\">CaskaydiaCove NF</button>"
+        "<button class=\"nav-popup-item nav-reading-font-item\" data-reading-font=\"jetbrains-mono\" onclick=\"setReadingFont('jetbrains-mono')\">JetBrainsMono NF</button>"
         "</div>"
-        "</div>"
+        "</div>");
+
+    if (n < 0) n = 0;
+    nav_len += (size_t)n;
+    if (nav_len >= sizeof(navbar)) nav_len = sizeof(navbar) - 1;
+
+    snprintf(navbar + nav_len, sizeof(navbar) - nav_len,
         "<div class=\"user-menu\" id=\"user-menu\">"
         "<button class=\"navbar-user\" onclick=\"toggleUserMenu(event)\">"
         "<span class=\"user-avatar-sm\">%c</span>"
@@ -169,7 +193,6 @@ static void set_navbar(template_ctx_t *ctx, http_request_t *req) {
         "</div>"
         "</div>"
         "</nav>",
-        admin_link,
         avatar, req->user.username,
         avatar, req->user.username, req->user.email,
         role_str, role_str,
