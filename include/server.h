@@ -136,6 +136,8 @@ void http_respond_json_with_cookie(struct mg_connection *c, int status, const ch
 void http_respond_html(struct mg_connection *c, int status, const char *html);
 void http_respond_error(struct mg_connection *c, int status, const char *message);
 void http_respond_redirect(struct mg_connection *c, const char *location);
+void http_respond_raw(struct mg_connection *c, int status, const char *headers,
+                      const void *body, size_t body_len);
 
 // Request context
 typedef struct {

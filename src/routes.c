@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <time.h>
 
 // Insert one row into activity_log for the current user
@@ -435,6 +436,40 @@ bool routes_handle(http_request_t *req) {
     if (uri_match(req, "/api/documents/*/viewers", param1, NULL) && method_is(req, "GET")) {
         route_api_documents_viewers(req, param1);
         return true;
+    }
+
+    // Media API — must be before generic /api/documents/* route
+    // Use mg_match directly for media delete (filename can be longer than UUID)
+    {
+        struct mg_str caps[3] = {{0}};
+        if (mg_match(req->hm->uri, mg_str("/api/documents/*/media/*"), caps)) {
+            // Extract doc UUID (first capture)
+            if (caps[0].len > 0 && caps[0].len < LDMD_UUID_LENGTH) {
+                memcpy(param1, caps[0].buf, caps[0].len);
+                param1[caps[0].len] = '\0';
+            }
+            // Extract filename (second capture, up to 256 chars)
+            char media_filename[256] = {0};
+            if (caps[1].len > 0 && caps[1].len < sizeof(media_filename)) {
+                memcpy(media_filename, caps[1].buf, caps[1].len);
+                media_filename[caps[1].len] = '\0';
+            }
+            if (method_is(req, "DELETE") && media_filename[0]) {
+                route_api_documents_media_delete(req, param1, media_filename);
+                return true;
+            }
+        }
+    }
+
+    if (uri_match(req, "/api/documents/*/media", param1, NULL)) {
+        if (method_is(req, "POST")) {
+            route_api_documents_media_upload(req, param1);
+            return true;
+        }
+        if (method_is(req, "GET")) {
+            route_api_documents_media_list(req, param1);
+            return true;
+        }
     }
 
     if (uri_match(req, "/api/documents/*/tags/*", param1, param2)) {
@@ -2011,6 +2046,254 @@ void route_api_documents_render(http_request_t *req, const char *doc_uuid) {
     http_respond_json(req->conn, 200, json_str);
     free(json_str);
     cJSON_Delete(resp);
+}
+
+/* ─── MIME type helper for media files ─────────────────────────── */
+static const char *media_content_type(const char *filename) {
+    const char *dot = strrchr(filename, '.');
+    if (!dot) return "application/octet-stream";
+    if (strcasecmp(dot, ".jpg") == 0 || strcasecmp(dot, ".jpeg") == 0) return "image/jpeg";
+    if (strcasecmp(dot, ".png") == 0)  return "image/png";
+    if (strcasecmp(dot, ".gif") == 0)  return "image/gif";
+    if (strcasecmp(dot, ".webp") == 0) return "image/webp";
+    if (strcasecmp(dot, ".svg") == 0)  return "image/svg+xml";
+    if (strcasecmp(dot, ".bmp") == 0)  return "image/bmp";
+    if (strcasecmp(dot, ".ico") == 0)  return "image/x-icon";
+    if (strcasecmp(dot, ".avif") == 0) return "image/avif";
+    if (strcasecmp(dot, ".mp4") == 0)  return "video/mp4";
+    if (strcasecmp(dot, ".webm") == 0) return "video/webm";
+    if (strcasecmp(dot, ".mov") == 0)  return "video/quicktime";
+    if (strcasecmp(dot, ".ogg") == 0)  return "video/ogg";
+    if (strcasecmp(dot, ".avi") == 0)  return "video/x-msvideo";
+    return "application/octet-stream";
+}
+
+static bool is_allowed_media_ext(const char *filename) {
+    const char *dot = strrchr(filename, '.');
+    if (!dot) return false;
+    const char *allowed[] = {
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".ico", ".avif",
+        ".mp4", ".webm", ".mov", ".ogg", ".avi", NULL
+    };
+    for (int i = 0; allowed[i]; i++) {
+        if (strcasecmp(dot, allowed[i]) == 0) return true;
+    }
+    return false;
+}
+
+/* ─── Media upload: POST /api/documents/{uuid}/media ───────────── */
+void route_api_documents_media_upload(http_request_t *req, const char *doc_uuid) {
+    if (!require_auth(req)) return;
+
+    ldmd_document_t doc;
+    if (db_document_get_by_uuid(req->server->db, doc_uuid, &doc) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Document not found");
+        return;
+    }
+
+    ldmd_project_t project;
+    db_project_get_by_id(req->server->db, doc.project_id, &project);
+
+    if (!rbac_can_edit_workspace(req->server->db, req->user.id, project.workspace_id)) {
+        http_respond_error(req->conn, 403, "Edit access required");
+        return;
+    }
+
+    if (!method_is(req, "POST")) {
+        http_respond_error(req->conn, 405, "Method not allowed");
+        return;
+    }
+
+    /* Parse multipart body */
+    struct mg_http_part part;
+    size_t ofs = 0;
+    bool uploaded_any = false;
+    cJSON *result_arr = cJSON_CreateArray();
+
+    while ((ofs = mg_http_next_multipart(req->hm->body, ofs, &part)) > 0) {
+        if (part.body.len == 0 || part.filename.len == 0) continue;
+
+        /* Extract original filename + extension */
+        char orig_filename[256] = {0};
+        size_t fn_len = part.filename.len < sizeof(orig_filename) - 1
+                        ? part.filename.len : sizeof(orig_filename) - 1;
+        memcpy(orig_filename, part.filename.buf, fn_len);
+        orig_filename[fn_len] = '\0';
+
+        /* Strip any quotes from filename */
+        char *fname = orig_filename;
+        if (fname[0] == '"') fname++;
+        size_t flen = strlen(fname);
+        if (flen > 0 && fname[flen - 1] == '"') fname[flen - 1] = '\0';
+
+        if (!is_allowed_media_ext(fname)) {
+            /* Skip disallowed files silently */
+            continue;
+        }
+
+        /* Get extension from original filename */
+        const char *dot = strrchr(fname, '.');
+        if (!dot) continue;
+
+        /* Generate unique filename: {uuid}{ext} */
+        char new_uuid[LDMD_UUID_LENGTH];
+        auth_generate_uuid(new_uuid);
+        char new_filename[128];
+        snprintf(new_filename, sizeof(new_filename), "%s%s", new_uuid, dot);
+
+        /* Ensure media directory exists */
+        char media_dir[LDMD_MAX_PATH];
+        document_media_path(req->server->config, doc_uuid,
+                            media_dir, sizeof(media_dir));
+        if (utils_mkdir_p(media_dir) != LDMD_OK) {
+            http_respond_error(req->conn, 500, "Failed to create media directory");
+            cJSON_Delete(result_arr);
+            return;
+        }
+
+        /* Write file */
+        char file_path[LDMD_MAX_PATH];
+        snprintf(file_path, sizeof(file_path), "%s/%s", media_dir, new_filename);
+        if (utils_write_binary_file(file_path, part.body.buf, part.body.len) != LDMD_OK) {
+            /* Clean up any files already written in this batch */
+            int n = cJSON_GetArraySize(result_arr);
+            for (int fi = 0; fi < n; fi++) {
+                cJSON *prev = cJSON_GetArrayItem(result_arr, fi);
+                const char *prev_fn = cJSON_GetStringValue(cJSON_GetObjectItem(prev, "filename"));
+                if (prev_fn) {
+                    char rm_path[LDMD_MAX_PATH];
+                    snprintf(rm_path, sizeof(rm_path), "%s/%s", media_dir, prev_fn);
+                    remove(rm_path);
+                }
+            }
+            http_respond_error(req->conn, 500, "Failed to save media file");
+            cJSON_Delete(result_arr);
+            return;
+        }
+
+        /* Build response entry */
+        char url[512];
+        snprintf(url, sizeof(url), "/media/%s/%s", doc_uuid, new_filename);
+
+        cJSON *entry = cJSON_CreateObject();
+        cJSON_AddStringToObject(entry, "filename", new_filename);
+        cJSON_AddStringToObject(entry, "original_name", fname);
+        cJSON_AddStringToObject(entry, "url", url);
+        cJSON_AddNumberToObject(entry, "size", (double)part.body.len);
+        cJSON_AddStringToObject(entry, "content_type", media_content_type(fname));
+        cJSON_AddItemToArray(result_arr, entry);
+        uploaded_any = true;
+
+        LOG_INFO("Media uploaded: %s -> %s for document %s", fname, new_filename, doc_uuid);
+    }
+
+    if (!uploaded_any) {
+        http_respond_error(req->conn, 400, "No valid media files in request");
+        cJSON_Delete(result_arr);
+        return;
+    }
+
+    char *json_str = cJSON_PrintUnformatted(result_arr);
+    http_respond_json(req->conn, 201, json_str);
+    free(json_str);
+    cJSON_Delete(result_arr);
+}
+
+/* ─── Media list: GET /api/documents/{uuid}/media ──────────────── */
+void route_api_documents_media_list(http_request_t *req, const char *doc_uuid) {
+    if (!require_auth(req)) return;
+
+    ldmd_document_t doc;
+    if (db_document_get_by_uuid(req->server->db, doc_uuid, &doc) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Document not found");
+        return;
+    }
+
+    ldmd_project_t project;
+    db_project_get_by_id(req->server->db, doc.project_id, &project);
+
+    if (!rbac_can_access_workspace(req->server->db, req->user.id, project.workspace_id)) {
+        http_respond_error(req->conn, 403, "Access denied");
+        return;
+    }
+
+    char media_dir[LDMD_MAX_PATH];
+    document_media_path(req->server->config, doc_uuid,
+                        media_dir, sizeof(media_dir));
+
+    cJSON *arr = cJSON_CreateArray();
+
+    DIR *dir = opendir(media_dir);
+    if (dir) {
+        struct dirent *entry;
+        while ((entry = readdir(dir)) != NULL) {
+            if (entry->d_name[0] == '.') continue;
+
+            char filepath[LDMD_MAX_PATH];
+            snprintf(filepath, sizeof(filepath), "%s/%s", media_dir, entry->d_name);
+
+            struct stat st;
+            if (stat(filepath, &st) != 0 || S_ISDIR(st.st_mode)) continue;
+
+            char url[512];
+            snprintf(url, sizeof(url), "/media/%s/%s", doc_uuid, entry->d_name);
+
+            cJSON *item = cJSON_CreateObject();
+            cJSON_AddStringToObject(item, "filename", entry->d_name);
+            cJSON_AddStringToObject(item, "url", url);
+            cJSON_AddNumberToObject(item, "size", (double)st.st_size);
+            cJSON_AddStringToObject(item, "content_type", media_content_type(entry->d_name));
+            cJSON_AddItemToArray(arr, item);
+        }
+        closedir(dir);
+    }
+
+    char *json_str = cJSON_PrintUnformatted(arr);
+    http_respond_json(req->conn, 200, json_str);
+    free(json_str);
+    cJSON_Delete(arr);
+}
+
+/* ─── Media delete: DELETE /api/documents/{uuid}/media/{filename} ─ */
+void route_api_documents_media_delete(http_request_t *req, const char *doc_uuid,
+                                       const char *filename) {
+    if (!require_auth(req)) return;
+
+    ldmd_document_t doc;
+    if (db_document_get_by_uuid(req->server->db, doc_uuid, &doc) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Document not found");
+        return;
+    }
+
+    ldmd_project_t project;
+    db_project_get_by_id(req->server->db, doc.project_id, &project);
+
+    if (!rbac_can_edit_workspace(req->server->db, req->user.id, project.workspace_id)) {
+        http_respond_error(req->conn, 403, "Edit access required");
+        return;
+    }
+
+    /* Sanitize filename — prevent directory traversal */
+    if (strchr(filename, '/') || strchr(filename, '\\') || strstr(filename, "..")) {
+        http_respond_error(req->conn, 400, "Invalid filename");
+        return;
+    }
+
+    char media_dir[LDMD_MAX_PATH];
+    document_media_path(req->server->config, doc_uuid,
+                        media_dir, sizeof(media_dir));
+
+    char filepath[LDMD_MAX_PATH];
+    snprintf(filepath, sizeof(filepath), "%s/%s", media_dir, filename);
+
+    if (!utils_file_exists(filepath)) {
+        http_respond_error(req->conn, 404, "Media file not found");
+        return;
+    }
+
+    utils_delete_file(filepath);
+    LOG_INFO("Media deleted: %s for document %s", filename, doc_uuid);
+    http_respond_json(req->conn, 200, "{\"success\":true}");
 }
 
 void route_api_admin_stats(http_request_t *req) {

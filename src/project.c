@@ -4,7 +4,7 @@
 #include "utils.h"
 #include <stdio.h>
 #include <string.h>
-
+    
 ldmd_error_t project_create(ldmd_database_t *db, ldmd_config_t *config,
                             int64_t workspace_id, const char *name,
                             const char *description, int64_t created_by,
@@ -64,6 +64,16 @@ ldmd_error_t project_delete(ldmd_database_t *db, ldmd_config_t *config, int64_t 
     err = db_workspace_get_by_id(db, project.workspace_id, &workspace);
     if (err != LDMD_OK) {
         return err;
+    }
+    
+    // Delete media for all documents in the project
+    ldmd_document_t *docs = NULL;
+    int doc_count = 0;
+    if (db_document_list(db, project_id, &docs, &doc_count) == LDMD_OK && docs) {
+        for (int i = 0; i < doc_count; i++) {
+            document_delete_media(config, docs[i].uuid);
+        }
+        free(docs);
     }
     
     // Delete project directory
@@ -208,10 +218,11 @@ ldmd_error_t document_delete(ldmd_database_t *db, ldmd_config_t *config, int64_t
     // Delete file
     utils_delete_file(doc.path);
     
+    // Delete associated media files
+    document_delete_media(config, doc.uuid);
+    
     // Delete from database
     return db_document_delete(db, document_id);
-    
-    (void)config;
 }
 
 ldmd_error_t document_get(ldmd_database_t *db, int64_t id, ldmd_document_t *document_out) {
@@ -226,4 +237,18 @@ ldmd_error_t document_get_by_uuid(ldmd_database_t *db, const char *uuid,
 ldmd_error_t document_list(ldmd_database_t *db, int64_t project_id,
                            ldmd_document_t **documents_out, int *count_out) {
     return db_document_list(db, project_id, documents_out, count_out);
+}
+
+void document_media_path(ldmd_config_t *config, const char *doc_uuid,
+                         char *path_out, size_t path_size) {
+    snprintf(path_out, path_size, "%s/%s", config->media_path, doc_uuid);
+}
+
+void document_delete_media(ldmd_config_t *config, const char *doc_uuid) {
+    char media_dir[LDMD_MAX_PATH];
+    document_media_path(config, doc_uuid, media_dir, sizeof(media_dir));
+    if (utils_is_directory(media_dir)) {
+        utils_rmdir_r(media_dir);
+        LOG_INFO("Deleted media for document %s", doc_uuid);
+    }
 }

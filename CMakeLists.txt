@@ -53,6 +53,9 @@ include_directories(
     ${OPENSSL_INCLUDE_DIR}
 )
 
+# Raise Mongoose receive buffer limit (default is 3 MB)
+add_definitions(-DMG_MAX_RECV_SIZE=2147483648UL)
+
 # Executable
 add_executable(${PROJECT_NAME} ${SOURCES})
 

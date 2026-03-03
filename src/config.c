@@ -158,6 +158,9 @@ ldmd_config_t *config_load(const char *path) {
     ldmd_strlcpy(config->documents_path,
                  ini_get(ini, "storage", "documents_path", "data/documents"),
                  sizeof(config->documents_path));
+    ldmd_strlcpy(config->media_path,
+                 ini_get(ini, "storage", "media_path", "data/media"),
+                 sizeof(config->media_path));
     config->max_file_size = ini_get_int(ini, "storage", "max_file_size", 5242880);
     ldmd_strlcpy(config->allowed_extensions,
                  ini_get(ini, "storage", "allowed_extensions", ".md,.markdown,.txt,.json,.yaml,.yml"),
@@ -172,6 +175,7 @@ ldmd_config_t *config_load(const char *path) {
     LOG_INFO("Server: %s:%d", config->server_host, config->server_port);
     LOG_INFO("Database: %s", config->db_path);
     LOG_INFO("Documents: %s", config->documents_path);
+    LOG_INFO("Media: %s", config->media_path);
     
     return config;
 }

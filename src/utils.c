@@ -134,6 +134,49 @@ ldmd_error_t utils_write_file(const char *path, const char *content) {
     return LDMD_OK;
 }
 
+ldmd_error_t utils_write_binary_file(const char *path, const void *data, size_t len) {
+    FILE *fp = fopen(path, "wb");
+    if (!fp) {
+        LOG_ERROR("Failed to create file: %s", path);
+        return LDMD_ERROR_IO;
+    }
+
+    size_t written = fwrite(data, 1, len, fp);
+    fclose(fp);
+
+    if (written != len) {
+        LOG_ERROR("Failed to write file: %s", path);
+        return LDMD_ERROR_IO;
+    }
+
+    return LDMD_OK;
+}
+
+ldmd_error_t utils_read_binary_file(const char *path, char **data_out, size_t *len_out) {
+    FILE *fp = fopen(path, "rb");
+    if (!fp) {
+        LOG_ERROR("Failed to open file: %s", path);
+        return LDMD_ERROR_IO;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    char *data = malloc(size);
+    if (!data) {
+        fclose(fp);
+        return LDMD_ERROR_MEMORY;
+    }
+
+    size_t rd = fread(data, 1, size, fp);
+    fclose(fp);
+
+    *data_out = data;
+    *len_out = rd;
+    return LDMD_OK;
+}
+
 ldmd_error_t utils_delete_file(const char *path) {
     if (unlink(path) != 0 && errno != ENOENT) {
         LOG_ERROR("Failed to delete file: %s (%s)", path, strerror(errno));

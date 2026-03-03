@@ -81,7 +81,7 @@ void route_api_forgot_password(http_request_t *req);
 // Admin: password-forgot-requests management
 void route_api_admin_forgot_requests(http_request_t *req);
 void route_api_admin_handle_forgot(http_request_t *req, const char *request_id);
-
+    
 // Admin: direct password reset for any user
 void route_api_admin_reset_user_password(http_request_t *req, const char *user_uuid);
 
@@ -91,6 +91,12 @@ void route_api_activity(http_request_t *req);
 // Document viewer presence
 void route_api_documents_ping(http_request_t *req, const char *doc_uuid);
 void route_api_documents_viewers(http_request_t *req, const char *doc_uuid);
+
+// Media upload/management per document
+void route_api_documents_media_upload(http_request_t *req, const char *doc_uuid);
+void route_api_documents_media_list(http_request_t *req, const char *doc_uuid);
+void route_api_documents_media_delete(http_request_t *req, const char *doc_uuid,
+                                       const char *filename);
 
 // Tags (global tag pool)
 void route_api_tags_list(http_request_t *req);

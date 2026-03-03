@@ -209,4 +209,21 @@ ldmd_error_t document_get_by_uuid(ldmd_database_t *db, const char *uuid,
 ldmd_error_t document_list(ldmd_database_t *db, int64_t project_id,
                            ldmd_document_t **documents_out, int *count_out);
 
+/**
+ * Delete all media files associated with a document
+ * @param config Configuration
+ * @param doc_uuid Document UUID
+ */
+void document_delete_media(ldmd_config_t *config, const char *doc_uuid);
+
+/**
+ * Get the media directory path for a document
+ * @param config Configuration
+ * @param doc_uuid Document UUID
+ * @param path_out Output path buffer
+ * @param path_size Path buffer size
+ */
+void document_media_path(ldmd_config_t *config, const char *doc_uuid,
+                         char *path_out, size_t path_size);
+
 #endif // PROJECT_H

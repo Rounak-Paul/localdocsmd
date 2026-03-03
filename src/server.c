@@ -30,8 +30,10 @@ static void resp_capture_destructor(void *p) {
  * Returns true for URIs under /css/, /js/, or any URI whose last
  * path segment contains a dot (has a file extension).            */
 static bool is_static_path(struct mg_str uri) {
-    if (mg_match(uri, mg_str("/css/**"), NULL)) return true;
-    if (mg_match(uri, mg_str("/js/**"),  NULL)) return true;
+    if (mg_match(uri, mg_str("/css/#"), NULL)) return true;
+    if (mg_match(uri, mg_str("/js/#"),  NULL)) return true;
+    if (mg_match(uri, mg_str("/media/#"), NULL)) return false;
+    if (mg_match(uri, mg_str("/api/#"), NULL)) return false;
     const char *last_slash = uri.buf;
     for (size_t i = 0; i < uri.len; i++) {
         if (uri.buf[i] == '/') last_slash = uri.buf + i;
@@ -218,10 +220,16 @@ static void http_handler(struct mg_connection *c, int ev, void *ev_data) {
         if (!server->pool) return;
         ldmd_work_item_t *resp = pool_pop_response(server->pool, c->id);
         if (resp) {
-            mg_http_reply(c, resp->resp_status, resp->resp_headers,
-                          "%.*s",
-                          (int)resp->resp_body_len,
-                          resp->resp_body ? resp->resp_body : "");
+            /* Binary-safe response: build headers manually and use mg_send
+               for the body so null bytes in binary payloads are preserved. */
+            mg_printf(c, "HTTP/1.1 %d OK\r\n%sContent-Length: %lu\r\n\r\n",
+                      resp->resp_status,
+                      resp->resp_headers,
+                      (unsigned long)resp->resp_body_len);
+            if (resp->resp_body && resp->resp_body_len > 0) {
+                mg_send(c, resp->resp_body, resp->resp_body_len);
+            }
+            c->is_resp = 0;  /* Mark response complete for keep-alive */
             work_item_free(resp);
         }
         return;
@@ -242,6 +250,60 @@ static void http_handler(struct mg_connection *c, int ev, void *ev_data) {
         };
         mg_http_serve_dir(c, hm, &opts);
         return;
+    }
+
+    /* ── Media files: /media/{doc_uuid}/{filename} ── serve with auth ── */
+    {
+        struct mg_str media_caps[3] = {{0}};
+        if (mg_match(hm->uri, mg_str("/media/*/*"), media_caps) &&
+            media_caps[0].len > 0 && media_caps[1].len > 0) {
+            /* Auth check */
+            char token[LDMD_TOKEN_LENGTH] = {0};
+            ldmd_session_t sess;
+            bool authed = false;
+            if (http_get_session_token(hm, token, sizeof(token))) {
+                if (auth_validate_session(server->db, token, &sess) == LDMD_OK) {
+                    authed = true;
+                }
+            }
+            if (!authed) {
+                mg_http_reply(c, 401,
+                              "Content-Type: application/json\r\n",
+                              "{\"error\":\"Unauthorized\"}");
+                return;
+            }
+
+            char doc_uuid[LDMD_UUID_LENGTH] = {0};
+            char filename[256] = {0};
+            size_t n = media_caps[0].len < sizeof(doc_uuid) - 1
+                       ? media_caps[0].len : sizeof(doc_uuid) - 1;
+            memcpy(doc_uuid, media_caps[0].buf, n);
+            doc_uuid[n] = '\0';
+
+            n = media_caps[1].len < sizeof(filename) - 1
+                ? media_caps[1].len : sizeof(filename) - 1;
+            memcpy(filename, media_caps[1].buf, n);
+            filename[n] = '\0';
+
+            /* Sanitize: reject directory traversal */
+            if (strchr(filename, '/') || strchr(filename, '\\') ||
+                strstr(filename, "..")) {
+                mg_http_reply(c, 400,
+                              "Content-Type: application/json\r\n",
+                              "{\"error\":\"Invalid filename\"}");
+                return;
+            }
+
+            char filepath[LDMD_MAX_PATH];
+            snprintf(filepath, sizeof(filepath), "%s/%s/%s",
+                     server->config->media_path, doc_uuid, filename);
+
+            struct mg_http_serve_opts sopts = {
+                .extra_headers = "Cache-Control: max-age=86400\r\n"
+            };
+            mg_http_serve_file(c, hm, filepath, &sopts);
+            return;
+        }
     }
 
     /* ── Dispatch to thread pool ── */
@@ -438,6 +500,34 @@ void http_respond_redirect(struct mg_connection *c, const char *location) {
         char hdrs[256];
         snprintf(hdrs, sizeof(hdrs), "Location: %s\r\n", location);
         mg_http_reply(c, 302, hdrs, "");
+    }
+}
+
+void http_respond_raw(struct mg_connection *c, int status,
+                      const char *extra_headers, const void *body,
+                      size_t body_len) {
+    ldmd_resp_capture_t *cap =
+        (ldmd_resp_capture_t *)pthread_getspecific(g_resp_capture_key);
+    if (cap) {
+        cap->active = true;
+        cap->status = status;
+        ldmd_strlcpy(cap->headers, extra_headers ? extra_headers : "",
+                     sizeof(cap->headers));
+        free(cap->body);
+        if (body && body_len > 0) {
+            cap->body = malloc(body_len);
+            if (cap->body) memcpy(cap->body, body, body_len);
+            cap->body_len = body_len;
+        } else {
+            cap->body = NULL;
+            cap->body_len = 0;
+        }
+    } else {
+        /* Main-thread path: manual response construction */
+        mg_printf(c, "HTTP/1.1 %d\r\n%sContent-Length: %lu\r\n\r\n",
+                  status, extra_headers ? extra_headers : "",
+                  (unsigned long)body_len);
+        if (body && body_len > 0) mg_send(c, body, body_len);
     }
 }
 

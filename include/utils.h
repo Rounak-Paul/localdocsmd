@@ -70,6 +70,24 @@ ldmd_error_t utils_read_file(const char *path, char **content_out);
 ldmd_error_t utils_write_file(const char *path, const char *content);
 
 /**
+ * Write binary data to file
+ * @param path File path
+ * @param data Data to write
+ * @param len Data length
+ * @return LDMD_OK or error code
+ */
+ldmd_error_t utils_write_binary_file(const char *path, const void *data, size_t len);
+
+/**
+ * Read binary file into buffer
+ * @param path File path
+ * @param data_out Output buffer (caller frees)
+ * @param len_out Output length
+ * @return LDMD_OK or error code
+ */
+ldmd_error_t utils_read_binary_file(const char *path, char **data_out, size_t *len_out);
+
+/**
  * Delete file
  * @param path File path
  * @return LDMD_OK or error code

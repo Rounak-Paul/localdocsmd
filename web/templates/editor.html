@@ -57,6 +57,12 @@
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.756 2.756 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.195l-.006.004a6.24 6.24 0 0 0-.26.16.952.952 0 0 0-.276.245.75.75 0 0 1-1.248-.832c.184-.264.42-.489.692-.661.103-.067.207-.132.313-.195l.007-.004c.1-.061.182-.11.258-.161a.969.969 0 0 0 .277-.245C8.96 6.514 9 6.427 9 6.25a.612.612 0 0 0-.262-.525A1.27 1.27 0 0 0 8 5.5c-.369 0-.595.09-.74.187a1.01 1.01 0 0 0-.34.398ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>
                 Help
             </button>
+            <!-- Media upload -->
+            <input type="file" id="media-file-input" multiple accept="image/*,video/*" style="display:none" onchange="handleMediaFileSelect(event)">
+            <button onclick="toggleMediaPanel()" class="btn" id="media-gallery-btn" title="Media gallery">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                Gallery
+            </button>
             <button onclick="openRenameDoc()" class="btn" title="Rename this document">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                 Rename
@@ -122,6 +128,52 @@
 </div>
 <div class="help-tab" id="help-tab" onclick="toggleHelp()" title="Markdown reference (Ctrl+/)">
     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.756 2.756 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.195l-.006.004a6.24 6.24 0 0 0-.26.16.952.952 0 0 0-.276.245.75.75 0 0 1-1.248-.832c.184-.264.42-.489.692-.661.103-.067.207-.132.313-.195l.007-.004c.1-.061.182-.11.258-.161a.969.969 0 0 0 .277-.245C8.96 6.514 9 6.427 9 6.25a.612.612 0 0 0-.262-.525A1.27 1.27 0 0 0 8 5.5c-.369 0-.595.09-.74.187a1.01 1.01 0 0 0-.34.398ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>
+</div>
+
+<!-- Media Gallery Panel -->
+<div class="media-overlay" id="media-overlay" onclick="toggleMediaPanel()"></div>
+<div class="media-panel" id="media-panel">
+    <div class="media-panel-header">
+        <span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            Media Gallery
+        </span>
+        <button class="help-close-btn" onclick="toggleMediaPanel()" title="Close">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg>
+        </button>
+    </div>
+    <div class="media-panel-actions">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('media-file-input').click()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Upload Files
+        </button>
+        <span class="media-count" id="media-count"></span>
+    </div>
+    <div class="media-upload-bar" id="media-upload-bar">
+        <div class="media-upload-bar-info">
+            <span id="media-upload-bar-text">Uploading…</span>
+            <span id="media-upload-bar-pct">0%</span>
+        </div>
+        <div class="media-upload-bar-track">
+            <div class="media-upload-bar-fill" id="media-upload-bar-fill"></div>
+        </div>
+    </div>
+    <div class="media-panel-body" id="media-panel-body">
+        <div class="media-empty" id="media-empty">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="opacity:.3"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            <p>No media uploaded yet</p>
+            <p class="text-muted">Upload images or videos, or drag &amp; drop onto the editor</p>
+        </div>
+        <div class="media-grid" id="media-grid"></div>
+    </div>
+</div>
+
+<!-- Editor drag overlay -->
+<div class="editor-drop-overlay" id="editor-drop-overlay">
+    <div class="editor-drop-message">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        <span>Drop to upload media</span>
+    </div>
 </div>
 
 <style>
@@ -290,11 +342,55 @@ kbd { display:inline-flex; align-items:center; justify-content:center; font-fami
 .kbd-combo { display:inline-flex; align-items:center; gap:2px; }
 .kbd-sep { color:var(--text-muted); font-size:.75em; padding:0 1px; }
 
+/* Media panel */
+.media-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9998; backdrop-filter:blur(2px); }
+.media-overlay.open { display:block; }
+.media-panel { position:fixed; top:0; right:0; width:480px; max-width:95vw; height:100vh; background:var(--card-bg); border-left:1px solid var(--card-border); box-shadow:-4px 0 32px rgba(0,0,0,.4); z-index:9999; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .22s cubic-bezier(.4,0,.2,1); }
+.media-panel.open { transform:translateX(0); }
+.media-panel-header { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; background:var(--divider); border-bottom:1px solid var(--border-color); font-size:.8rem; font-weight:600; flex-shrink:0; }
+.media-panel-header > span { display:flex; align-items:center; gap:8px; color:var(--text-color); }
+.media-panel-actions { display:flex; align-items:center; gap:10px; padding:12px 18px; border-bottom:1px solid var(--border-color); flex-shrink:0; }
+.media-panel-actions .btn-sm { padding:5px 12px; font-size:.78rem; }
+.media-count { font-size:.75rem; color:var(--text-muted); }
+.media-panel-body { flex:1; overflow-y:auto; padding:12px; }
+.media-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:48px 20px; color:var(--text-muted); text-align:center; }
+.media-empty p { margin:0; font-size:.82rem; }
+.media-empty .text-muted { font-size:.75rem; opacity:.6; }
+.media-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:8px; }
+.media-item { position:relative; border:1px solid var(--card-border); overflow:hidden; background:var(--divider); transition:border-color .15s,box-shadow .15s; }
+.media-item:hover { border-color:var(--primary-color); box-shadow:0 0 0 1px var(--primary-color); }
+.media-item-thumb { width:100%; height:110px; overflow:hidden; position:relative; background:#000; }
+.media-item-thumb img, .media-item-thumb video { width:100%; height:100%; object-fit:cover; display:block; }
+.media-item-info { padding:6px 8px; font-size:.7rem; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center; gap:4px; border-top:1px solid var(--border-color); }
+.media-item-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.media-item-size { flex-shrink:0; }
+.media-item-actions { position:absolute; top:0; right:0; display:flex; gap:0; opacity:0; transition:opacity .15s; }
+.media-item:hover .media-item-actions { opacity:1; }
+.media-item-btn { display:flex; align-items:center; justify-content:center; width:26px; height:26px; background:rgba(0,0,0,.75); border:none; color:#fff; cursor:pointer; font-size:11px; transition:background .12s; }
+.media-item-btn:hover { background:rgba(0,0,0,.95); }
+.media-item-btn.danger { color:var(--danger-color); }
+.media-item-btn.danger:hover { background:var(--danger-color); color:#fff; }
+
+/* Upload progress bar */
+.media-upload-bar { display:none; padding:10px 18px; border-bottom:1px solid var(--border-color); font-size:.78rem; }
+.media-upload-bar.active { display:block; }
+.media-upload-bar-info { display:flex; justify-content:space-between; margin-bottom:4px; color:var(--text-muted); }
+.media-upload-bar-track { width:100%; height:6px; background:var(--border-color); overflow:hidden; }
+.media-upload-bar-fill { width:0%; height:100%; background:var(--primary-color); transition:width .15s ease; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* Drag & drop overlay */
+.editor-drop-overlay { display:none; position:fixed; inset:0; background:rgba(88,166,255,.08); border:3px dashed var(--primary-color); z-index:10001; align-items:center; justify-content:center; pointer-events:none; }
+.editor-drop-overlay.active { display:flex; }
+.editor-drop-message { display:flex; flex-direction:column; align-items:center; gap:8px; color:var(--primary-color); font-size:1rem; font-weight:500; }
+
 @media (max-width:768px) {
     .editor-container { flex-direction:column; }
     .toc-sidebar { display:none!important; }
     .editor-page { padding:var(--spacing-sm); }
     .act-dropdown-menu { right:auto; left:0; }
+    .media-panel { width:100vw; }
+    .media-grid { grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); }
 }
 
 
@@ -971,6 +1067,172 @@ window.toggleHelp = function() {
 };
 
 /* ─────────────────────────────────────────────────────────────────
+   MEDIA MANAGEMENT
+   ───────────────────────────────────────────────────────────────── */
+const mediaPanel    = document.getElementById('media-panel');
+const mediaOverlay  = document.getElementById('media-overlay');
+const mediaGrid     = document.getElementById('media-grid');
+const mediaCount    = document.getElementById('media-count');
+const mediaEmpty    = document.getElementById('media-empty');
+const mediaFileInput= document.getElementById('media-file-input');
+const dropOverlay   = document.getElementById('editor-drop-overlay');
+let mediaPanelOpen  = false;
+
+function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(1) + ' MB';
+}
+
+function isVideoFile(ct) { return ct && ct.startsWith('video/'); }
+
+window.toggleMediaPanel = function() {
+    mediaPanelOpen = !mediaPanelOpen;
+    mediaPanel.classList.toggle('open', mediaPanelOpen);
+    mediaOverlay.classList.toggle('open', mediaPanelOpen);
+    if (mediaPanelOpen) refreshMediaGallery();
+};
+
+async function refreshMediaGallery() {
+    mediaGrid.innerHTML = '<div class="media-upload-progress"><div class="spinner"></div></div>';
+    try {
+        const r = await fetch(`/api/documents/${DOC_UUID}/media`);
+        if (!r.ok) { mediaGrid.innerHTML = ''; mediaCount.textContent = '0 files'; mediaEmpty.style.display = ''; return; }
+        const files = await r.json();
+        mediaCount.textContent = files.length + ' file' + (files.length !== 1 ? 's' : '');
+        if (!files.length) { mediaGrid.innerHTML = ''; mediaEmpty.style.display = ''; return; }
+        mediaEmpty.style.display = 'none';
+        let html = '';
+        files.forEach(f => {
+            const isVid = isVideoFile(f.content_type);
+            const thumbHtml = isVid
+                ? `<video src="${f.url}" muted preload="metadata"></video>`
+                : `<img src="${f.url}" alt="${f.filename}" loading="lazy">`;
+            html += `<div class="media-item">
+                <div class="media-item-thumb">${thumbHtml}
+                    ${isVid ? '<span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,.7);color:#fff;font-size:10px;padding:1px 5px;">VIDEO</span>' : ''}
+                </div>
+                <div class="media-item-info">
+                    <div class="media-item-name" title="${f.filename}">${f.original_name || f.filename}</div>
+                    <div class="media-item-size">${formatBytes(f.size)}</div>
+                </div>
+                <div class="media-item-actions">
+                    <button class="media-item-btn" onclick="insertMediaIntoEditor('${f.url}','${(f.original_name||f.filename).replace(/'/g,"\\'")}','${f.content_type}')" title="Insert into document">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                    </button>
+                    <button class="media-item-btn" onclick="copyMediaUrl('${f.url}')" title="Copy URL">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="0"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    </button>
+                    <button class="media-item-btn danger" onclick="deleteMediaFile('${f.filename}')" title="Delete">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/></svg>
+                    </button>
+                </div>
+            </div>`;
+        });
+        mediaGrid.innerHTML = html;
+    } catch (e) {
+        mediaGrid.innerHTML = '<div style="padding:1rem;color:var(--text-muted)">Failed to load media</div>';
+    }
+}
+
+function uploadMediaFiles(files) {
+    if (!files || !files.length) return;
+    const fd = new FormData();
+    let totalSize = 0;
+    for (let i = 0; i < files.length; i++) { fd.append('file', files[i]); totalSize += files[i].size; }
+
+    const bar     = document.getElementById('media-upload-bar');
+    const barFill = document.getElementById('media-upload-bar-fill');
+    const barText = document.getElementById('media-upload-bar-text');
+    const barPct  = document.getElementById('media-upload-bar-pct');
+
+    bar.classList.add('active');
+    barFill.style.width = '0%';
+    barText.textContent = 'Uploading ' + files.length + ' file' + (files.length > 1 ? 's' : '') + ' (' + formatBytes(totalSize) + ')…';
+    barPct.textContent = '0%';
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/api/documents/${DOC_UUID}/media`);
+
+    xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            barFill.style.width = pct + '%';
+            barPct.textContent = pct + '%';
+            barText.textContent = 'Uploading… ' + formatBytes(e.loaded) + ' / ' + formatBytes(e.total);
+        }
+    };
+
+    xhr.onload = function() {
+        bar.classList.remove('active');
+        if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+                const uploaded = JSON.parse(xhr.responseText);
+                const arr = Array.isArray(uploaded) ? uploaded : (uploaded.files || []);
+                showToast(arr.length + ' file' + (arr.length > 1 ? 's' : '') + ' uploaded');
+                arr.forEach(f => insertMediaIntoEditor(f.url, f.original_name || f.filename, f.content_type));
+            } catch (e) { showToast('Upload completed'); }
+            if (mediaPanelOpen) refreshMediaGallery();
+        } else {
+            try { const d = JSON.parse(xhr.responseText); showToast(d.error || 'Upload failed', 3000); }
+            catch (e) { showToast('Upload failed', 3000); }
+        }
+    };
+
+    xhr.onerror = function() {
+        bar.classList.remove('active');
+        showToast('Upload failed: network error', 3000);
+    };
+
+    xhr.onabort = function() {
+        bar.classList.remove('active');
+        showToast('Upload cancelled', 3000);
+    };
+
+    xhr.send(fd);
+}
+
+window.insertMediaIntoEditor = function(url, name, contentType) {
+    const isVid = isVideoFile(contentType);
+    let md;
+    if (isVid) {
+        md = `\n<video src="${url}" controls width="100%"></video>\n`;
+    } else {
+        md = `![${name}](${url})`;
+    }
+    const s = editorEl.selectionStart, e = editorEl.selectionEnd;
+    editorEl.value = editorEl.value.substring(0, s) + md + editorEl.value.substring(e);
+    editorEl.selectionStart = editorEl.selectionEnd = s + md.length;
+    editorEl.focus();
+    content = editorEl.value;
+    scheduleAutosave();
+    debouncedRender();
+    updateStatusBar();
+};
+
+window.copyMediaUrl = function(url) {
+    navigator.clipboard.writeText(window.location.origin + url).then(
+        () => showToast('URL copied to clipboard'),
+        () => showToast('Failed to copy URL', 3000)
+    );
+};
+
+window.deleteMediaFile = async function(filename) {
+    if (!confirm('Delete this media file? Any references in your document will break.')) return;
+    try {
+        const r = await fetch(`/api/documents/${DOC_UUID}/media/${filename}`, { method: 'DELETE' });
+        if (r.ok) { showToast('File deleted'); refreshMediaGallery(); }
+        else { const d = await r.json().catch(() => ({})); showToast(d.error || 'Delete failed', 3000); }
+    } catch (e) { showToast('Delete failed', 3000); }
+};
+
+window.handleMediaFileSelect = function(event) {
+    const files = event.target.files;
+    if (files.length) uploadMediaFiles(files);
+    event.target.value = '';
+};
+
+/* ─────────────────────────────────────────────────────────────────
    INSERT MARKDOWN
    ───────────────────────────────────────────────────────────────── */
 window.insertMarkdown = function(before, after='') {
@@ -1038,12 +1300,61 @@ document.addEventListener('DOMContentLoaded', function(){
     });
 
     document.addEventListener('keydown',e=>{
-        if(e.key==='Escape'){const p=document.getElementById('help-panel');if(p&&p.classList.contains('open')){window.toggleHelp();return;}closeAllDropdowns();}
+        if(e.key==='Escape'){
+            if(mediaPanelOpen){window.toggleMediaPanel();return;}
+            const p=document.getElementById('help-panel');if(p&&p.classList.contains('open')){window.toggleHelp();return;}
+            closeAllDropdowns();
+        }
     });
     document.addEventListener('click',e=>{
         if(!e.target.closest('.act-dropdown')) closeAllDropdowns();
     });
     window.addEventListener('beforeunload',e=>{if(content!==lastSaved){e.preventDefault();e.returnValue='';}});
+
+    // Move media panel elements to body (escape stacking context)
+    ['media-panel','media-overlay','editor-drop-overlay'].forEach(id=>{const el=document.getElementById(id);if(el) document.body.appendChild(el);});
+
+    // Drag-and-drop media upload on editor
+    let dragCounter = 0;
+    const editorPane = document.querySelector('.editor-pane') || editorEl.parentElement;
+    editorPane.addEventListener('dragenter', e => {
+        e.preventDefault(); e.stopPropagation();
+        dragCounter++;
+        if (e.dataTransfer.types.indexOf('Files') !== -1) dropOverlay.classList.add('active');
+    });
+    editorPane.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); });
+    editorPane.addEventListener('dragleave', e => {
+        e.preventDefault(); e.stopPropagation();
+        dragCounter--;
+        if (dragCounter <= 0) { dragCounter = 0; dropOverlay.classList.remove('active'); }
+    });
+    editorPane.addEventListener('drop', e => {
+        e.preventDefault(); e.stopPropagation();
+        dragCounter = 0; dropOverlay.classList.remove('active');
+        const files = e.dataTransfer.files;
+        if (files.length) {
+            const mediaFiles = Array.from(files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+            if (mediaFiles.length) uploadMediaFiles(mediaFiles);
+            else showToast('Only image and video files are supported', 3000);
+        }
+    });
+
+    // Paste image from clipboard
+    editorEl.addEventListener('paste', e => {
+        const items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        const mediaItems = [];
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].kind === 'file' && (items[i].type.startsWith('image/') || items[i].type.startsWith('video/'))) {
+                const f = items[i].getAsFile();
+                if (f) mediaItems.push(f);
+            }
+        }
+        if (mediaItems.length) {
+            e.preventDefault();
+            uploadMediaFiles(mediaItems);
+        }
+    });
 
     setSaveStatus('saved','Saved');
     editorEl.focus();

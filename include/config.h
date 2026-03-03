@@ -27,6 +27,7 @@ struct ldmd_config {
     
     // Storage settings
     char documents_path[LDMD_MAX_PATH];
+    char media_path[LDMD_MAX_PATH];
     size_t max_file_size;
     char allowed_extensions[512];
 

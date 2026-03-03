@@ -1,6 +1,7 @@
 #include "workspace.h"
 #include "auth.h"
 #include "rbac.h"
+#include "project.h"
 #include "utils.h"
 #include <stdio.h>
 #include <string.h>
@@ -57,6 +58,23 @@ ldmd_error_t workspace_delete(ldmd_database_t *db, ldmd_config_t *config, int64_
     ldmd_error_t err = db_workspace_get_by_id(db, workspace_id, &workspace);
     if (err != LDMD_OK) {
         return err;
+    }
+    
+    // Delete media for all documents in all projects of this workspace
+    ldmd_project_t *projects = NULL;
+    int proj_count = 0;
+    if (db_project_list(db, workspace_id, &projects, &proj_count) == LDMD_OK && projects) {
+        for (int p = 0; p < proj_count; p++) {
+            ldmd_document_t *docs = NULL;
+            int doc_count = 0;
+            if (db_document_list(db, projects[p].id, &docs, &doc_count) == LDMD_OK && docs) {
+                for (int d = 0; d < doc_count; d++) {
+                    document_delete_media(config, docs[d].uuid);
+                }
+                free(docs);
+            }
+        }
+        free(projects);
     }
     
     // Delete workspace directory
