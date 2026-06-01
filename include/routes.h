@@ -124,4 +124,8 @@ void route_raw_put(http_request_t *req, const char *token);
 // Admin: full backup download (ZIP of db + data directories)
 void route_api_admin_backup(http_request_t *req);
 
+// Document revision history
+void route_api_documents_history(http_request_t *req, const char *doc_uuid);
+void route_api_documents_history_rev(http_request_t *req, const char *doc_uuid, const char *rev_id);
+
 #endif // ROUTES_H

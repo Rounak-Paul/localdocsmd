@@ -183,7 +183,23 @@ static const char *SCHEMA_SQL =
     "CREATE INDEX IF NOT EXISTS idx_activity_log_user_ts ON activity_log(user_id, ts);"
     "CREATE INDEX IF NOT EXISTS idx_document_tags_doc    ON document_tags(document_id);"
     "CREATE INDEX IF NOT EXISTS idx_document_tags_tag    ON document_tags(tag_id);"
-    "CREATE INDEX IF NOT EXISTS idx_tags_name            ON tags(name);";
+    "CREATE INDEX IF NOT EXISTS idx_tags_name            ON tags(name);"
+
+    // Document revision history — one row per save, stores the full content
+    // that was current BEFORE the new save replaced it (so rev 1 = first ever
+    // snapshot taken the moment someone saves over the initial content).
+    "CREATE TABLE IF NOT EXISTS document_revisions ("
+    "  id          INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "  document_id INTEGER NOT NULL,"
+    "  saved_by    INTEGER NOT NULL,"
+    "  saved_at    INTEGER NOT NULL,"
+    "  content     TEXT    NOT NULL,"
+    "  FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,"
+    "  FOREIGN KEY (saved_by)    REFERENCES users(id)"
+    ");"
+
+    "CREATE INDEX IF NOT EXISTS idx_doc_revisions_doc_ts"
+    "  ON document_revisions(document_id, saved_at DESC);";
 
 ldmd_database_t *db_init(const char *path) {
     ldmd_database_t *db = calloc(1, sizeof(ldmd_database_t));

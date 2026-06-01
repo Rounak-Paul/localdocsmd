@@ -32,6 +32,75 @@ static void activity_log_insert(ldmd_database_t *db, int64_t user_id, const char
     }
 }
 
+// Snapshot the current on-disk content of a document into document_revisions
+// before overwriting it.  No-op if the file is empty or doesn't exist yet.
+//
+// Debounce: if a revision for this document already exists within the last
+// AUDIT_DEBOUNCE_SECS seconds, skip — the existing snapshot already captures
+// the start of this editing burst.
+//
+// Cap: after inserting, prune revisions beyond AUDIT_MAX_REVISIONS so disk
+// usage stays bounded (≈ AUDIT_MAX_REVISIONS × avg_doc_size per document).
+#define AUDIT_DEBOUNCE_SECS 300    /* 5 minutes */
+#define AUDIT_MAX_REVISIONS 4096  /* revisions kept per document */
+
+static void audit_snapshot(ldmd_database_t *db, ldmd_config_t *cfg,
+                            const ldmd_document_t *doc, int64_t saved_by) {
+    /* ── Debounce check ── */
+    {
+        sqlite3_stmt *chk;
+        const char *chk_sql =
+            "SELECT 1 FROM document_revisions"
+            " WHERE document_id = ?1 AND saved_at >= ?2 LIMIT 1";
+        bool recent = false;
+        if (sqlite3_prepare_v2(db->db, chk_sql, -1, &chk, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(chk, 1, doc->id);
+            sqlite3_bind_int64(chk, 2, (int64_t)(time(NULL) - AUDIT_DEBOUNCE_SECS));
+            if (sqlite3_step(chk) == SQLITE_ROW) recent = true;
+            sqlite3_finalize(chk);
+        }
+        if (recent) return;
+    }
+
+    char *old = NULL;
+    if (utils_read_file(doc->path, &old) != LDMD_OK || !old) return;
+    if (old[0] == '\0') { free(old); return; } /* skip blank initial saves */
+
+    sqlite3_stmt *stmt;
+    const char *sql =
+        "INSERT INTO document_revisions (document_id, saved_by, saved_at, content)"
+        " VALUES (?, ?, ?, ?)";
+    if (sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, doc->id);
+        sqlite3_bind_int64(stmt, 2, saved_by);
+        sqlite3_bind_int64(stmt, 3, (int64_t)time(NULL));
+        sqlite3_bind_text (stmt, 4, old, -1, SQLITE_TRANSIENT);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+    free(old);
+    (void)cfg;
+
+    /* ── Prune old revisions beyond the cap ── */
+    {
+        sqlite3_stmt *del;
+        const char *del_sql =
+            "DELETE FROM document_revisions"
+            " WHERE document_id = ?1"
+            "   AND id NOT IN ("
+            "     SELECT id FROM document_revisions"
+            "     WHERE document_id = ?1"
+            "     ORDER BY id DESC LIMIT ?2"
+            "   )";
+        if (sqlite3_prepare_v2(db->db, del_sql, -1, &del, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(del, 1, doc->id);
+            sqlite3_bind_int  (del, 2, AUDIT_MAX_REVISIONS);
+            sqlite3_step(del);
+            sqlite3_finalize(del);
+        }
+    }
+}
+
 // Helper to check if method matches
 static bool method_is(http_request_t *req, const char *method) {
     return mg_strcasecmp(req->hm->method, mg_str(method)) == 0;
@@ -451,6 +520,16 @@ bool routes_handle(http_request_t *req) {
         return true;
     }
 
+    if (uri_match(req, "/api/documents/*/history/*", param1, param2) && method_is(req, "GET")) {
+        route_api_documents_history_rev(req, param1, param2);
+        return true;
+    }
+
+    if (uri_match(req, "/api/documents/*/history", param1, NULL) && method_is(req, "GET")) {
+        route_api_documents_history(req, param1);
+        return true;
+    }
+
     if (uri_match(req, "/api/documents/*/render", param1, NULL) && method_is(req, "GET")) {
         route_api_documents_render(req, param1);
         return true;
@@ -814,6 +893,7 @@ void route_page_document(http_request_t *req, const char *document_uuid) {
     template_set(ctx, "project_name", project.name);
     template_set(ctx, "project_uuid", project.uuid);
     template_set_bool(ctx, "can_edit", rbac_can_edit_workspace(req->server->db, req->user.id, project.workspace_id));
+    template_set_bool(ctx, "is_admin", req->user.global_role == ROLE_ADMIN);
     set_navbar(ctx, req);
     
     free(html_content);
@@ -2034,6 +2114,7 @@ void route_api_documents_content(http_request_t *req, const char *doc_uuid) {
         }
         
         const char *content = json_get_string(json, "content");
+        audit_snapshot(req->server->db, req->server->config, &doc, req->user.id);
         document_save_content(req->server->config, &doc, content);
         
         doc.updated_by = req->user.id;
@@ -3167,16 +3248,163 @@ void route_raw_put(http_request_t *req, const char *token) {
     if (body_len > 0) memcpy(content, req->hm->body.buf, body_len);
     content[body_len] = '\0';
 
+    /* Snapshot the old content before overwriting (token-based; attribute to last editor) */
+    audit_snapshot(req->server->db, req->server->config, &doc,
+                   doc.updated_by ? doc.updated_by : doc.created_by);
+
     document_save_content(req->server->config, &doc, content);
     free(content);
 
-    /* Record update metadata without needing a user_id (token-based access).
-     * We deliberately do not log activity here since the actor is anonymous
-     * from the session perspective. */
+    /* Record update metadata without needing a user_id (token-based access). */
     doc.updated_at = (time_t)time(NULL);
     document_update(req->server->db, &doc);
 
     http_respond_json(req->conn, 200, "{\"success\":true}");
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Document revision history
+ *
+ * GET /api/documents/:uuid/history[?limit=50&before=<id>]
+ *   Returns a JSON array of revision metadata (no content):
+ *   [{id, saved_by_id, saved_by_username, saved_at}, ...]
+ *   newest first.  Default page size 50.
+ *
+ * GET /api/documents/:uuid/history/:rev_id
+ *   Returns {id, saved_at, saved_by_id, saved_by_username, content}
+ *   for the specified revision.
+ * ──────────────────────────────────────────────────────────────── */
+void route_api_documents_history(http_request_t *req, const char *doc_uuid) {
+    if (!require_auth(req) || !require_admin(req)) return;
+
+    ldmd_document_t doc;
+    if (db_document_get_by_uuid(req->server->db, doc_uuid, &doc) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Document not found");
+        return;
+    }
+
+    ldmd_project_t project;
+    db_project_get_by_id(req->server->db, doc.project_id, &project);
+    if (!rbac_can_access_workspace(req->server->db, req->user.id, project.workspace_id)) {
+        http_respond_error(req->conn, 403, "Access denied");
+        return;
+    }
+
+    /* Optional pagination: ?limit=N&before=<rev_id> */
+    int limit = 50;
+    int64_t before = INT64_MAX;
+    char qs[256] = {0};
+    if (req->hm->query.len > 0 && req->hm->query.len < sizeof(qs)) {
+        memcpy(qs, req->hm->query.buf, req->hm->query.len);
+        char *lp = strstr(qs, "limit=");
+        if (lp) { int v = atoi(lp + 6); if (v > 0 && v <= 200) limit = v; }
+        char *bp = strstr(qs, "before=");
+        if (bp) { int64_t v = (int64_t)atoll(bp + 7); if (v > 0) before = v; }
+    }
+
+    const char *sql =
+        "SELECT r.id, r.saved_by, u.username, r.saved_at"
+        " FROM document_revisions r"
+        " JOIN users u ON u.id = r.saved_by"
+        " WHERE r.document_id = ?1 AND r.id < ?2"
+        " ORDER BY r.id DESC LIMIT ?3";
+
+    sqlite3_stmt *stmt;
+    cJSON *arr = cJSON_CreateArray();
+    if (sqlite3_prepare_v2(req->server->db->db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, doc.id);
+        sqlite3_bind_int64(stmt, 2, before);
+        sqlite3_bind_int  (stmt, 3, limit);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            cJSON *item = cJSON_CreateObject();
+            cJSON_AddNumberToObject(item, "id",       (double)sqlite3_column_int64(stmt, 0));
+            cJSON_AddNumberToObject(item, "saved_by", (double)sqlite3_column_int64(stmt, 1));
+            cJSON_AddStringToObject(item, "username",
+                (const char *)sqlite3_column_text(stmt, 2));
+            cJSON_AddNumberToObject(item, "saved_at", (double)sqlite3_column_int64(stmt, 3));
+            cJSON_AddItemToArray(arr, item);
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    /* Total revision count for this document (for slot display) */
+    int64_t total = 0;
+    {
+        sqlite3_stmt *cnt;
+        const char *cnt_sql =
+            "SELECT COUNT(*) FROM document_revisions WHERE document_id = ?1";
+        if (sqlite3_prepare_v2(req->server->db->db, cnt_sql, -1, &cnt, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(cnt, 1, doc.id);
+            if (sqlite3_step(cnt) == SQLITE_ROW)
+                total = sqlite3_column_int64(cnt, 0);
+            sqlite3_finalize(cnt);
+        }
+    }
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddNumberToObject(resp, "total", (double)total);
+    cJSON_AddNumberToObject(resp, "max",   AUDIT_MAX_REVISIONS);
+    cJSON_AddItemToObject  (resp, "revisions", arr);
+
+    char *out = cJSON_PrintUnformatted(resp);
+    cJSON_Delete(resp);
+    http_respond_json(req->conn, 200, out);
+    free(out);
+}
+
+void route_api_documents_history_rev(http_request_t *req,
+                                     const char *doc_uuid, const char *rev_id) {
+    if (!require_auth(req) || !require_admin(req)) return;
+
+    ldmd_document_t doc;
+    if (db_document_get_by_uuid(req->server->db, doc_uuid, &doc) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Document not found");
+        return;
+    }
+
+    ldmd_project_t project;
+    db_project_get_by_id(req->server->db, doc.project_id, &project);
+    if (!rbac_can_access_workspace(req->server->db, req->user.id, project.workspace_id)) {
+        http_respond_error(req->conn, 403, "Access denied");
+        return;
+    }
+
+    int64_t rid = (int64_t)atoll(rev_id);
+    if (rid <= 0) { http_respond_error(req->conn, 400, "Invalid revision id"); return; }
+
+    const char *sql =
+        "SELECT r.id, r.saved_by, u.username, r.saved_at, r.content"
+        " FROM document_revisions r"
+        " JOIN users u ON u.id = r.saved_by"
+        " WHERE r.id = ?1 AND r.document_id = ?2";
+
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(req->server->db->db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        http_respond_error(req->conn, 500, "DB error");
+        return;
+    }
+    sqlite3_bind_int64(stmt, 1, rid);
+    sqlite3_bind_int64(stmt, 2, doc.id);
+
+    if (sqlite3_step(stmt) != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        http_respond_error(req->conn, 404, "Revision not found");
+        return;
+    }
+
+    cJSON *obj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(obj, "id",       (double)sqlite3_column_int64(stmt, 0));
+    cJSON_AddNumberToObject(obj, "saved_by", (double)sqlite3_column_int64(stmt, 1));
+    cJSON_AddStringToObject(obj, "username", (const char *)sqlite3_column_text(stmt, 2));
+    cJSON_AddNumberToObject(obj, "saved_at", (double)sqlite3_column_int64(stmt, 3));
+    cJSON_AddStringToObject(obj, "content",
+        sqlite3_column_text(stmt, 4) ? (const char *)sqlite3_column_text(stmt, 4) : "");
+    sqlite3_finalize(stmt);
+
+    char *out = cJSON_PrintUnformatted(obj);
+    cJSON_Delete(obj);
+    http_respond_json(req->conn, 200, out);
+    free(out);
 }
 
 /* ─────────────────────────────────────────────────────────────────

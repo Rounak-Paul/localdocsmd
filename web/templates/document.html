@@ -68,6 +68,17 @@
                 Share Link
             </button>
 
+            {{#if is_admin}}
+            <button class="btn" id="history-btn" onclick="toggleHistory()" title="View revision history">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="12 8 12 12 14 14"></polyline>
+                    <path d="M3.05 11a9 9 0 1 0 .5-4.5"></path>
+                    <polyline points="3 3 3 7 7 7"></polyline>
+                </svg>
+                History
+            </button>
+            {{/if}}
+
             {{#if can_edit}}
             <a href="/editor/{{document_uuid}}" class="btn btn-primary">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -90,6 +101,72 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin" style="opacity:.4"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
                 Loading&#8230;
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── History Drawer ──────────────────────────────────────────── -->
+<div id="history-drawer" class="history-drawer" style="display:none">
+    <div class="history-drawer-header">
+        <span class="history-drawer-title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.7">
+                <polyline points="12 8 12 12 14 14"></polyline>
+                <path d="M3.05 11a9 9 0 1 0 .5-4.5"></path>
+                <polyline points="3 3 3 7 7 7"></polyline>
+            </svg>
+            Revision History
+        </span>
+        <div style="display:flex;align-items:center;gap:10px">
+            <span class="history-slot-label" id="history-slot-label" style="font-size:.7rem;color:var(--text-muted)"></span>
+            <button class="history-drawer-close" onclick="toggleHistory()" title="Close">&times;</button>
+        </div>
+    </div>
+    <div class="history-drawer-body" id="history-list">
+        <div class="history-loading" id="history-loading">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin" style="opacity:.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        </div>
+    </div>
+    <div class="history-drawer-footer" id="history-footer" style="display:none">
+        <button class="btn" id="history-load-more" onclick="loadMoreHistory()">Load older</button>
+    </div>
+</div>
+
+<!-- ── History Preview Modal ───────────────────────────────────── -->
+<div id="history-modal" class="modal" style="display:none" onclick="historyModalBackdrop(event)">
+    <div class="modal-content history-modal-content">
+        <div class="modal-header">
+            <div>
+                <div class="modal-title">Revision Preview</div>
+                <div class="history-modal-meta" id="history-modal-meta"></div>
+            </div>
+            <button onclick="closeModal('history-modal')" class="btn-close">&times;</button>
+        </div>
+        <div class="history-modal-body">
+            <div class="history-modal-loading" id="history-modal-loading">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin" style="opacity:.4"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            </div>
+            <div class="history-modal-content-area markdown-body" id="history-modal-content" style="display:none"></div>
+        </div>
+        <div class="modal-footer" id="history-modal-footer" style="display:none">
+            <button class="btn btn-primary" id="history-restore-btn" onclick="restoreRevision()">Restore this version</button>
+            <button class="btn" onclick="closeModal('history-modal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="history-restore-confirm" class="modal" style="display:none" onclick="if(event.target===this)closeModal('history-restore-confirm')">
+    <div class="modal-content" style="max-width:420px">
+        <div class="modal-header">
+            <div class="modal-title">Restore this version?</div>
+            <button onclick="closeModal('history-restore-confirm')" class="btn-close">&times;</button>
+        </div>
+        <p style="padding:16px 20px;color:var(--text-secondary);margin:0">
+            This will replace the current document content with the selected revision.
+            The current content will be saved as a new history entry first.
+        </p>
+        <div class="modal-footer">
+            <button class="btn btn-primary" id="history-restore-confirm-btn" onclick="doRestore()">Restore</button>
+            <button class="btn" onclick="closeModal('history-restore-confirm')">Cancel</button>
         </div>
     </div>
 </div>
@@ -495,6 +572,84 @@ kbd { display: inline-flex; align-items: center; justify-content: center; font-f
     font-size: .74rem; color: var(--text-muted);
     padding: 8px 10px; background: var(--divider);
     border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+}
+
+/* ── History Drawer ─────────────────────────────────────────────── */
+.history-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 300px; background: var(--surface);
+    border-left: 1px solid var(--border-color);
+    display: flex; flex-direction: column;
+    z-index: 400; box-shadow: -4px 0 24px rgba(0,0,0,.25);
+    animation: slideInRight .15s ease;
+}
+@keyframes slideInRight {
+    from { transform: translateX(20px); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+.history-drawer-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+.history-drawer-title {
+    display: flex; align-items: center; gap: 7px;
+    font-size: .85rem; font-weight: 600; color: var(--text-color);
+}
+.history-drawer-close {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 1.2rem; line-height: 1;
+    padding: 2px 6px; border-radius: var(--radius-sm);
+    transition: color .1s, background .1s;
+}
+.history-drawer-close:hover { color: var(--text-color); background: var(--divider); }
+.history-drawer-body {
+    flex: 1; overflow-y: auto; padding: 8px 0;
+}
+.history-loading {
+    display: flex; justify-content: center; padding: 32px 0;
+}
+.history-item {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 10px 16px; cursor: pointer;
+    border-bottom: 1px solid var(--divider);
+    transition: background .1s;
+}
+.history-item:hover { background: var(--divider); }
+.history-item-user {
+    font-size: .8rem; font-weight: 600; color: var(--text-color);
+}
+.history-item-time {
+    font-size: .73rem; color: var(--text-muted);
+}
+.history-empty {
+    text-align: center; color: var(--text-muted);
+    font-size: .82rem; padding: 40px 16px;
+}
+.history-drawer-footer {
+    padding: 10px 16px; border-top: 1px solid var(--border-color);
+    display: flex; justify-content: center;
+}
+
+/* ── History Preview Modal ──────────────────────────────────────── */
+.history-modal-content { max-width: 760px; }
+.history-modal-meta {
+    font-size: .75rem; color: var(--text-muted); margin-top: 2px;
+}
+.history-modal-body {
+    padding: 20px; max-height: 60vh; overflow-y: auto;
+}
+.history-modal-loading {
+    display: flex; justify-content: center; padding: 32px 0;
+}
+.history-modal-content-area {
+    background: var(--bg-color); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); padding: 16px 20px;
+    max-height: 55vh; overflow-y: auto;
+}
+.modal-footer {
+    display: flex; gap: 8px; justify-content: flex-end;
+    padding: 12px 20px; border-top: 1px solid var(--border-color);
 }
 </style>
 
@@ -1123,6 +1278,158 @@ window.switchEditorTab = function(tabEl, panelId) {
 
 window.presignModalBackdrop = function(e) {
     if (e.target === document.getElementById('presign-modal')) closeModal('presign-modal');
+};
+
+/* ── History ──────────────────────────────────────────────────── */
+const _docUuidForHistory = '{{document_uuid}}';
+let _historyOpen   = false;
+let _historyItems  = [];      // loaded revisions
+let _historyBefore = null;    // pagination cursor (smallest id seen)
+let _historyDone   = false;   // no more pages
+let _pendingRevId  = null;    // revision being previewed/restored
+let _pendingContent = null;   // content of pending revision
+
+function _fmtDate(ts) {
+    const d = new Date(ts * 1000);
+    const now = Date.now();
+    const diff = now - d.getTime();
+    if (diff < 60000)  return 'Just now';
+    if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+    if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+    return d.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'})
+        + ' ' + d.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
+}
+
+function _renderHistoryList() {
+    const list = document.getElementById('history-list');
+    list.innerHTML = '';
+    if (_historyItems.length === 0) {
+        list.innerHTML = '<div class="history-empty">No saved revisions yet.<br>Revisions are created each time the document is saved.</div>';
+        return;
+    }
+    _historyItems.forEach(rev => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML =
+            `<span class="history-item-user">${rev.username}</span>` +
+            `<span class="history-item-time">${_fmtDate(rev.saved_at)}</span>`;
+        item.onclick = () => openRevision(rev.id);
+        list.appendChild(item);
+    });
+    const footer = document.getElementById('history-footer');
+    footer.style.display = _historyDone ? 'none' : 'flex';
+}
+
+async function _fetchHistory(before) {
+    const qs = before ? `?limit=50&before=${before}` : '?limit=50';
+    const resp = await fetch(`/api/documents/${_docUuidForHistory}/history${qs}`);
+    if (!resp.ok) return {total:0, max:4096, revisions:[]};
+    return resp.json(); /* {total, max, revisions:[]} */
+}
+
+window.toggleHistory = async function() {
+    const drawer = document.getElementById('history-drawer');
+    _historyOpen = !_historyOpen;
+    drawer.style.display = _historyOpen ? 'flex' : 'none';
+    if (!_historyOpen) return;
+
+    // First open: load
+    if (_historyItems.length === 0 && !_historyDone) {
+        document.getElementById('history-list').innerHTML =
+            '<div class="history-loading"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin" style="opacity:.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></div>';
+        const data = await _fetchHistory(null);
+        _historyItems = data.revisions;
+        if (data.revisions.length > 0) _historyBefore = data.revisions[data.revisions.length - 1].id;
+        if (data.revisions.length < 50) _historyDone = true;
+        _updateSlotLabel(data.total, data.max);
+        _renderHistoryList();
+    }
+};
+
+window.loadMoreHistory = async function() {
+    if (_historyDone) return;
+    const btn = document.getElementById('history-load-more');
+    btn.disabled = true; btn.textContent = 'Loading…';
+    const data = await _fetchHistory(_historyBefore);
+    _historyItems = _historyItems.concat(data.revisions);
+    if (data.revisions.length > 0) _historyBefore = data.revisions[data.revisions.length - 1].id;
+    if (data.revisions.length < 50) _historyDone = true;
+    _updateSlotLabel(data.total, data.max);
+    _renderHistoryList();
+    btn.disabled = false; btn.textContent = 'Load older';
+};
+
+function _updateSlotLabel(total, max) {
+    const el = document.getElementById('history-slot-label');
+    if (!el) return;
+    const pct = Math.round(total / max * 100);
+    el.textContent = `${total} / ${max} slots used (${pct}%)`;
+    el.title = `${total} revisions stored. Oldest are pruned after ${max}.`;
+    el.style.color = pct >= 90 ? 'var(--error, #e55)'
+                   : pct >= 70 ? 'var(--warning, #e90)'
+                   : 'var(--text-muted)';
+}
+
+window.openRevision = async function(revId) {
+    _pendingRevId = revId;
+    _pendingContent = null;
+    closeModal('history-restore-confirm');
+
+    const modal = document.getElementById('history-modal');
+    modal.style.display = 'flex';
+    document.getElementById('history-modal-loading').style.display = 'flex';
+    document.getElementById('history-modal-content').style.display = 'none';
+    document.getElementById('history-modal-footer').style.display = 'none';
+    document.getElementById('history-modal-meta').textContent = '';
+
+    const resp = await fetch(`/api/documents/${_docUuidForHistory}/history/${revId}`);
+    if (!resp.ok) {
+        document.getElementById('history-modal-loading').innerHTML =
+            '<span style="color:var(--error)">Failed to load revision.</span>';
+        return;
+    }
+    const rev = await resp.json();
+    _pendingContent = rev.content;
+
+    document.getElementById('history-modal-meta').textContent =
+        `Saved by ${rev.username} · ${_fmtDate(rev.saved_at)}`;
+
+    const contentEl = document.getElementById('history-modal-content');
+    contentEl.innerHTML = typeof marked !== 'undefined'
+        ? marked.parse(rev.content || '')
+        : `<pre style="white-space:pre-wrap">${(rev.content||'').replace(/</g,'&lt;')}</pre>`;
+
+    document.getElementById('history-modal-loading').style.display = 'none';
+    contentEl.style.display = 'block';
+    document.getElementById('history-modal-footer').style.display = 'flex';
+};
+
+window.restoreRevision = function() {
+    closeModal('history-modal');
+    document.getElementById('history-restore-confirm').style.display = 'flex';
+};
+
+window.doRestore = async function() {
+    closeModal('history-restore-confirm');
+    if (!_pendingContent) return;
+
+    const resp = await fetch(`/api/documents/${_docUuidForHistory}/content`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content: _pendingContent})
+    });
+    if (resp.ok) {
+        // Reset history cache so fresh load next open
+        _historyItems = []; _historyBefore = null; _historyDone = false;
+        // Reload doc content
+        window.location.reload();
+    } else {
+        alert('Failed to restore revision. Please try again.');
+    }
+};
+
+window.historyModalBackdrop = function(e) {
+    if (e.target === document.getElementById('history-modal')) closeModal('history-modal');
 };
 
 })();
