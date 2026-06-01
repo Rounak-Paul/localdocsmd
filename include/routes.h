@@ -121,4 +121,7 @@ void route_api_documents_presign(http_request_t *req, const char *doc_uuid);
 void route_raw_get(http_request_t *req, const char *token);
 void route_raw_put(http_request_t *req, const char *token);
 
+// Admin: full backup download (ZIP of db + data directories)
+void route_api_admin_backup(http_request_t *req);
+
 #endif // ROUTES_H

@@ -9,6 +9,7 @@
 #include "mongoose.h"
 #include "cJSON.h"
 #include "presign.h"
+#include "backup.h"
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -560,6 +561,11 @@ bool routes_handle(http_request_t *req) {
     // Admin API
     if (uri_match(req, "/api/admin/stats", NULL, NULL) && method_is(req, "GET")) {
         route_api_admin_stats(req);
+        return true;
+    }
+
+    if (uri_match(req, "/api/admin/backup", NULL, NULL) && method_is(req, "GET")) {
+        route_api_admin_backup(req);
         return true;
     }
     
@@ -3171,4 +3177,53 @@ void route_raw_put(http_request_t *req, const char *token) {
     document_update(req->server->db, &doc);
 
     http_respond_json(req->conn, 200, "{\"success\":true}");
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Admin: full backup download
+ *
+ * GET /api/admin/backup
+ * Returns a ZIP archive (STORE, no compression) containing:
+ *   localdocsmd.db        – consistent hot-copy of the live database
+ *   <documents_path>/...  – all document files
+ *   <media_path>/...      – all media files
+ *
+ * To restore: extract the ZIP next to the executable and run
+ * ./localdocsmd — the server finds data/ and the .db automatically.
+ * ──────────────────────────────────────────────────────────────── */
+void route_api_admin_backup(http_request_t *req) {
+    if (!require_auth(req) || !require_admin(req)) return;
+
+    ldmd_config_t   *cfg = req->server->config;
+    ldmd_database_t *db  = req->server->db;
+
+    size_t   zip_len  = 0;
+    uint8_t *zip_data = backup_create_zip(
+        db->db,
+        cfg->db_path,
+        cfg->documents_path,
+        cfg->media_path,
+        &zip_len
+    );
+
+    if (!zip_data) {
+        http_respond_error(req->conn, 500, "Failed to create backup");
+        return;
+    }
+
+    time_t now = time(NULL);
+    struct tm *tm = localtime(&now);
+    char fname[64];
+    snprintf(fname, sizeof(fname), "localdocsmd-backup-%04d%02d%02d.zip",
+             tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
+
+    char headers[256];
+    snprintf(headers, sizeof(headers),
+             "Content-Type: application/zip\r\n"
+             "Content-Disposition: attachment; filename=\"%s\"\r\n"
+             "Cache-Control: no-store\r\n",
+             fname);
+
+    http_respond_raw(req->conn, 200, headers, zip_data, zip_len);
+    free(zip_data);
 }

@@ -39,6 +39,7 @@ set(SOURCES
     src/utils.c
     src/template.c
     src/presign.c
+    src/backup.c
     vendor/mongoose.c
     vendor/cJSON.c
     vendor/md4c.c
