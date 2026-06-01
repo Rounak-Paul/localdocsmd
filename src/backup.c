@@ -251,6 +251,7 @@ static void walk_dir(dyn_buf_t *zip, const char *zip_prefix,
 
 /* ── Public API ───────────────────────────────────────────────── */
 uint8_t *backup_create_zip(sqlite3    *src_db,
+                           const char *config_path,
                            const char *db_path,
                            const char *documents_path,
                            const char *media_path,
@@ -268,6 +269,25 @@ uint8_t *backup_create_zip(sqlite3    *src_db,
     }
 
     int count = 0;
+
+    /* ── 0. Active config.ini ── */
+    if (config_path && config_path[0] != '\0') {
+        struct stat st;
+        if (stat(config_path, &st) == 0 && S_ISREG(st.st_mode) && st.st_size > 0) {
+            FILE *fp = fopen(config_path, "rb");
+            if (fp) {
+                uint8_t *buf = malloc((size_t)st.st_size);
+                if (buf) {
+                    size_t n = fread(buf, 1, (size_t)st.st_size, fp);
+                    if (n == (size_t)st.st_size && cd_ensure(&cd, &cd_cap, count)) {
+                        zip_add_entry(&zip, "config.ini", buf, (uint32_t)n, &cd[count++]);
+                    }
+                    free(buf);
+                }
+                fclose(fp);
+            }
+        }
+    }
 
     /* ── 1. SQLite online backup → temp file → read into ZIP ── */
     char tmp_path[LDMD_MAX_PATH];

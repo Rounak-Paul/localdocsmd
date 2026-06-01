@@ -10,6 +10,7 @@
  * and all data directories.
  *
  * The archive contains:
+ *   config.ini       - the active configuration file used by the server
  *   localdocsmd.db   - consistent hot-copy of the running database
  *   <documents_path>/...  - all document files, preserving sub-directories
  *   <media_path>/...      - all media files, preserving sub-directories
@@ -18,6 +19,7 @@
  * executable and run ./localdocsmd.
  *
  * @param src_db          Live sqlite3 connection (read-only hot backup)
+ * @param config_path     Path to the active config file to include as config.ini
  * @param db_path         Filesystem path of the DB file (used for temp file)
  * @param documents_path  Path to the documents directory
  * @param media_path      Path to the media directory
@@ -25,6 +27,7 @@
  * @return malloc'd ZIP bytes (caller must free()), or NULL on failure
  */
 uint8_t *backup_create_zip(sqlite3    *src_db,
+                           const char *config_path,
                            const char *db_path,
                            const char *documents_path,
                            const char *media_path,

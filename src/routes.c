@@ -3599,6 +3599,7 @@ void route_api_admin_backup(http_request_t *req) {
     size_t   zip_len  = 0;
     uint8_t *zip_data = backup_create_zip(
         db->db,
+        cfg->config_path,
         cfg->db_path,
         cfg->documents_path,
         cfg->media_path,

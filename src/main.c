@@ -109,6 +109,7 @@ int main(int argc, char *argv[]) {
         ldmd_strlcpy(config->allowed_extensions, ".md,.markdown,.txt", sizeof(config->allowed_extensions));
         config->num_threads = 0; /* auto-detect */
     }
+    ldmd_strlcpy(config->config_path, config_path, sizeof(config->config_path));
     
     // Apply port override
     if (port_override > 0) {

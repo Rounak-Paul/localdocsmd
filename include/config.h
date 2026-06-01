@@ -10,6 +10,7 @@ struct ldmd_config {
     int server_port;
     char web_root[LDMD_MAX_PATH];
     size_t max_body_size;
+    char config_path[LDMD_MAX_PATH];
     
     // Database settings
     char db_path[LDMD_MAX_PATH];
