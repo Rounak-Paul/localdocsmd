@@ -43,6 +43,8 @@ static void activity_log_insert(ldmd_database_t *db, int64_t user_id, const char
 // usage stays bounded (≈ AUDIT_MAX_REVISIONS × avg_doc_size per document).
 #define AUDIT_DEBOUNCE_SECS 300    /* 5 minutes */
 #define AUDIT_MAX_REVISIONS 4096  /* revisions kept per document */
+#define CHAT_MAX_MESSAGE_LEN 4000
+#define CHAT_PAGE_SIZE 50
 
 static void audit_snapshot(ldmd_database_t *db, ldmd_config_t *cfg,
                             const ldmd_document_t *doc, int64_t saved_by) {
@@ -99,6 +101,18 @@ static void audit_snapshot(ldmd_database_t *db, ldmd_config_t *cfg,
             sqlite3_finalize(del);
         }
     }
+}
+
+static void chat_append_json_message(cJSON *arr, sqlite3_stmt *stmt) {
+    cJSON *item = cJSON_CreateObject();
+    cJSON_AddNumberToObject(item, "id", (double)sqlite3_column_int64(stmt, 0));
+    cJSON_AddNumberToObject(item, "user_id", (double)sqlite3_column_int64(stmt, 1));
+    cJSON_AddStringToObject(item, "username",
+                            (const char *)sqlite3_column_text(stmt, 2));
+    cJSON_AddNumberToObject(item, "created_at", (double)sqlite3_column_int64(stmt, 3));
+    cJSON_AddStringToObject(item, "message",
+                            sqlite3_column_text(stmt, 4) ? (const char *)sqlite3_column_text(stmt, 4) : "");
+    cJSON_AddItemToArray(arr, item);
 }
 
 // Helper to check if method matches
@@ -517,6 +531,11 @@ bool routes_handle(http_request_t *req) {
 
     if (uri_match(req, "/api/documents/*/presign", param1, NULL) && method_is(req, "POST")) {
         route_api_documents_presign(req, param1);
+        return true;
+    }
+
+    if (uri_match(req, "/api/documents/*/chat", param1, NULL)) {
+        route_api_documents_chat(req, param1);
         return true;
     }
 
@@ -3403,6 +3422,158 @@ void route_api_documents_history_rev(http_request_t *req,
 
     char *out = cJSON_PrintUnformatted(obj);
     cJSON_Delete(obj);
+    http_respond_json(req->conn, 200, out);
+    free(out);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Document chat
+ *
+ * GET /api/documents/:uuid/chat?limit=50&before=<id>&after=<id>
+ * POST /api/documents/:uuid/chat {"message":"..."}
+ * ──────────────────────────────────────────────────────────────── */
+void route_api_documents_chat(http_request_t *req, const char *doc_uuid) {
+    if (!require_auth(req)) return;
+
+    ldmd_document_t doc;
+    if (db_document_get_by_uuid(req->server->db, doc_uuid, &doc) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Document not found");
+        return;
+    }
+
+    ldmd_project_t project;
+    db_project_get_by_id(req->server->db, doc.project_id, &project);
+    if (!rbac_can_access_workspace(req->server->db, req->user.id, project.workspace_id)) {
+        http_respond_error(req->conn, 403, "Access denied");
+        return;
+    }
+
+    if (method_is(req, "POST")) {
+        cJSON *json = parse_json_body(req);
+        if (!json) {
+            http_respond_error(req->conn, 400, "Invalid JSON");
+            return;
+        }
+
+        const char *message = json_get_string(json, "message");
+        if (!message || !*message) message = json_get_string(json, "content");
+        if (!message || !*message) {
+            cJSON_Delete(json);
+            http_respond_error(req->conn, 400, "Message required");
+            return;
+        }
+        if (strlen(message) > CHAT_MAX_MESSAGE_LEN) {
+            cJSON_Delete(json);
+            http_respond_error(req->conn, 400, "Message too long");
+            return;
+        }
+
+        sqlite3_stmt *stmt;
+        const char *sql =
+            "INSERT INTO document_chat_messages (document_id, user_id, message, created_at)"
+            " VALUES (?, ?, ?, ?)";
+        if (sqlite3_prepare_v2(req->server->db->db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+            cJSON_Delete(json);
+            http_respond_error(req->conn, 500, "DB error");
+            return;
+        }
+        sqlite3_bind_int64(stmt, 1, doc.id);
+        sqlite3_bind_int64(stmt, 2, req->user.id);
+        sqlite3_bind_text(stmt, 3, message, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64(stmt, 4, (int64_t)time(NULL));
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+        cJSON_Delete(json);
+
+        activity_log_insert(req->server->db, req->user.id, "doc_chat");
+        http_respond_json(req->conn, 200, "{\"success\":true}");
+        return;
+    }
+
+    if (!method_is(req, "GET")) {
+        http_respond_error(req->conn, 405, "Method not allowed");
+        return;
+    }
+
+    int limit = CHAT_PAGE_SIZE;
+    int64_t before = INT64_MAX;
+    int64_t after = 0;
+    char qs[256] = {0};
+    if (req->hm->query.len > 0 && req->hm->query.len < sizeof(qs)) {
+        memcpy(qs, req->hm->query.buf, req->hm->query.len);
+        char *lp = strstr(qs, "limit=");
+        if (lp) { int v = atoi(lp + 6); if (v > 0 && v <= 200) limit = v; }
+        char *bp = strstr(qs, "before=");
+        if (bp) { int64_t v = (int64_t)atoll(bp + 7); if (v > 0) before = v; }
+        char *ap = strstr(qs, "after=");
+        if (ap) { int64_t v = (int64_t)atoll(ap + 6); if (v > 0) after = v; }
+    }
+
+    const char *sql_after =
+        "SELECT m.id, m.user_id, u.username, m.created_at, m.message"
+        " FROM document_chat_messages m"
+        " JOIN users u ON u.id = m.user_id"
+        " WHERE m.document_id = ?1 AND m.id > ?2"
+        " ORDER BY m.id ASC LIMIT ?3";
+    const char *sql_before =
+        "SELECT m.id, m.user_id, u.username, m.created_at, m.message"
+        " FROM document_chat_messages m"
+        " JOIN users u ON u.id = m.user_id"
+        " WHERE m.document_id = ?1 AND m.id < ?2"
+        " ORDER BY m.id DESC LIMIT ?3";
+    const char *sql_latest =
+        "SELECT m.id, m.user_id, u.username, m.created_at, m.message"
+        " FROM document_chat_messages m"
+        " JOIN users u ON u.id = m.user_id"
+        " WHERE m.document_id = ?1"
+        " ORDER BY m.id DESC LIMIT ?2";
+
+    cJSON *arr = cJSON_CreateArray();
+    sqlite3_stmt *stmt = NULL;
+    if (after > 0) {
+        if (sqlite3_prepare_v2(req->server->db->db, sql_after, -1, &stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(stmt, 1, doc.id);
+            sqlite3_bind_int64(stmt, 2, after);
+            sqlite3_bind_int  (stmt, 3, limit);
+        }
+    } else if (before != INT64_MAX) {
+        if (sqlite3_prepare_v2(req->server->db->db, sql_before, -1, &stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(stmt, 1, doc.id);
+            sqlite3_bind_int64(stmt, 2, before);
+            sqlite3_bind_int  (stmt, 3, limit);
+        }
+    } else {
+        if (sqlite3_prepare_v2(req->server->db->db, sql_latest, -1, &stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(stmt, 1, doc.id);
+            sqlite3_bind_int  (stmt, 2, limit);
+        }
+    }
+
+    if (stmt) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            chat_append_json_message(arr, stmt);
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    int64_t total = 0;
+    {
+        sqlite3_stmt *cnt;
+        const char *cnt_sql =
+            "SELECT COUNT(*) FROM document_chat_messages WHERE document_id = ?1";
+        if (sqlite3_prepare_v2(req->server->db->db, cnt_sql, -1, &cnt, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(cnt, 1, doc.id);
+            if (sqlite3_step(cnt) == SQLITE_ROW)
+                total = sqlite3_column_int64(cnt, 0);
+            sqlite3_finalize(cnt);
+        }
+    }
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddNumberToObject(resp, "total", (double)total);
+    cJSON_AddItemToObject(resp, "messages", arr);
+    char *out = cJSON_PrintUnformatted(resp);
+    cJSON_Delete(resp);
     http_respond_json(req->conn, 200, out);
     free(out);
 }

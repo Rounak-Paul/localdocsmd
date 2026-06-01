@@ -68,6 +68,15 @@
                 Share Link
             </button>
 
+            <button class="btn" id="chat-btn" onclick="toggleChat()" title="Open document chat">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path>
+                    <path d="M8 9h8"></path>
+                    <path d="M8 13h5"></path>
+                </svg>
+                Chat
+            </button>
+
             {{#if is_admin}}
             <button class="btn" id="history-btn" onclick="toggleHistory()" title="View revision history">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -128,6 +137,36 @@
     </div>
     <div class="history-drawer-footer" id="history-footer" style="display:none">
         <button class="btn" id="history-load-more" onclick="loadMoreHistory()">Load older</button>
+    </div>
+</div>
+
+<!-- ── Chat Drawer ─────────────────────────────────────────────── -->
+<div id="chat-drawer" class="chat-drawer" style="display:none">
+    <div class="history-drawer-header">
+        <span class="history-drawer-title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.7">
+                <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path>
+                <path d="M8 9h8"></path>
+                <path d="M8 13h5"></path>
+            </svg>
+            Document Chat
+        </span>
+        <div style="display:flex;align-items:center;gap:10px">
+            <span class="history-slot-label" id="chat-count" style="font-size:.7rem;color:var(--text-muted)"></span>
+            <button class="history-drawer-close" onclick="toggleChat()" title="Close">&times;</button>
+        </div>
+    </div>
+    <div class="chat-drawer-body" id="chat-list">
+        <div class="history-loading" id="chat-loading">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin" style="opacity:.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+        </div>
+    </div>
+    <div class="chat-drawer-footer">
+        <textarea id="chat-input" class="chat-input" placeholder="Write a message to collaborators..."></textarea>
+        <div class="chat-actions">
+            <button class="btn" id="chat-load-more" onclick="loadMoreChat()">Load older</button>
+            <button class="btn btn-primary" id="chat-send-btn" onclick="sendChatMessage()">Send</button>
+        </div>
     </div>
 </div>
 
@@ -575,10 +614,11 @@ kbd { display: inline-flex; align-items: center; justify-content: center; font-f
 }
 
 /* ── History Drawer ─────────────────────────────────────────────── */
-.history-drawer {
+.history-drawer,
+.chat-drawer {
     position: fixed; top: 0; right: 0; bottom: 0;
-    width: 300px; background: var(--surface);
-    border-left: 1px solid var(--border-color);
+    width: 340px; background: var(--card-bg);
+    border-left: 1px solid var(--card-border);
     display: flex; flex-direction: column;
     z-index: 400; box-shadow: -4px 0 24px rgba(0,0,0,.25);
     animation: slideInRight .15s ease;
@@ -603,8 +643,10 @@ kbd { display: inline-flex; align-items: center; justify-content: center; font-f
     transition: color .1s, background .1s;
 }
 .history-drawer-close:hover { color: var(--text-color); background: var(--divider); }
-.history-drawer-body {
+.history-drawer-body,
+.chat-drawer-body {
     flex: 1; overflow-y: auto; padding: 8px 0;
+    background: var(--card-bg);
 }
 .history-loading {
     display: flex; justify-content: center; padding: 32px 0;
@@ -629,6 +671,41 @@ kbd { display: inline-flex; align-items: center; justify-content: center; font-f
 .history-drawer-footer {
     padding: 10px 16px; border-top: 1px solid var(--border-color);
     display: flex; justify-content: center;
+}
+
+/* ── Chat Drawer ─────────────────────────────────────────────── */
+.chat-drawer-footer {
+    padding: 12px 14px; border-top: 1px solid var(--border-color);
+    display: flex; flex-direction: column; gap: 10px;
+    background: var(--card-bg);
+}
+.chat-input {
+    width: 100%; min-height: 84px; resize: vertical; max-height: 180px;
+    border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+    background: var(--input-bg, var(--divider)); color: var(--text-color);
+    padding: 10px 12px; font: inherit; line-height: 1.5; outline: none;
+}
+.chat-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(var(--primary-rgb, 99,102,241), .12); }
+.chat-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.chat-actions .btn { flex-shrink: 0; }
+.chat-message {
+    margin: 0 12px 10px; padding: 10px 12px; border: 1px solid var(--border-color);
+    border-radius: 12px; background: var(--divider); display: flex; flex-direction: column; gap: 6px;
+}
+.chat-message.own {
+    background: rgba(59,130,246,.12); border-color: rgba(59,130,246,.28);
+}
+.chat-message-meta {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    font-size: .72rem; color: var(--text-muted);
+}
+.chat-message-author { font-weight: 700; color: var(--text-color); }
+.chat-message-text {
+    white-space: pre-wrap; word-break: break-word; font-size: .84rem;
+    line-height: 1.55; color: var(--text-color);
+}
+.chat-empty {
+    text-align: center; color: var(--text-muted); font-size: .82rem; padding: 40px 16px;
 }
 
 /* ── History Preview Modal ──────────────────────────────────────── */
@@ -1140,6 +1217,17 @@ document.addEventListener('DOMContentLoaded', async function () {
     pollViewers();
     setInterval(ping, 15000);
     setInterval(pollViewers, 5000);
+    setInterval(pollChat, 5000);
+
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput) {
+        chatInput.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
+    }
 });
 
 /* ── Presign / External-Edit ─────────────────────────────────── */
@@ -1282,12 +1370,20 @@ window.presignModalBackdrop = function(e) {
 
 /* ── History ──────────────────────────────────────────────────── */
 const _docUuidForHistory = '{{document_uuid}}';
+const CHAT_PAGE_SIZE = 50;
 let _historyOpen   = false;
 let _historyItems  = [];      // loaded revisions
 let _historyBefore = null;    // pagination cursor (smallest id seen)
 let _historyDone   = false;   // no more pages
 let _pendingRevId  = null;    // revision being previewed/restored
 let _pendingContent = null;   // content of pending revision
+let _chatOpen     = false;
+let _chatItems    = [];
+let _chatBefore   = null;
+let _chatAfter    = 0;
+let _chatDone     = false;
+let _chatTotal    = 0;
+let _chatLoading  = false;
 
 function _fmtDate(ts) {
     const d = new Date(ts * 1000);
@@ -1328,6 +1424,10 @@ async function _fetchHistory(before) {
 }
 
 window.toggleHistory = async function() {
+    if (_chatOpen) {
+        _chatOpen = false;
+        document.getElementById('chat-drawer').style.display = 'none';
+    }
     const drawer = document.getElementById('history-drawer');
     _historyOpen = !_historyOpen;
     drawer.style.display = _historyOpen ? 'flex' : 'none';
@@ -1343,6 +1443,175 @@ window.toggleHistory = async function() {
         if (data.revisions.length < 50) _historyDone = true;
         _updateSlotLabel(data.total, data.max);
         _renderHistoryList();
+    }
+};
+
+function _updateChatCount() {
+    const el = document.getElementById('chat-count');
+    if (!el) return;
+    el.textContent = _chatTotal > 0 ? `${_chatTotal} messages` : 'No messages yet';
+}
+
+function _buildChatMessageNode(msg) {
+    const row = document.createElement('div');
+    row.className = 'chat-message' + (msg.username === CURRENT_USER ? ' own' : '');
+
+    const meta = document.createElement('div');
+    meta.className = 'chat-message-meta';
+
+    const author = document.createElement('span');
+    author.className = 'chat-message-author';
+    author.textContent = msg.username || 'Unknown';
+
+    const time = document.createElement('span');
+    time.textContent = _fmtDate(msg.created_at);
+
+    meta.appendChild(author);
+    meta.appendChild(time);
+
+    const body = document.createElement('div');
+    body.className = 'chat-message-text';
+    body.textContent = msg.message || '';
+
+    row.appendChild(meta);
+    row.appendChild(body);
+    return row;
+}
+
+function _renderChatList() {
+    const list = document.getElementById('chat-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (_chatItems.length === 0) {
+        list.innerHTML = '<div class="chat-empty">No messages yet. Start the conversation here.</div>';
+    } else {
+        _chatItems.forEach(msg => list.appendChild(_buildChatMessageNode(msg)));
+    }
+
+    const loadMore = document.getElementById('chat-load-more');
+    if (loadMore) loadMore.style.display = _chatDone ? 'none' : 'inline-flex';
+    _updateChatCount();
+}
+
+async function _fetchChat(params) {
+    const qs = new URLSearchParams();
+    qs.set('limit', String(CHAT_PAGE_SIZE));
+    if (params && params.before) qs.set('before', String(params.before));
+    if (params && params.after) qs.set('after', String(params.after));
+    const resp = await fetch(`/api/documents/${_docUuidForHistory}/chat?${qs.toString()}`);
+    if (!resp.ok) return { total: 0, messages: [] };
+    return resp.json();
+}
+
+async function _loadInitialChat() {
+    const list = document.getElementById('chat-list');
+    if (list) {
+        list.innerHTML = '<div class="history-loading"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin" style="opacity:.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg></div>';
+    }
+    const data = await _fetchChat(null);
+    _chatItems = (data.messages || []).slice().reverse();
+    _chatTotal = data.total || _chatItems.length;
+    _chatBefore = _chatItems.length ? _chatItems[0].id : null;
+    _chatAfter = _chatItems.length ? _chatItems[_chatItems.length - 1].id : 0;
+    _chatDone = (data.messages || []).length < CHAT_PAGE_SIZE;
+    _renderChatList();
+    if (list) list.scrollTop = list.scrollHeight;
+}
+
+window.toggleChat = async function() {
+    if (_historyOpen) {
+        _historyOpen = false;
+        document.getElementById('history-drawer').style.display = 'none';
+    }
+
+    const drawer = document.getElementById('chat-drawer');
+    _chatOpen = !_chatOpen;
+    drawer.style.display = _chatOpen ? 'flex' : 'none';
+    if (!_chatOpen) return;
+
+    if (_chatItems.length === 0 && !_chatLoading) {
+        _chatLoading = true;
+        try { await _loadInitialChat(); } finally { _chatLoading = false; }
+    } else {
+        _renderChatList();
+    }
+
+    const input = document.getElementById('chat-input');
+    if (input) input.focus();
+};
+
+window.loadMoreChat = async function() {
+    if (_chatDone || _chatLoading || !_chatBefore) return;
+    _chatLoading = true;
+    const list = document.getElementById('chat-list');
+    const prevScrollTop = list ? list.scrollTop : 0;
+    const prevScrollHeight = list ? list.scrollHeight : 0;
+    const data = await _fetchChat({ before: _chatBefore });
+    const older = (data.messages || []).slice().reverse();
+    if (older.length) {
+        _chatItems = older.concat(_chatItems);
+        _chatBefore = _chatItems[0].id;
+    }
+    _chatTotal = data.total || _chatTotal;
+    _chatDone = (data.messages || []).length < CHAT_PAGE_SIZE;
+    _renderChatList();
+    if (list) list.scrollTop = list.scrollHeight - prevScrollHeight + prevScrollTop;
+    _chatLoading = false;
+};
+
+async function pollChat() {
+    if (!_chatOpen || _chatLoading) return;
+    if (!_chatAfter) return;
+
+    const list = document.getElementById('chat-list');
+    const nearBottom = list && (list.scrollHeight - list.scrollTop - list.clientHeight < 120);
+    const prevScrollTop = list ? list.scrollTop : 0;
+    const prevScrollHeight = list ? list.scrollHeight : 0;
+    const data = await _fetchChat({ after: _chatAfter });
+    const newer = data.messages || [];
+    if (!newer.length) {
+        _chatTotal = data.total || _chatTotal;
+        _updateChatCount();
+        return;
+    }
+
+    _chatItems = _chatItems.concat(newer);
+    _chatAfter = _chatItems[_chatItems.length - 1].id;
+    _chatTotal = data.total || _chatTotal;
+    _renderChatList();
+    if (list) {
+        list.scrollTop = nearBottom ? list.scrollHeight : prevScrollTop + (list.scrollHeight - prevScrollHeight);
+    }
+}
+
+window.sendChatMessage = async function() {
+    const input = document.getElementById('chat-input');
+    const btn = document.getElementById('chat-send-btn');
+    if (!input || !btn) return;
+
+    const message = input.value.trim();
+    if (!message) return;
+
+    btn.disabled = true;
+    try {
+        const resp = await fetch(`/api/documents/${_docUuidForHistory}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message })
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        input.value = '';
+        if (_chatItems.length === 0) {
+            await _loadInitialChat();
+        } else {
+            await pollChat();
+        }
+        if (_chatOpen) input.focus();
+    } catch (e) {
+        alert('Failed to send chat message.');
+    } finally {
+        btn.disabled = false;
     }
 };
 

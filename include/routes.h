@@ -128,4 +128,7 @@ void route_api_admin_backup(http_request_t *req);
 void route_api_documents_history(http_request_t *req, const char *doc_uuid);
 void route_api_documents_history_rev(http_request_t *req, const char *doc_uuid, const char *rev_id);
 
+// Document chat
+void route_api_documents_chat(http_request_t *req, const char *doc_uuid);
+
 #endif // ROUTES_H

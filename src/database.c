@@ -199,7 +199,21 @@ static const char *SCHEMA_SQL =
     ");"
 
     "CREATE INDEX IF NOT EXISTS idx_doc_revisions_doc_ts"
-    "  ON document_revisions(document_id, saved_at DESC);";
+    "  ON document_revisions(document_id, saved_at DESC);"
+
+    // Document chat: one row per message, ordered chronologically.
+    "CREATE TABLE IF NOT EXISTS document_chat_messages ("
+    "  id          INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "  document_id INTEGER NOT NULL,"
+    "  user_id     INTEGER NOT NULL,"
+    "  message     TEXT    NOT NULL,"
+    "  created_at  INTEGER NOT NULL,"
+    "  FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,"
+    "  FOREIGN KEY (user_id)     REFERENCES users(id)"
+    ");"
+
+    "CREATE INDEX IF NOT EXISTS idx_doc_chat_doc_id"
+    "  ON document_chat_messages(document_id, id);";
 
 ldmd_database_t *db_init(const char *path) {
     ldmd_database_t *db = calloc(1, sizeof(ldmd_database_t));
