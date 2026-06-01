@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "mongoose.h"
 #include "cJSON.h"
+#include "presign.h"
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -266,6 +267,27 @@ bool routes_handle(http_request_t *req) {
         return true;
     }
 
+    // Raw document access via presigned token (no auth cookie required).
+    // Tokens are LDMD_TOKEN_LENGTH-1 = 64 hex chars — longer than LDMD_UUID_LENGTH,
+    // so we bypass uri_match() and use mg_match() directly with a proper-sized buffer.
+    {
+        char raw_token[LDMD_TOKEN_LENGTH] = {0};
+        struct mg_str raw_caps[2] = {{0}};
+        if (mg_match(req->hm->uri, mg_str("/raw/*"), raw_caps) &&
+            raw_caps[0].len > 0 && raw_caps[0].len < LDMD_TOKEN_LENGTH) {
+            memcpy(raw_token, raw_caps[0].buf, raw_caps[0].len);
+            raw_token[raw_caps[0].len] = '\0';
+            if (method_is(req, "GET")) {
+                route_raw_get(req, raw_token);
+                return true;
+            }
+            if (method_is(req, "PUT")) {
+                route_raw_put(req, raw_token);
+                return true;
+            }
+        }
+    }
+
     // ============== API Routes ==============
     
     // Auth API
@@ -422,7 +444,12 @@ bool routes_handle(http_request_t *req) {
         route_api_documents_content(req, param1);
         return true;
     }
-    
+
+    if (uri_match(req, "/api/documents/*/presign", param1, NULL) && method_is(req, "POST")) {
+        route_api_documents_presign(req, param1);
+        return true;
+    }
+
     if (uri_match(req, "/api/documents/*/render", param1, NULL) && method_is(req, "GET")) {
         route_api_documents_render(req, param1);
         return true;
@@ -3015,4 +3042,133 @@ void route_api_documents_viewers(http_request_t *req, const char *doc_uuid) {
     } else {
         http_respond_error(req->conn, 500, "Internal error");
     }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Presigned-URL: generate a 24-hour raw-access token for a document.
+ *
+ * POST /api/documents/:uuid/presign
+ * Response: { "token": "...", "expires_in": 86400 }
+ * ──────────────────────────────────────────────────────────────── */
+void route_api_documents_presign(http_request_t *req, const char *doc_uuid) {
+    if (!require_auth(req)) return;
+
+    ldmd_document_t doc;
+    if (db_document_get_by_uuid(req->server->db, doc_uuid, &doc) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Document not found");
+        return;
+    }
+
+    ldmd_project_t project;
+    db_project_get_by_id(req->server->db, doc.project_id, &project);
+
+    if (!rbac_can_access_workspace(req->server->db, req->user.id, project.workspace_id)) {
+        http_respond_error(req->conn, 403, "Access denied");
+        return;
+    }
+
+    char token[LDMD_TOKEN_LENGTH];
+    if (presign_create(doc_uuid, req->user.id, token) != LDMD_OK) {
+        http_respond_error(req->conn, 500, "Could not create presigned token");
+        return;
+    }
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddStringToObject(resp, "token", token);
+    cJSON_AddNumberToObject(resp, "expires_in", PRESIGN_EXPIRE_SECS);
+    cJSON_AddStringToObject(resp, "doc_name", doc.name);
+
+    char *body = cJSON_PrintUnformatted(resp);
+    cJSON_Delete(resp);
+    if (body) {
+        http_respond_json(req->conn, 200, body);
+        free(body);
+    } else {
+        http_respond_error(req->conn, 500, "Internal error");
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Raw content GET via presigned token – no session cookie required.
+ *
+ * GET /raw/:token
+ * Returns the document as plain text (text/plain; charset=utf-8).
+ * Sets Content-Disposition so editors / curl see the filename.
+ * ──────────────────────────────────────────────────────────────── */
+void route_raw_get(http_request_t *req, const char *token) {
+    char doc_uuid[LDMD_UUID_LENGTH];
+    if (presign_validate(token, doc_uuid) != LDMD_OK) {
+        http_respond_error(req->conn, 403, "Invalid or expired token");
+        return;
+    }
+
+    ldmd_document_t doc;
+    if (db_document_get_by_uuid(req->server->db, doc_uuid, &doc) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Document not found");
+        return;
+    }
+
+    char *content = NULL;
+    document_load_content(req->server->config, &doc, &content);
+
+    /* Sanitise doc name for use in Content-Disposition header */
+    char safe_name[LDMD_MAX_NAME + 8];
+    snprintf(safe_name, sizeof(safe_name), "%s.md", doc.name);
+    /* Replace characters that are unsafe in HTTP header values */
+    for (char *p = safe_name; *p; p++) {
+        if (*p == '"' || *p == '\\' || *p == '\r' || *p == '\n') *p = '_';
+    }
+
+    char hdrs[512];
+    snprintf(hdrs, sizeof(hdrs),
+             "Content-Type: text/plain; charset=utf-8\r\n"
+             "Content-Disposition: inline; filename=\"%s\"\r\n"
+             "Cache-Control: no-store\r\n",
+             safe_name);
+
+    const char *body = content ? content : "";
+    http_respond_raw(req->conn, 200, hdrs, body, strlen(body));
+    free(content);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Raw content PUT via presigned token – no session cookie required.
+ *
+ * PUT /raw/:token
+ * Body: raw markdown text (Content-Type: text/plain or anything).
+ * Returns 200 {"success":true} on success.
+ * ──────────────────────────────────────────────────────────────── */
+void route_raw_put(http_request_t *req, const char *token) {
+    char doc_uuid[LDMD_UUID_LENGTH];
+    if (presign_validate(token, doc_uuid) != LDMD_OK) {
+        http_respond_error(req->conn, 403, "Invalid or expired token");
+        return;
+    }
+
+    ldmd_document_t doc;
+    if (db_document_get_by_uuid(req->server->db, doc_uuid, &doc) != LDMD_OK) {
+        http_respond_error(req->conn, 404, "Document not found");
+        return;
+    }
+
+    /* Accept the raw body as new content */
+    size_t body_len = req->hm->body.len;
+    char *content = malloc(body_len + 1);
+    if (!content) {
+        http_respond_error(req->conn, 500, "Out of memory");
+        return;
+    }
+    if (body_len > 0) memcpy(content, req->hm->body.buf, body_len);
+    content[body_len] = '\0';
+
+    document_save_content(req->server->config, &doc, content);
+    free(content);
+
+    /* Record update metadata without needing a user_id (token-based access).
+     * We deliberately do not log activity here since the actor is anonymous
+     * from the session perspective. */
+    doc.updated_at = (time_t)time(NULL);
+    document_update(req->server->db, &doc);
+
+    http_respond_json(req->conn, 200, "{\"success\":true}");
 }

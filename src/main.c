@@ -5,6 +5,7 @@
 #include "auth.h"
 #include "utils.h"
 #include "mongoose.h"
+#include "presign.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -78,6 +79,7 @@ int main(int argc, char *argv[]) {
     log_set_level(debug ? LOG_DEBUG : LOG_INFO);
     
     LOG_INFO("Starting LocalDocsMD %s", LDMD_VERSION_STRING);
+    presign_init();
     
     // Load configuration
     ldmd_config_t *config = config_load(config_path);

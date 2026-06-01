@@ -60,6 +60,14 @@
                 </div>
             </div>
 
+            <button class="btn" id="presign-btn" onclick="openPresignModal()" title="Get a shareable external-edit link">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                Share Link
+            </button>
+
             {{#if can_edit}}
             <a href="/editor/{{document_uuid}}" class="btn btn-primary">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -81,6 +89,138 @@
             <div class="doc-loading">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin" style="opacity:.4"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
                 Loading&#8230;
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Presign / External-Edit Modal ───────────────────────────── -->
+<div id="presign-modal" class="modal" style="display:none" onclick="presignModalBackdrop(event)">
+    <div class="modal-content presign-modal-content">
+        <div class="modal-header">
+            <h3>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.7;flex-shrink:0">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                External Edit Link
+            </h3>
+            <button onclick="closeModal('presign-modal')" class="btn-close">&times;</button>
+        </div>
+        <div class="presign-modal-body">
+            <!-- Loading -->
+            <div id="presign-loading" class="presign-loading">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin" style="opacity:.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                Generating link&hellip;
+            </div>
+            <!-- Error -->
+            <div id="presign-error" class="presign-err" style="display:none">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Failed to generate link. Please try again.
+            </div>
+            <!-- Content -->
+            <div id="presign-content" style="display:none">
+                <p class="presign-desc">
+                    Raw read &amp; write access for <strong>24 hours</strong> — no login required. Share only with trusted collaborators.
+                </p>
+
+                <div class="presign-field-label">Raw document URL</div>
+                <div class="presign-url-row">
+                    <input id="presign-url-input" class="presign-url-input" readonly autocomplete="off" spellcheck="false">
+                    <button class="btn presign-copy-btn" id="copy-url-btn" onclick="copyPresignUrl()">Copy</button>
+                </div>
+
+                <!-- OS tabs -->
+                <div class="presign-field-label" style="margin-top:18px">Open &amp; edit in your editor</div>
+                <div class="presign-os-tabs">
+                    <button class="presign-os-tab active" onclick="switchOsTab(this,'os-mac')">macOS</button>
+                    <button class="presign-os-tab" onclick="switchOsTab(this,'os-linux')">Linux</button>
+                    <button class="presign-os-tab" onclick="switchOsTab(this,'os-win')">Windows</button>
+                    <button class="presign-os-tab" onclick="switchOsTab(this,'os-wsl')">Windows (WSL)</button>
+                </div>
+
+                <!-- ── macOS ── -->
+                <div class="presign-os-panel active" id="os-mac">
+                    <p class="presign-desc presign-desc-sm">Run in Terminal. Neovim / Helix auto-upload on every save; others upload when you close the editor.</p>
+                    <div class="presign-editor-tabs">
+                        <button class="presign-tab active" onclick="switchEditorTab(this,'mac-nvim')">Neovim</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'mac-hx')">Helix</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'mac-vsc')">VS Code</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'mac-emacs')">Emacs</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'mac-nano')">nano</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'mac-curl')">curl (read)</button>
+                    </div>
+                    <div class="presign-cmd-panel active" id="mac-nvim"><code class="presign-cmd-code" id="mac-nvim-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('mac-nvim-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="mac-hx"><code class="presign-cmd-code" id="mac-hx-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('mac-hx-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="mac-vsc"><code class="presign-cmd-code" id="mac-vsc-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('mac-vsc-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="mac-emacs"><code class="presign-cmd-code" id="mac-emacs-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('mac-emacs-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="mac-nano"><code class="presign-cmd-code" id="mac-nano-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('mac-nano-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="mac-curl"><code class="presign-cmd-code" id="mac-curl-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('mac-curl-code',this)">Copy</button></div>
+                </div>
+
+                <!-- ── Linux ── -->
+                <div class="presign-os-panel" id="os-linux">
+                    <p class="presign-desc presign-desc-sm">Run in any terminal. Neovim / Vim / Helix auto-upload on every save; others upload when you close the editor.</p>
+                    <div class="presign-editor-tabs">
+                        <button class="presign-tab active" onclick="switchEditorTab(this,'lnx-nvim')">Neovim</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'lnx-hx')">Helix</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'lnx-vim')">Vim</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'lnx-vsc')">VS Code</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'lnx-emacs')">Emacs</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'lnx-nano')">nano</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'lnx-gedit')">gedit / kate</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'lnx-curl')">curl (read)</button>
+                    </div>
+                    <div class="presign-cmd-panel active" id="lnx-nvim"><code class="presign-cmd-code" id="lnx-nvim-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('lnx-nvim-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="lnx-hx"><code class="presign-cmd-code" id="lnx-hx-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('lnx-hx-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="lnx-vim"><code class="presign-cmd-code" id="lnx-vim-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('lnx-vim-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="lnx-vsc"><code class="presign-cmd-code" id="lnx-vsc-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('lnx-vsc-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="lnx-emacs"><code class="presign-cmd-code" id="lnx-emacs-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('lnx-emacs-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="lnx-nano"><code class="presign-cmd-code" id="lnx-nano-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('lnx-nano-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="lnx-gedit"><code class="presign-cmd-code" id="lnx-gedit-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('lnx-gedit-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="lnx-curl"><code class="presign-cmd-code" id="lnx-curl-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('lnx-curl-code',this)">Copy</button></div>
+                </div>
+
+                <!-- ── Windows (PowerShell) ── -->
+                <div class="presign-os-panel" id="os-win">
+                    <p class="presign-desc presign-desc-sm">Run in PowerShell 5+ or Windows Terminal. Uploads when you close the editor.</p>
+                    <div class="presign-editor-tabs">
+                        <button class="presign-tab active" onclick="switchEditorTab(this,'win-vsc')">VS Code</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'win-npp')">Notepad++</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'win-notepad')">Notepad</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'win-curl')">curl (read)</button>
+                    </div>
+                    <div class="presign-cmd-panel active" id="win-vsc"><code class="presign-cmd-code" id="win-vsc-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('win-vsc-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="win-npp"><code class="presign-cmd-code" id="win-npp-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('win-npp-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="win-notepad"><code class="presign-cmd-code" id="win-notepad-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('win-notepad-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="win-curl"><code class="presign-cmd-code" id="win-curl-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('win-curl-code',this)">Copy</button></div>
+                </div>
+
+                <!-- ── Windows WSL ── -->
+                <div class="presign-os-panel" id="os-wsl">
+                    <p class="presign-desc presign-desc-sm">Run inside a WSL terminal (Ubuntu, Debian, etc.). Neovim / Vim / Helix auto-upload on every save.</p>
+                    <div class="presign-editor-tabs">
+                        <button class="presign-tab active" onclick="switchEditorTab(this,'wsl-nvim')">Neovim</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'wsl-hx')">Helix</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'wsl-vim')">Vim</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'wsl-vsc')">VS Code</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'wsl-emacs')">Emacs</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'wsl-nano')">nano</button>
+                        <button class="presign-tab" onclick="switchEditorTab(this,'wsl-curl')">curl (read)</button>
+                    </div>
+                    <div class="presign-cmd-panel active" id="wsl-nvim"><code class="presign-cmd-code" id="wsl-nvim-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('wsl-nvim-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="wsl-hx"><code class="presign-cmd-code" id="wsl-hx-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('wsl-hx-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="wsl-vim"><code class="presign-cmd-code" id="wsl-vim-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('wsl-vim-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="wsl-vsc"><code class="presign-cmd-code" id="wsl-vsc-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('wsl-vsc-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="wsl-emacs"><code class="presign-cmd-code" id="wsl-emacs-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('wsl-emacs-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="wsl-nano"><code class="presign-cmd-code" id="wsl-nano-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('wsl-nano-code',this)">Copy</button></div>
+                    <div class="presign-cmd-panel" id="wsl-curl"><code class="presign-cmd-code" id="wsl-curl-code"></code><button class="presign-cmd-copy" onclick="copyPresignCmd('wsl-curl-code',this)">Copy</button></div>
+                </div>
+
+                <div class="presign-notice">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    Expires in 24 hours &middot; Anyone with this link can edit this document
+                </div>
             </div>
         </div>
     </div>
@@ -278,6 +418,83 @@ kbd { display: inline-flex; align-items: center; justify-content: center; font-f
     .document-page { padding: var(--spacing-sm); }
     .toc-sidebar { display: none !important; }
     .act-dropdown-menu { right: auto; left: 0; }
+}
+
+/* ── Presign modal ───────────────────────────────────────────── */
+.presign-modal-content { max-width: 660px; }
+.presign-modal-body { padding: 20px 24px 24px; }
+.presign-loading {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--text-muted); font-size: .88rem; padding: 12px 0;
+}
+.presign-err {
+    display: flex; align-items: center; gap: 8px;
+    color: #ef4444; font-size: .85rem; padding: 10px 0;
+}
+.presign-desc { font-size: .83rem; color: var(--text-secondary); margin: 0 0 14px; line-height: 1.55; }
+.presign-desc-sm { font-size: .78rem; margin: 0 0 10px; }
+.presign-field-label { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-bottom: 6px; }
+.presign-url-row { display: flex; gap: 8px; }
+.presign-url-input {
+    flex: 1; min-width: 0;
+    padding: 7px 10px; font-size: .8rem; font-family: var(--font-mono);
+    background: var(--input-bg, var(--divider)); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); color: var(--text-color);
+    outline: none; cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.presign-copy-btn { flex-shrink: 0; }
+/* OS tabs (outer) */
+.presign-os-tabs {
+    display: flex; gap: 0; border-bottom: 2px solid var(--border-color); margin-bottom: 0;
+}
+.presign-os-tab {
+    padding: 7px 16px; background: none; border: none;
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    color: var(--text-muted); font-size: .8rem; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: color .12s, border-color .12s; white-space: nowrap;
+}
+.presign-os-tab:hover { color: var(--text-color); }
+.presign-os-tab.active { color: var(--text-color); border-bottom-color: var(--text-color); }
+.presign-os-panel { display: none; padding: 12px 0 0; }
+.presign-os-panel.active { display: block; }
+/* Editor tabs (inner) */
+.presign-editor-tabs {
+    display: flex; flex-wrap: wrap; gap: 0;
+    border-bottom: 1px solid var(--border-color); margin-bottom: 0;
+}
+.presign-tab {
+    padding: 5px 12px; background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--text-muted); font-size: .75rem; font-weight: 500; cursor: pointer;
+    font-family: inherit; transition: color .12s, border-color .12s; white-space: nowrap;
+}
+.presign-tab:hover { color: var(--text-color); }
+.presign-tab.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+/* Cmd panels */
+.presign-cmd-panel {
+    display: none; position: relative;
+    background: var(--input-bg, var(--divider)); border: 1px solid var(--border-color);
+    border-top: none; border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    padding: 12px 44px 12px 12px; margin-bottom: 14px;
+}
+.presign-cmd-panel.active { display: block; }
+.presign-cmd-code {
+    display: block; font-family: var(--font-mono); font-size: .76rem;
+    color: var(--text-color); white-space: pre-wrap; word-break: break-all;
+    line-height: 1.55; background: transparent; user-select: text;
+}
+.presign-cmd-copy {
+    position: absolute; top: 8px; right: 8px;
+    padding: 3px 8px; background: var(--card-bg); border: 1px solid var(--border-color);
+    border-radius: 4px; color: var(--text-muted); font-size: .7rem; cursor: pointer;
+    font-family: inherit; transition: color .1s, background .1s;
+}
+.presign-cmd-copy:hover { background: var(--border-color); color: var(--text-color); }
+/* Notice */
+.presign-notice {
+    display: flex; align-items: center; gap: 6px;
+    font-size: .74rem; color: var(--text-muted);
+    padding: 8px 10px; background: var(--divider);
+    border: 1px solid var(--border-color); border-radius: var(--radius-sm);
 }
 </style>
 
@@ -769,6 +986,144 @@ document.addEventListener('DOMContentLoaded', async function () {
     setInterval(ping, 15000);
     setInterval(pollViewers, 5000);
 });
+
+/* ── Presign / External-Edit ─────────────────────────────────── */
+let _presignRawUrl = '';
+
+function _bashCmds(u) {
+    const dl = `f=$(mktemp /tmp/docXXXXXX) && mv "$f" "\${f}.md" && f="\${f}.md"\ncurl -s "${u}" > "$f"`;
+    const rm = `rm -f "$f"`;
+    return {
+        nvim:  `URL="${u}"\n${dl}\nnvim -c "au BufWritePost <buffer> call jobstart(['curl','-sX','PUT','-H','Content-Type: text/plain','--data-binary','@$f','$URL'])" -c "au VimLeavePre * call jobwait([jobstart(['curl','-sX','PUT','-H','Content-Type: text/plain','--data-binary','@$f','$URL'])],5000)" "$f"\n${rm}`,
+        hx:    `URL="${u}"\n${dl}\n# Helix has no shell autocmd — loop re-uploads after each session\nwhile true; do\n  hx "$f"\n  curl -sX PUT -H "Content-Type: text/plain" --data-binary @"$f" "$URL"\n  printf 'Uploaded. Edit again? [y/N] '; read ans; [[ "$ans" != y ]] && break\ndone\n${rm}`,
+        vim:   `URL="${u}"\n${dl}\nvim -c "au BufWritePost <buffer> silent! call system('curl -sX PUT -H \\'Content-Type: text/plain\\' --data-binary @$f $URL &')" -c "au VimLeavePre * silent! call system('curl -sX PUT -H \\'Content-Type: text/plain\\' --data-binary @$f $URL')" "$f"\n${rm}`,
+        vsc:   `URL="${u}"\n${dl}\ncode --wait "$f" && curl -sX PUT -H "Content-Type: text/plain" --data-binary @"$f" "$URL"\n${rm}`,
+        emacs: `URL="${u}"\n${dl}\nemacs --eval "(progn\n  (find-file \\"$f\\")\n  (add-hook 'after-save-hook\n    (lambda () (shell-command\n      (format \\"curl -sX PUT -H 'Content-Type: text/plain' --data-binary @%s %s &\\"\n        (buffer-file-name) \\"${u}\\"))) nil t))" \\\n  --eval "(recursive-edit)"\n${rm}`,
+        nano:  `URL="${u}"\n${dl}\nnano "$f"\ncurl -sX PUT -H "Content-Type: text/plain" --data-binary @"$f" "$URL"\n${rm}`,
+        gedit: `URL="${u}"\n${dl}\ngedit "$f"\ncurl -sX PUT -H "Content-Type: text/plain" --data-binary @"$f" "$URL"\n${rm}`,
+        curl:  `curl -s "${u}"`,
+    };
+}
+
+function _psCmds(u) {
+    const dl = `$f = [IO.Path]::GetTempFileName() + ".md"\nInvoke-WebRequest -Uri "${u}" -OutFile $f`;
+    const up = `Invoke-WebRequest -Uri "${u}" -Method PUT -ContentType "text/plain" -InFile $f`;
+    const rm = `Remove-Item $f`;
+    return {
+        vsc:     `${dl}\ncode --wait $f\n${up}\n${rm}`,
+        npp:     `${dl}\nStart-Process -Wait "C:\\Program Files\\Notepad++\\notepad++.exe" $f\n${up}\n${rm}`,
+        notepad: `${dl}\nStart-Process -Wait notepad $f\n${up}\n${rm}`,
+        curl:    `curl.exe -s "${u}"`,
+    };
+}
+
+window.openPresignModal = async function() {
+    const modal   = document.getElementById('presign-modal');
+    const loading = document.getElementById('presign-loading');
+    const content = document.getElementById('presign-content');
+    const errEl   = document.getElementById('presign-error');
+
+    modal.style.display = 'flex';
+    loading.style.display = 'flex';
+    content.style.display  = 'none';
+    errEl.style.display    = 'none';
+
+    try {
+        const resp = await fetch('/api/documents/' + DOC_UUID + '/presign', { method: 'POST' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+
+        const origin = window.location.origin;
+        _presignRawUrl = origin + '/raw/' + data.token;
+        document.getElementById('presign-url-input').value = _presignRawUrl;
+
+        const b  = _bashCmds(_presignRawUrl);
+        const ps = _psCmds(_presignRawUrl);
+
+        // macOS
+        document.getElementById('mac-nvim-code').textContent  = b.nvim;
+        document.getElementById('mac-hx-code').textContent    = b.hx;
+        document.getElementById('mac-vsc-code').textContent   = b.vsc;
+        document.getElementById('mac-emacs-code').textContent = b.emacs;
+        document.getElementById('mac-nano-code').textContent  = b.nano;
+        document.getElementById('mac-curl-code').textContent  = b.curl;
+        // Linux
+        document.getElementById('lnx-nvim-code').textContent  = b.nvim;
+        document.getElementById('lnx-hx-code').textContent    = b.hx;
+        document.getElementById('lnx-vim-code').textContent   = b.vim;
+        document.getElementById('lnx-vsc-code').textContent   = b.vsc;
+        document.getElementById('lnx-emacs-code').textContent = b.emacs;
+        document.getElementById('lnx-nano-code').textContent  = b.nano;
+        document.getElementById('lnx-gedit-code').textContent = b.gedit;
+        document.getElementById('lnx-curl-code').textContent  = b.curl;
+        // Windows PS
+        document.getElementById('win-vsc-code').textContent     = ps.vsc;
+        document.getElementById('win-npp-code').textContent     = ps.npp;
+        document.getElementById('win-notepad-code').textContent = ps.notepad;
+        document.getElementById('win-curl-code').textContent    = ps.curl;
+        // WSL
+        document.getElementById('wsl-nvim-code').textContent  = b.nvim;
+        document.getElementById('wsl-hx-code').textContent    = b.hx;
+        document.getElementById('wsl-vim-code').textContent   = b.vim;
+        document.getElementById('wsl-vsc-code').textContent   = b.vsc;
+        document.getElementById('wsl-emacs-code').textContent = b.emacs;
+        document.getElementById('wsl-nano-code').textContent  = b.nano;
+        document.getElementById('wsl-curl-code').textContent  = b.curl;
+
+        // Reset all OS panels to first editor tab
+        document.querySelectorAll('.presign-os-panel').forEach(panel => {
+            panel.querySelectorAll('.presign-tab').forEach((t,i) => t.classList.toggle('active', i===0));
+            panel.querySelectorAll('.presign-cmd-panel').forEach((p,i) => p.classList.toggle('active', i===0));
+        });
+        // Reset OS tab to first (macOS)
+        document.querySelectorAll('.presign-os-tab').forEach((t,i) => t.classList.toggle('active', i===0));
+        document.querySelectorAll('.presign-os-panel').forEach((p,i) => p.classList.toggle('active', i===0));
+
+        loading.style.display = 'none';
+        content.style.display = 'block';
+    } catch(e) {
+        loading.style.display = 'none';
+        errEl.style.display   = 'flex';
+    }
+};
+
+window.copyPresignUrl = function() {
+    if (!_presignRawUrl) return;
+    navigator.clipboard.writeText(_presignRawUrl).then(() => {
+        const btn = document.getElementById('copy-url-btn');
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+    });
+};
+
+window.copyPresignCmd = function(id, btn) {
+    const text = document.getElementById(id).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+    });
+};
+
+window.switchOsTab = function(tabEl, panelId) {
+    document.querySelectorAll('.presign-os-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.presign-os-panel').forEach(p => p.classList.remove('active'));
+    tabEl.classList.add('active');
+    document.getElementById(panelId).classList.add('active');
+};
+
+window.switchEditorTab = function(tabEl, panelId) {
+    const osPanel = tabEl.closest('.presign-os-panel');
+    osPanel.querySelectorAll('.presign-tab').forEach(t => t.classList.remove('active'));
+    osPanel.querySelectorAll('.presign-cmd-panel').forEach(p => p.classList.remove('active'));
+    tabEl.classList.add('active');
+    document.getElementById(panelId).classList.add('active');
+};
+
+window.presignModalBackdrop = function(e) {
+    if (e.target === document.getElementById('presign-modal')) closeModal('presign-modal');
+};
 
 })();
 </script>

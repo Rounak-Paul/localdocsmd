@@ -114,4 +114,11 @@ void route_api_search(http_request_t *req);
 // Search page
 void route_page_search(http_request_t *req);
 
+// Presigned URL: generate a 24-hour single-token link for a document
+void route_api_documents_presign(http_request_t *req, const char *doc_uuid);
+
+// Raw document content via presigned token (no auth cookie required)
+void route_raw_get(http_request_t *req, const char *token);
+void route_raw_put(http_request_t *req, const char *token);
+
 #endif // ROUTES_H

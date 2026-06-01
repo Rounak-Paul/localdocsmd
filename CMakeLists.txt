@@ -38,6 +38,7 @@ set(SOURCES
     src/routes.c
     src/utils.c
     src/template.c
+    src/presign.c
     vendor/mongoose.c
     vendor/cJSON.c
     vendor/md4c.c
