@@ -51,11 +51,24 @@ Client→Server:
 - Main thread drains notify queue in collab_tick (called every poll iteration ~100ms)
 - All OT transform+apply on main thread — no cross-thread content access
 
-## Flush Strategy
+## Flush + Session Lifetime Strategy
 - collab_tick() called every mg_mgr_poll (100ms)
 - Dirty docs flushed every COLLAB_FLUSH_SECS(30)s while clients active
 - Immediate flush when last client disconnects
 - On flush: document_audit_snapshot (5-min debounce), atomic file write (utils_write_file), db_document_save_flush (increments version)
+- After last client disconnects, session stays alive for COLLAB_SESSION_GRACE_SECS(10)s before eviction
+  - Allows page-refresh to reconnect to in-memory canonical content via WS init (avoids stale disk read)
+  - collab_tick() evicts after grace period by calling free_doc_content + pthread_mutex_destroy + active=false
+
+## Null Byte Protection
+- HTTP PUT /api/documents/:uuid/content: raw body scanned for \0 before JSON parse; 400 returned if found
+- raw PUT /raw/:token: body scanned for \0 after copy; 400 returned if found
+
+## Frontend Sync Guarantee
+- Editor readOnly=true on page load until WS init fires
+- WS init (first connect): always applies server canonical content unconditionally, then readOnly=false
+- WS onclose (if init never received): readOnly=false to allow offline editing
+- Ctrl+S / saveDocument() is a no-op when WS is connected (shows "● Live"); only runs HTTP PUT when offline
 
 ## Raw Path Attribution
 presign_validate() now returns user_id alongside doc_uuid.

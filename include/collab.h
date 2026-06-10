@@ -8,10 +8,14 @@
 #include <pthread.h>
 #include <time.h>
 
-#define COLLAB_MAX_DOCS      64
-#define COLLAB_MAX_CLIENTS   32
-#define COLLAB_OP_HISTORY    500
-#define COLLAB_FLUSH_SECS    30
+#define COLLAB_MAX_DOCS           64
+#define COLLAB_MAX_CLIENTS        32
+#define COLLAB_OP_HISTORY         2000
+#define COLLAB_FLUSH_SECS         30
+/* Session stays alive this many seconds after the last client disconnects.
+ * Ensures a page refresh reconnects to the in-memory canonical content
+ * rather than potentially stale on-disk content. */
+#define COLLAB_SESSION_GRACE_SECS 10
 
 /**
  * Per-WebSocket-connection metadata stored in mg_connection->data as a pointer.
@@ -55,6 +59,7 @@ typedef struct {
     bool             active;
     bool             dirty;
     time_t           last_activity;
+    time_t           last_empty_at;  /* when client_count dropped to zero */
     collab_client_t  clients[COLLAB_MAX_CLIENTS];
     int              client_count;
     collab_op_t      ops[COLLAB_OP_HISTORY];

@@ -2058,13 +2058,18 @@ void route_api_documents_content(http_request_t *req, const char *doc_uuid) {
             http_respond_error(req->conn, 403, "Edit access required");
             return;
         }
-        
+
+        if (memchr(req->hm->body.buf, '\0', req->hm->body.len)) {
+            http_respond_error(req->conn, 400, "Content must not contain null bytes");
+            return;
+        }
+
         cJSON *json = parse_json_body(req);
         if (!json) {
             http_respond_error(req->conn, 400, "Invalid JSON");
             return;
         }
-        
+
         const char *content_str = json_get_string(json, "content");
         if (!content_str) content_str = "";
         document_audit_snapshot(req->server->db, &doc, req->user.id);
@@ -3202,6 +3207,12 @@ void route_raw_put(http_request_t *req, const char *token) {
     }
     if (body_len > 0) memcpy(content, req->hm->body.buf, body_len);
     content[body_len] = '\0';
+
+    if (memchr(content, '\0', body_len)) {
+        free(content);
+        http_respond_error(req->conn, 400, "Content must not contain null bytes");
+        return;
+    }
 
     document_audit_snapshot(req->server->db, &doc, presign_user_id);
     document_save_content(req->server->config, &doc, content);

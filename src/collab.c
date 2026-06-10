@@ -165,7 +165,10 @@ static void flush_doc(collab_doc_t *doc, ldmd_database_t *db, ldmd_config_t *cfg
     }
 
     document_audit_snapshot(db, &ldoc, last_user);
-    document_save_content(cfg, &ldoc, doc->content);
+    if (document_save_content(cfg, &ldoc, doc->content) != LDMD_OK) {
+        LOG_INFO("collab: flush FAILED for %s — will retry", doc->doc_uuid);
+        return; /* keep dirty=true so the next tick retries */
+    }
     db_document_save_flush(db, ldoc.id, last_user, (time_t)time(NULL));
 
     doc->dirty = false;
@@ -413,20 +416,18 @@ void collab_ws_disconnect(collab_manager_t *cm, ldmd_database_t *db, ldmd_config
 
     bool empty = (doc->client_count == 0);
 
-    if (empty && doc->dirty) {
-        flush_doc(doc, db, cfg);
+    if (empty) {
+        if (doc->dirty) flush_doc(doc, db, cfg);
+        doc->last_empty_at = time(NULL);
+        /* Don't evict here — keep the session alive through the grace period so
+         * a page refresh reconnects to the in-memory canonical content instead
+         * of reading stale on-disk content.  collab_tick() handles eviction. */
     }
 
     pthread_mutex_unlock(&doc->mutex);
 
     if (!empty) {
         broadcast_presence(doc);
-    }
-
-    if (empty) {
-        free_doc_content(doc);
-        pthread_mutex_destroy(&doc->mutex);
-        doc->active = false;
     }
 
     pthread_mutex_unlock(&cm->docs_mutex);
@@ -524,15 +525,35 @@ void collab_ws_message(collab_manager_t *cm, struct mg_connection *c,
 
     /* Apply transformed ops to canonical content */
     char *new_content = doc->content ? strdup(doc->content) : strdup("");
+    if (!new_content) {
+        pthread_mutex_unlock(&doc->mutex);
+        pthread_mutex_unlock(&cm->docs_mutex);
+        for (int i = 0; i < valid_ops; i++)
+            if (client_ops[i].type == 'i') free(client_ops[i].text);
+        free(client_ops);
+        cJSON_Delete(msg);
+        return;
+    }
+    bool oom = false;
     for (int i = 0; i < valid_ops; i++) {
         char *tmp = apply_op(new_content, &client_ops[i]);
+        if (!tmp) { oom = true; break; }
         free(new_content);
-        new_content = tmp ? tmp : strdup("");
+        new_content = tmp;
         /* Clamp positions for subsequent ops */
-        int nc_len = new_content ? (int)strlen(new_content) : 0;
-        if (i + 1 < valid_ops) {
-            if (client_ops[i+1].pos > nc_len) client_ops[i+1].pos = nc_len;
-        }
+        int nc_len = (int)strlen(new_content);
+        if (i + 1 < valid_ops && client_ops[i+1].pos > nc_len)
+            client_ops[i+1].pos = nc_len;
+    }
+    if (oom) {
+        free(new_content);
+        pthread_mutex_unlock(&doc->mutex);
+        pthread_mutex_unlock(&cm->docs_mutex);
+        for (int i = 0; i < valid_ops; i++)
+            if (client_ops[i].type == 'i') free(client_ops[i].text);
+        free(client_ops);
+        cJSON_Delete(msg);
+        return;
     }
 
     free(doc->content);
@@ -648,25 +669,35 @@ void collab_tick(collab_manager_t *cm, ldmd_database_t *db, ldmd_config_t *cfg) 
         queue = next;
     }
 
-    /* ── Periodic flush ── */
+    /* ── Periodic flush and grace-period eviction ── */
     time_t now = time(NULL);
     pthread_mutex_lock(&cm->docs_mutex);
     for (int i = 0; i < COLLAB_MAX_DOCS; i++) {
         collab_doc_t *doc = &cm->docs[i];
-        if (!doc->active || !doc->dirty) continue;
+        if (!doc->active) continue;
 
         bool has_clients = (doc->client_count > 0);
-        time_t idle = now - doc->last_activity;
 
-        if (!has_clients || idle >= COLLAB_FLUSH_SECS) {
-            pthread_mutex_lock(&doc->mutex);
-            flush_doc(doc, db, cfg);
-            pthread_mutex_unlock(&doc->mutex);
-
-            if (!has_clients) {
+        if (!has_clients) {
+            /* Fallback flush in case disconnect somehow left dirty state. */
+            if (doc->dirty) {
+                pthread_mutex_lock(&doc->mutex);
+                flush_doc(doc, db, cfg);
+                pthread_mutex_unlock(&doc->mutex);
+            }
+            /* Evict only after the grace period expires. */
+            if (now - doc->last_empty_at >= COLLAB_SESSION_GRACE_SECS) {
                 free_doc_content(doc);
                 pthread_mutex_destroy(&doc->mutex);
                 doc->active = false;
+            }
+        } else if (doc->dirty) {
+            /* Periodic flush while clients are active. */
+            time_t idle = now - doc->last_activity;
+            if (idle >= COLLAB_FLUSH_SECS) {
+                pthread_mutex_lock(&doc->mutex);
+                flush_doc(doc, db, cfg);
+                pthread_mutex_unlock(&doc->mutex);
             }
         }
     }
