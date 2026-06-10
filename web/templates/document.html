@@ -210,6 +210,12 @@
     </div>
 </div>
 
+<!-- ── Zoom/Pan Lightbox ──────────────────────────────────────── -->
+<div id="zoom-lightbox" class="zoom-lightbox" style="display:none" onclick="closeLightboxBackdrop(event)">
+    <button class="zoom-lightbox-close" onclick="closeLightbox()">&times;</button>
+    <div id="zoom-lightbox-inner" class="zoom-lightbox-inner"></div>
+</div>
+
 <!-- ── Presign / External-Edit Modal ───────────────────────────── -->
 <div id="presign-modal" class="modal" style="display:none" onclick="presignModalBackdrop(event)">
     <div class="modal-content presign-modal-content">
@@ -488,8 +494,34 @@ main.container { padding: 0; height: calc(100vh - 64px); overflow: hidden; }
 .line-content { display: inline; }
 
 /* ── Mermaid ─────────────────────────────────────────────────── */
-.mermaid { background: var(--divider); border-radius: 8px; padding: 16px; margin: 16px 0; text-align: center; overflow-x: auto; }
-.mermaid-error { color: #ef4444; font-size: .8rem; padding: 8px; text-align: center; }
+.mermaid { background: var(--divider); border-radius: 8px; padding: 16px; margin: 16px 0; text-align: center; overflow-x: auto; cursor: zoom-in; }
+.mermaid-error { color: #ef4444; font-size: .8rem; padding: 8px; text-align: center; cursor: default; }
+
+/* ── Zoom/Pan Lightbox ───────────────────────────────────────── */
+.zoom-lightbox {
+    position: fixed; inset: 0; background: rgba(0,0,0,.88);
+    z-index: 2000; display: flex; align-items: center; justify-content: center;
+    overflow: hidden; cursor: grab;
+}
+.zoom-lightbox.dragging { cursor: grabbing; }
+.zoom-lightbox-close {
+    position: absolute; top: 16px; right: 20px; z-index: 2001;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+    color: #fff; font-size: 1.3rem; width: 36px; height: 36px;
+    border-radius: 50%; cursor: pointer; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+}
+.zoom-lightbox-close:hover { background: rgba(255,255,255,.25); }
+.zoom-lightbox-inner {
+    transform-origin: 50% 50%;
+    will-change: transform;
+    user-select: none;
+    display: flex; align-items: center; justify-content: center;
+}
+.zoom-lightbox-inner img { display: block; border-radius: 4px; cursor: default; }
+.zoom-lightbox-inner svg { display: block; cursor: default; }
+.markdown-body img { cursor: zoom-in; }
 
 /* ── Plots ───────────────────────────────────────────────────── */
 .plot-container { margin: 16px 0; border-radius: 8px; overflow: visible; }
@@ -787,37 +819,184 @@ window.downloadMd = function() {
     a.click();
     URL.revokeObjectURL(a.href);
 };
-window.downloadHtml = function() {
+window.downloadHtml = async function() {
     document.querySelectorAll('.act-dropdown-menu.open').forEach(m => m.classList.remove('open'));
-    const html = `<!DOCTYPE html>\n<html>\n<head><meta charset="UTF-8"><title>${DOC_NAME}</title></head>\n<body>\n${contentEl.innerHTML}\n</body>\n</html>`;
+
+    // Fetch each external stylesheet and inline it. Rewrite relative URLs (fonts, images)
+    // to absolute so they resolve when the file is opened from disk.
+    const linkEls = Array.from(document.querySelectorAll('link[rel="stylesheet"]'));
+    const fetchedCss = await Promise.all(linkEls.map(async el => {
+        try {
+            const resp = await fetch(el.href);
+            if (!resp.ok) throw new Error(resp.status);
+            let css = await resp.text();
+            const base = el.href.substring(0, el.href.lastIndexOf('/') + 1);
+            // Rewrite relative url(...) references to absolute
+            css = css.replace(
+                /url\(\s*(['"]?)(?!data:|https?:\/\/|\/\/)([^)'"]+)\1\s*\)/g,
+                (_, q, path) => `url(${q}${new URL(path, base).href}${q})`
+            );
+            return css;
+        } catch (_) {
+            return `/* could not inline ${el.href} */`;
+        }
+    }));
+
+    const inlineCss = Array.from(document.querySelectorAll('style'))
+        .map(s => s.textContent).join('\n');
+
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+
+    // Overrides that make the standalone file usable: the app CSS locks overflow:hidden
+    // on html/body and uses flex page layout assuming the nav chrome is present. Undo all
+    // of that so the exported file is a normal scrollable page.
+    const standaloneOverride = `
+html, body { overflow: auto !important; height: auto !important; min-height: 100%; }
+.doc-content {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 28px 36px !important;
+    box-sizing: border-box;
+}`;
+
+    const html = `<!DOCTYPE html>
+<html data-theme="${escHtml(currentTheme)}">
+<head>
+  <meta charset="UTF-8">
+  <title>${escHtml(DOC_NAME)}</title>
+  <style>
+${fetchedCss.join('\n')}
+${inlineCss}
+${standaloneOverride}
+  </style>
+</head>
+<body>
+${contentEl.outerHTML}
+</body>
+</html>`;
+
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
-    a.download = DOC_NAME + '.html';
+    a.download = DOC_NAME.replace(/\.md$/i, '') + '.html';
     a.click();
     URL.revokeObjectURL(a.href);
 };
 window.downloadPdf = function() {
     document.querySelectorAll('.act-dropdown-menu.open').forEach(m => m.classList.remove('open'));
     if (typeof html2pdf === 'undefined') { alert('PDF library not loaded'); return; }
+
     const filename = DOC_NAME.replace(/\.md$/i, '') + '.pdf';
-    // Probe to get the fully-resolved card background
+
+    // Resolve background colour from theme.
     const probe = document.createElement('div');
     probe.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;background:var(--card-bg)';
     document.body.appendChild(probe);
     const bgColor = getComputedStyle(probe).backgroundColor;
     document.body.removeChild(probe);
-    // Override any !important transparent rules with !important inline
+
+    // Capture contentEl directly. Use the real viewport width so html2canvas does
+    // not reflow the page layout (which would misplace the element and cause the
+    // captured canvas to start from the wrong x origin).
+    const viewportW = document.documentElement.clientWidth;
+
+    // Inner width of contentEl, used to constrain mermaid SVGs.
+    const docCs = getComputedStyle(contentEl);
+    const innerW = Math.max(1,
+        contentEl.clientWidth
+        - parseFloat(docCs.paddingLeft)
+        - parseFloat(docCs.paddingRight)
+    );
+
+    // Scale mermaid SVGs to fit innerW before capture; restore after.
+    const svgSaves = [];
+    contentEl.querySelectorAll('.mermaid').forEach(container => {
+        const svg = container.querySelector('svg');
+        if (!svg) return;
+
+        const cs = getComputedStyle(container);
+        const availW = Math.max(1, Math.floor(
+            innerW - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+        ));
+
+        let dispW = 0, dispH = 0;
+        const vb = svg.getAttribute('viewBox');
+        if (vb) {
+            const parts = vb.trim().split(/[\s,]+/);
+            if (parts.length >= 4) {
+                const natW = parseFloat(parts[2]);
+                const natH = parseFloat(parts[3]);
+                if (natW > 0 && natH > 0) {
+                    const s = Math.min(1, availW / natW);
+                    dispW = Math.round(natW * s);
+                    dispH = Math.round(natH * s);
+                }
+            }
+        }
+        if (!dispW || !dispH) {
+            const attrW = parseFloat(svg.getAttribute('width'));
+            const attrH = parseFloat(svg.getAttribute('height'));
+            if (attrW > 0 && attrH > 0) {
+                const s = Math.min(1, availW / attrW);
+                dispW = Math.round(attrW * s);
+                dispH = Math.round(attrH * s);
+            } else {
+                dispW = availW;
+                dispH = 200;
+            }
+        }
+
+        svgSaves.push({
+            svg, container,
+            origW:        svg.getAttribute('width'),
+            origH:        svg.getAttribute('height'),
+            origStyle:    svg.getAttribute('style'),
+            origOverflow: container.style.overflow,
+        });
+
+        svg.setAttribute('width',  dispW);
+        svg.setAttribute('height', dispH);
+        svg.style.width    = dispW + 'px';
+        svg.style.height   = dispH + 'px';
+        svg.style.maxWidth = 'none';
+        container.style.overflow = 'hidden';
+    });
+
+    // Reset element scroll so the capture starts from the top.
+    const savedScrollTop  = contentEl.scrollTop;
+    const savedScrollLeft = contentEl.scrollLeft;
+    contentEl.scrollTop  = 0;
+    contentEl.scrollLeft = 0;
+
     contentEl.style.setProperty('background', bgColor, 'important');
-    const opt = {
-        margin:      0,
-        filename:    filename,
-        image:       { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: bgColor },
-        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
+
+    const restore = () => {
+        contentEl.style.removeProperty('background');
+        contentEl.scrollTop  = savedScrollTop;
+        contentEl.scrollLeft = savedScrollLeft;
+        svgSaves.forEach(({ svg, container, origW, origH, origStyle, origOverflow }) => {
+            if (origW     !== null) svg.setAttribute('width',  origW);  else svg.removeAttribute('width');
+            if (origH     !== null) svg.setAttribute('height', origH);  else svg.removeAttribute('height');
+            if (origStyle !== null) svg.setAttribute('style',  origStyle); else svg.removeAttribute('style');
+            container.style.overflow = origOverflow;
+        });
     };
-    html2pdf().set(opt).from(contentEl).save()
-        .then(() => { contentEl.style.removeProperty('background'); })
-        .catch(() => { contentEl.style.removeProperty('background'); });
+
+    html2pdf().set({
+        // 15 mm left/right margins prevent content from touching the page edge.
+        margin:   [10, 15, 10, 15],
+        filename,
+        image:    { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+            scale: 2, useCORS: true, logging: false,
+            backgroundColor: bgColor,
+            scrollX: 0, scrollY: 0,
+            windowWidth: viewportW,
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    }).from(contentEl).save().then(restore).catch(restore);
 };
 
 /* ── Tab groups ──────────────────────────────────────────────── */
@@ -961,6 +1140,17 @@ function postProcess(container) {
         div.className = 'plot-container'; div.setAttribute('data-source', src);
         code.parentElement.replaceWith(div);
     });
+    container.querySelectorAll('img').forEach(img => {
+        img.addEventListener('click', () => {
+            const clone = new Image();
+            clone.src = img.src;
+            clone.alt = img.alt;
+            const maxW = window.innerWidth  * 0.9;
+            const maxH = window.innerHeight * 0.9;
+            clone.style.cssText = `max-width:${maxW}px;max-height:${maxH}px;border-radius:4px;display:block;cursor:default`;
+            openLightbox(clone);
+        });
+    });
     container.querySelectorAll('pre').forEach(pre => {
         const btn = document.createElement('button');
         btn.className = 'code-copy-btn'; btn.textContent = 'Copy';
@@ -1010,6 +1200,14 @@ async function renderMermaid() {
             const id = 'md-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
             const { svg } = await window._mermaid.render(id, src);
             div.innerHTML = svg;
+            const svgEl = div.querySelector('svg');
+            if (svgEl) {
+                div.addEventListener('click', () => {
+                    const clone = svgEl.cloneNode(true);
+                    clone.style.cssText = 'display:block;cursor:default';
+                    openLightbox(clone);
+                });
+            }
         } catch(e) { div.innerHTML = `<div class="mermaid-error">Mermaid error: ${e.message}</div>`; }
     }
 }
@@ -1700,6 +1898,133 @@ window.doRestore = async function() {
 window.historyModalBackdrop = function(e) {
     if (e.target === document.getElementById('history-modal')) closeModal('history-modal');
 };
+
+/* ── Zoom/Pan Lightbox ───────────────────────────────────────── */
+// For SVG content: zoom by updating element dimensions (forces browser re-render at display size).
+// For raster images: zoom via CSS transform scale (vectors re-render natively; rasters upscale).
+let _lbScale = 1, _lbOffX = 0, _lbOffY = 0;
+let _lbDragging = false, _lbDragMoved = false;
+let _lbDragOrigin = { x: 0, y: 0 };
+let _lbSvgMode = false, _lbSvgInitW = 0, _lbSvgInitH = 0;
+
+function openLightbox(node) {
+    const lb    = document.getElementById('zoom-lightbox');
+    const inner = document.getElementById('zoom-lightbox-inner');
+    inner.innerHTML = '';
+    _lbScale = 1; _lbOffX = 0; _lbOffY = 0;
+
+    _lbSvgMode = node.tagName && node.tagName.toLowerCase() === 'svg';
+    if (_lbSvgMode) {
+        const vb = node.getAttribute('viewBox');
+        if (vb) {
+            const parts = vb.trim().split(/[\s,]+/);
+            if (parts.length >= 4) {
+                const natW = parseFloat(parts[2]);
+                const natH = parseFloat(parts[3]);
+                const maxW = window.innerWidth  * 0.9;
+                const maxH = window.innerHeight * 0.9;
+                const fit  = Math.min(maxW / natW, maxH / natH);
+                _lbSvgInitW = Math.round(natW * fit);
+                _lbSvgInitH = Math.round(natH * fit);
+                node.setAttribute('width',  _lbSvgInitW);
+                node.setAttribute('height', _lbSvgInitH);
+                node.style.maxWidth  = 'none';
+                node.style.maxHeight = 'none';
+            }
+        }
+    } else {
+        _lbSvgInitW = 0; _lbSvgInitH = 0;
+    }
+
+    inner.appendChild(node);
+    inner.style.transform = '';
+    lb.style.display = 'flex';
+    lb.addEventListener('wheel',     _lbOnWheel,     { passive: false });
+    lb.addEventListener('mousedown', _lbOnMousedown);
+    document.addEventListener('mousemove', _lbOnMousemove);
+    document.addEventListener('mouseup',   _lbOnMouseup);
+}
+
+window.closeLightbox = function() {
+    const lb    = document.getElementById('zoom-lightbox');
+    const inner = document.getElementById('zoom-lightbox-inner');
+    lb.removeEventListener('wheel',     _lbOnWheel);
+    lb.removeEventListener('mousedown', _lbOnMousedown);
+    document.removeEventListener('mousemove', _lbOnMousemove);
+    document.removeEventListener('mouseup',   _lbOnMouseup);
+    lb.style.display = 'none';
+    inner.innerHTML = '';
+    _lbSvgMode = false;
+};
+
+window.closeLightboxBackdrop = function(e) {
+    if (_lbDragMoved) { _lbDragMoved = false; return; }
+    if (e.target === document.getElementById('zoom-lightbox')) closeLightbox();
+};
+
+function _lbApplyTransform() {
+    const inner = document.getElementById('zoom-lightbox-inner');
+    if (!inner) return;
+    // SVG: dimension updates handle scale; transform is translate-only so the browser
+    // re-rasterizes the vector at the actual display size on each zoom step.
+    if (_lbSvgMode) {
+        inner.style.transform = `translate(${_lbOffX}px,${_lbOffY}px)`;
+    } else {
+        inner.style.transform = `translate(${_lbOffX}px,${_lbOffY}px) scale(${_lbScale})`;
+    }
+}
+
+function _lbOnWheel(e) {
+    e.preventDefault();
+    const lb   = document.getElementById('zoom-lightbox');
+    const rect = lb.getBoundingClientRect();
+    const mx   = e.clientX - rect.left - rect.width  / 2;
+    const my   = e.clientY - rect.top  - rect.height / 2;
+    const factor   = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    const newScale = Math.min(12, Math.max(0.08, _lbScale * factor));
+    _lbOffX = mx - (mx - _lbOffX) * (newScale / _lbScale);
+    _lbOffY = my - (my - _lbOffY) * (newScale / _lbScale);
+    _lbScale = newScale;
+    if (_lbSvgMode && _lbSvgInitW) {
+        const svg = document.querySelector('#zoom-lightbox-inner svg');
+        if (svg) {
+            svg.setAttribute('width',  Math.round(_lbSvgInitW * newScale));
+            svg.setAttribute('height', Math.round(_lbSvgInitH * newScale));
+        }
+    }
+    _lbApplyTransform();
+}
+
+function _lbOnMousedown(e) {
+    if (e.button !== 0 || e.target.classList.contains('zoom-lightbox-close')) return;
+    _lbDragging  = true;
+    _lbDragMoved = false;
+    _lbDragOrigin = { x: e.clientX - _lbOffX, y: e.clientY - _lbOffY };
+    document.getElementById('zoom-lightbox').classList.add('dragging');
+    e.preventDefault();
+}
+
+function _lbOnMousemove(e) {
+    if (!_lbDragging) return;
+    _lbOffX = e.clientX - _lbDragOrigin.x;
+    _lbOffY = e.clientY - _lbDragOrigin.y;
+    _lbDragMoved = true;
+    _lbApplyTransform();
+}
+
+function _lbOnMouseup() {
+    if (!_lbDragging) return;
+    _lbDragging = false;
+    const lb = document.getElementById('zoom-lightbox');
+    if (lb) lb.classList.remove('dragging');
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const lb = document.getElementById('zoom-lightbox');
+        if (lb && lb.style.display !== 'none') { e.stopPropagation(); closeLightbox(); }
+    }
+});
 
 })();
 </script>
