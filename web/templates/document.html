@@ -902,51 +902,38 @@ window.downloadPdf = function() {
     // captured canvas to start from the wrong x origin).
     const viewportW = document.documentElement.clientWidth;
 
-    // Inner width of contentEl, used to constrain mermaid SVGs.
-    const docCs = getComputedStyle(contentEl);
-    const innerW = Math.max(1,
-        contentEl.clientWidth
-        - parseFloat(docCs.paddingLeft)
-        - parseFloat(docCs.paddingRight)
-    );
-
-    // Scale mermaid SVGs to fit innerW before capture; restore after.
+    // Scale mermaid SVGs before capture; restore after.
     const svgSaves = [];
     contentEl.querySelectorAll('.mermaid').forEach(container => {
         const svg = container.querySelector('svg');
         if (!svg) return;
 
-        const cs = getComputedStyle(container);
-        const availW = Math.max(1, Math.floor(
-            innerW - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
-        ));
+        // getBoundingClientRect gives the actual rendered width regardless of scroll
+        // position — more accurate than deriving it through a clientWidth chain.
+        const cs       = getComputedStyle(container);
+        const contRect = container.getBoundingClientRect();
+        const availW   = Math.max(1, Math.floor(
+            contRect.width
+            - parseFloat(cs.paddingLeft)
+            - parseFloat(cs.paddingRight)
+        ) - 1); // 1 px guard for sub-pixel rounding
+        const availH   = Math.round(availW * (277 / 180)); // one A4 usable-page height at same scale
 
-        let dispW = 0, dispH = 0;
+        // Natural dimensions: prefer viewBox (always correct), fall back to attributes.
+        let natW = 0, natH = 0;
         const vb = svg.getAttribute('viewBox');
         if (vb) {
             const parts = vb.trim().split(/[\s,]+/);
-            if (parts.length >= 4) {
-                const natW = parseFloat(parts[2]);
-                const natH = parseFloat(parts[3]);
-                if (natW > 0 && natH > 0) {
-                    const s = Math.min(1, availW / natW);
-                    dispW = Math.round(natW * s);
-                    dispH = Math.round(natH * s);
-                }
-            }
+            if (parts.length >= 4) { natW = parseFloat(parts[2]); natH = parseFloat(parts[3]); }
         }
-        if (!dispW || !dispH) {
-            const attrW = parseFloat(svg.getAttribute('width'));
-            const attrH = parseFloat(svg.getAttribute('height'));
-            if (attrW > 0 && attrH > 0) {
-                const s = Math.min(1, availW / attrW);
-                dispW = Math.round(attrW * s);
-                dispH = Math.round(attrH * s);
-            } else {
-                dispW = availW;
-                dispH = 200;
-            }
+        if (!natW || !natH) {
+            natW = parseFloat(svg.getAttribute('width'))  || availW;
+            natH = parseFloat(svg.getAttribute('height')) || availH;
         }
+
+        const s     = Math.min(1, availW / natW, availH / natH);
+        const dispW = Math.round(natW * s);
+        const dispH = Math.round(natH * s);
 
         svgSaves.push({
             svg, container,
@@ -986,11 +973,11 @@ window.downloadPdf = function() {
 
     html2pdf().set({
         // 15 mm left/right margins prevent content from touching the page edge.
-        margin:   [10, 15, 10, 15],
+        margin:   [0, 0, 0, 0],
         filename,
-        image:    { type: 'jpeg', quality: 0.98 },
+        image:    { type: 'jpeg' },
         html2canvas: {
-            scale: 2, useCORS: true, logging: false,
+            scale: 3, useCORS: true, logging: false,
             backgroundColor: bgColor,
             scrollX: 0, scrollY: 0,
             windowWidth: viewportW,
