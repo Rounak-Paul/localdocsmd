@@ -36,11 +36,13 @@ ldmd_error_t presign_create(const char *doc_uuid, int64_t user_id,
  *
  * @param token        Token string to validate.
  * @param doc_uuid_out Buffer of at least LDMD_UUID_LENGTH bytes; receives the
- *                     document UUID.  May be NULL if the caller only needs the
- *                     return code.
+ *                     document UUID.  May be NULL.
+ * @param user_id_out  Receives the ID of the user who created the token.  May
+ *                     be NULL if the caller does not need it.
  * @return LDMD_OK if the token is valid and not expired, otherwise
  *         LDMD_ERROR_UNAUTHORIZED.
  */
-ldmd_error_t presign_validate(const char *token, char *doc_uuid_out);
+ldmd_error_t presign_validate(const char *token, char *doc_uuid_out,
+                              int64_t *user_id_out);
 
 #endif /* PRESIGN_H */

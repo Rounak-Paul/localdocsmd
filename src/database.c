@@ -86,6 +86,7 @@ static const char *SCHEMA_SQL =
     "  updated_by INTEGER,"
     "  created_at INTEGER NOT NULL,"
     "  updated_at INTEGER NOT NULL,"
+    "  version INTEGER NOT NULL DEFAULT 0,"
     "  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,"
     "  FOREIGN KEY (created_by) REFERENCES users(id),"
     "  FOREIGN KEY (updated_by) REFERENCES users(id)"
@@ -263,9 +264,66 @@ ldmd_database_t *db_init(const char *path) {
     }
     
     db->initialized = true;
+
+    if (db_run_migrations(db) != LDMD_OK) {
+        LOG_ERROR("Database migration failed");
+        sqlite3_close(db->db);
+        free(db);
+        return NULL;
+    }
+
+    /* Fresh DB: schema already has version column; mark as current. */
+    sqlite3_exec(db->db,
+        "PRAGMA user_version = 1;",
+        NULL, NULL, NULL);
+
     LOG_INFO("Database initialized: %s", path);
-    
+
     return db;
+}
+
+#define CURRENT_DB_VERSION 1
+
+static bool db_column_exists(sqlite3 *db, const char *table, const char *column) {
+    char sql[256];
+    snprintf(sql, sizeof(sql), "PRAGMA table_info(%s);", table);
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) return false;
+    bool found = false;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *col = (const char *)sqlite3_column_text(stmt, 1);
+        if (col && strcmp(col, column) == 0) { found = true; break; }
+    }
+    sqlite3_finalize(stmt);
+    return found;
+}
+
+ldmd_error_t db_run_migrations(ldmd_database_t *db) {
+    int user_version = 0;
+    sqlite3_stmt *vs;
+    if (sqlite3_prepare_v2(db->db, "PRAGMA user_version;", -1, &vs, NULL) == SQLITE_OK) {
+        if (sqlite3_step(vs) == SQLITE_ROW)
+            user_version = sqlite3_column_int(vs, 0);
+        sqlite3_finalize(vs);
+    }
+
+    if (user_version >= CURRENT_DB_VERSION) return LDMD_OK;
+
+    /* v0 → v1: add version column to documents */
+    if (user_version < 1) {
+        if (!db_column_exists(db->db, "documents", "version")) {
+            int rc = sqlite3_exec(db->db,
+                "ALTER TABLE documents ADD COLUMN version INTEGER NOT NULL DEFAULT 0;",
+                NULL, NULL, NULL);
+            if (rc != SQLITE_OK) {
+                LOG_ERROR("Migration v1 failed: %s", sqlite3_errmsg(db->db));
+                return LDMD_ERROR_DATABASE;
+            }
+        }
+        LOG_INFO("Database migrated to v1");
+    }
+
+    return LDMD_OK;
 }
 
 void db_close(ldmd_database_t *db) {
@@ -1356,10 +1414,11 @@ static void fill_document_from_stmt(sqlite3_stmt *stmt, ldmd_document_t *documen
     document->updated_by = sqlite3_column_int64(stmt, 6);
     document->created_at = sqlite3_column_int64(stmt, 7);
     document->updated_at = sqlite3_column_int64(stmt, 8);
+    document->version    = sqlite3_column_int64(stmt, 9);
 }
 
 ldmd_error_t db_document_get_by_id(ldmd_database_t *db, int64_t id, ldmd_document_t *document) {
-    const char *sql = "SELECT id, uuid, project_id, name, path, created_by, updated_by, created_at, updated_at "
+    const char *sql = "SELECT id, uuid, project_id, name, path, created_by, updated_by, created_at, updated_at, version "
                       "FROM documents WHERE id = ?;";
     
     sqlite3_stmt *stmt;
@@ -1382,7 +1441,7 @@ ldmd_error_t db_document_get_by_id(ldmd_database_t *db, int64_t id, ldmd_documen
 }
 
 ldmd_error_t db_document_get_by_uuid(ldmd_database_t *db, const char *uuid, ldmd_document_t *document) {
-    const char *sql = "SELECT id, uuid, project_id, name, path, created_by, updated_by, created_at, updated_at "
+    const char *sql = "SELECT id, uuid, project_id, name, path, created_by, updated_by, created_at, updated_at, version "
                       "FROM documents WHERE uuid = ?;";
     
     sqlite3_stmt *stmt;
@@ -1445,7 +1504,7 @@ ldmd_error_t db_document_delete(ldmd_database_t *db, int64_t id) {
 
 ldmd_error_t db_document_list(ldmd_database_t *db, int64_t project_id, 
                               ldmd_document_t **documents, int *count) {
-    const char *sql = "SELECT id, uuid, project_id, name, path, created_by, updated_by, created_at, updated_at "
+    const char *sql = "SELECT id, uuid, project_id, name, path, created_by, updated_by, created_at, updated_at, version "
                       "FROM documents WHERE project_id = ? ORDER BY name;";
     
     sqlite3_stmt *stmt;
@@ -1483,6 +1542,21 @@ ldmd_error_t db_document_list(ldmd_database_t *db, int64_t project_id,
     *count = i;
     
     return LDMD_OK;
+}
+
+ldmd_error_t db_document_save_flush(ldmd_database_t *db, int64_t doc_id,
+                                    int64_t updated_by, time_t updated_at) {
+    const char *sql =
+        "UPDATE documents SET updated_by=?, updated_at=?, version=version+1 WHERE id=?;";
+    sqlite3_stmt *stmt;
+    int rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) return LDMD_ERROR_DATABASE;
+    sqlite3_bind_int64(stmt, 1, updated_by);
+    sqlite3_bind_int64(stmt, 2, (int64_t)updated_at);
+    sqlite3_bind_int64(stmt, 3, doc_id);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_DONE) ? LDMD_OK : LDMD_ERROR_DATABASE;
 }
 
 // Password request operations

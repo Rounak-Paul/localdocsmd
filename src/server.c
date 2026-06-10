@@ -137,6 +137,7 @@ static void *worker_thread_fn(void *arg) {
     thread_server.db      = pool->dbs[slot];
     thread_server.running = true;
     thread_server.pool    = pool;
+    thread_server.collab  = server->collab;  /* shared; collab uses its own mutex */
     /* mgr stays NULL in thread_server; routes only use config/db  */
 
     LOG_INFO("[Worker %d] Ready", slot);
@@ -235,6 +236,26 @@ static void http_handler(struct mg_connection *c, int ev, void *ev_data) {
         return;
     }
 
+    /* ── WebSocket incoming frame ── */
+    if (ev == MG_EV_WS_MSG) {
+        struct mg_ws_message *wm = (struct mg_ws_message *)ev_data;
+        if ((wm->flags & 0x0f) == WEBSOCKET_OP_TEXT && server->collab)
+            collab_ws_message(server->collab, c, wm->data.buf, wm->data.len);
+        return;
+    }
+
+    /* ── Connection close — clean up any WS session ── */
+    if (ev == MG_EV_CLOSE) {
+        ws_conn_data_t *wd = *(ws_conn_data_t **)c->data;
+        if (wd) {
+            if (server->collab)
+                collab_ws_disconnect(server->collab, server->db, server->config, c);
+            free(wd);
+            *(ws_conn_data_t **)c->data = NULL;
+        }
+        return;
+    }
+
     if (ev != MG_EV_HTTP_MSG) return;
     struct mg_http_message *hm = (struct mg_http_message *)ev_data;
 
@@ -302,6 +323,57 @@ static void http_handler(struct mg_connection *c, int ev, void *ev_data) {
                 .extra_headers = "Cache-Control: max-age=86400\r\n"
             };
             mg_http_serve_file(c, hm, filepath, &sopts);
+            return;
+        }
+    }
+
+    /* ── WebSocket upgrade: GET /ws/documents/:uuid ── */
+    {
+        struct mg_str ws_caps[2] = {{0}};
+        if (mg_match(hm->uri, mg_str("/ws/documents/*"), ws_caps)) {
+            struct mg_str *upgrade = mg_http_get_header(hm, "Upgrade");
+            if (!upgrade || mg_strcasecmp(*upgrade, mg_str("websocket")) != 0) {
+                mg_http_reply(c, 400, "Content-Type: text/plain\r\n",
+                              "WebSocket upgrade required\n");
+                return;
+            }
+
+            char token[LDMD_TOKEN_LENGTH] = {0};
+            ldmd_session_t sess;
+            ldmd_user_t user;
+            bool authed = false;
+            if (http_get_session_token(hm, token, sizeof(token))) {
+                if (auth_validate_session(server->db, token, &sess) == LDMD_OK &&
+                    sess.expires_at > (time_t)time(NULL)) {
+                    if (db_user_get_by_id(server->db, sess.user_id, &user) == LDMD_OK)
+                        authed = true;
+                }
+            }
+            if (!authed) {
+                mg_http_reply(c, 401, "Content-Type: text/plain\r\n",
+                              "Unauthorized\n");
+                return;
+            }
+
+            char doc_uuid[LDMD_UUID_LENGTH] = {0};
+            size_t ulen = ws_caps[0].len < sizeof(doc_uuid) - 1
+                          ? ws_caps[0].len : sizeof(doc_uuid) - 1;
+            memcpy(doc_uuid, ws_caps[0].buf, ulen);
+            doc_uuid[ulen] = '\0';
+
+            ws_conn_data_t *wd = calloc(1, sizeof(ws_conn_data_t));
+            if (wd) {
+                ldmd_strlcpy(wd->doc_uuid, doc_uuid, sizeof(wd->doc_uuid));
+                wd->user_id = user.id;
+                ldmd_strlcpy(wd->username, user.username, sizeof(wd->username));
+                *(ws_conn_data_t **)c->data = wd;
+            }
+
+            mg_ws_upgrade(c, hm, NULL);
+
+            if (wd && server->collab)
+                collab_ws_connect(server->collab, server->db, server->config,
+                                  c, doc_uuid, user.id, user.username);
             return;
         }
     }
@@ -656,6 +728,10 @@ ldmd_server_t *server_create(ldmd_config_t *config, ldmd_database_t *db) {
         return NULL;
     }
     mg_mgr_init(server->mgr);
+
+    server->collab = collab_create();
+    if (!server->collab) LOG_WARN("Failed to create collab manager");
+
     return server;
 }
 
@@ -701,6 +777,10 @@ void server_stop(ldmd_server_t *server) {
 void server_free(ldmd_server_t *server) {
     if (!server) return;
     if (server->pool) { pool_destroy(server->pool); server->pool = NULL; }
+    if (server->collab) {
+        collab_destroy(server->collab, server->db, server->config);
+        server->collab = NULL;
+    }
     if (server->mgr)  { mg_mgr_free(server->mgr); free(server->mgr); }
     free(server);
 }
@@ -714,6 +794,7 @@ void server_run(ldmd_server_t *server) {
     time_t last_cleanup = time(NULL);
     while (server->running && s_signo == 0) {
         mg_mgr_poll(server->mgr, 100);
+        if (server->collab) collab_tick(server->collab, server->db, server->config);
         time_t now = time(NULL);
         if (now - last_cleanup > 300) {
             db_session_cleanup(server->db);
@@ -722,6 +803,10 @@ void server_run(ldmd_server_t *server) {
     }
 
     LOG_INFO("Server shutting down...");
+    if (server->collab) {
+        collab_destroy(server->collab, server->db, server->config);
+        server->collab = NULL;
+    }
     if (server->pool) { pool_destroy(server->pool); server->pool = NULL; }
 }
 

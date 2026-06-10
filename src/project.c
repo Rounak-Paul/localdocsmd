@@ -2,8 +2,12 @@
 #include "workspace.h"
 #include "auth.h"
 #include "utils.h"
+#include <sqlite3.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
+
+#define AUDIT_DEBOUNCE_SECS 300
     
 ldmd_error_t project_create(ldmd_database_t *db, ldmd_config_t *config,
                             int64_t workspace_id, const char *name,
@@ -242,6 +246,62 @@ ldmd_error_t document_list(ldmd_database_t *db, int64_t project_id,
 void document_media_path(ldmd_config_t *config, const char *doc_uuid,
                          char *path_out, size_t path_size) {
     snprintf(path_out, path_size, "%s/%s", config->media_path, doc_uuid);
+}
+
+void document_audit_snapshot(ldmd_database_t *db, const ldmd_document_t *doc,
+                              int64_t saved_by) {
+    /* Debounce: skip if a revision already exists within the last N seconds. */
+    {
+        sqlite3_stmt *chk;
+        const char *chk_sql =
+            "SELECT 1 FROM document_revisions"
+            " WHERE document_id = ?1 AND saved_at >= ?2 LIMIT 1";
+        bool recent = false;
+        if (sqlite3_prepare_v2(db->db, chk_sql, -1, &chk, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(chk, 1, doc->id);
+            sqlite3_bind_int64(chk, 2, (int64_t)(time(NULL) - AUDIT_DEBOUNCE_SECS));
+            if (sqlite3_step(chk) == SQLITE_ROW) recent = true;
+            sqlite3_finalize(chk);
+        }
+        if (recent) return;
+    }
+
+    char *old = NULL;
+    if (utils_read_file(doc->path, &old) != LDMD_OK || !old) return;
+    if (old[0] == '\0') { free(old); return; }
+
+    sqlite3_stmt *stmt;
+    const char *sql =
+        "INSERT INTO document_revisions (document_id, saved_by, saved_at, content)"
+        " VALUES (?, ?, ?, ?)";
+    if (sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, doc->id);
+        sqlite3_bind_int64(stmt, 2, saved_by);
+        sqlite3_bind_int64(stmt, 3, (int64_t)time(NULL));
+        sqlite3_bind_text (stmt, 4, old, -1, SQLITE_TRANSIENT);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+    free(old);
+
+    /* Prune old revisions beyond the cap. */
+    {
+        sqlite3_stmt *del;
+        const char *del_sql =
+            "DELETE FROM document_revisions"
+            " WHERE document_id = ?1"
+            "   AND id NOT IN ("
+            "     SELECT id FROM document_revisions"
+            "     WHERE document_id = ?1"
+            "     ORDER BY id DESC LIMIT ?2"
+            "   )";
+        if (sqlite3_prepare_v2(db->db, del_sql, -1, &del, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(del, 1, doc->id);
+            sqlite3_bind_int  (del, 2, AUDIT_MAX_REVISIONS);
+            sqlite3_step(del);
+            sqlite3_finalize(del);
+        }
+    }
 }
 
 void document_delete_media(ldmd_config_t *config, const char *doc_uuid) {

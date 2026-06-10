@@ -116,21 +116,31 @@ ldmd_error_t utils_read_file(const char *path, char **content_out) {
 }
 
 ldmd_error_t utils_write_file(const char *path, const char *content) {
-    FILE *fp = fopen(path, "wb");
+    char tmp_path[LDMD_MAX_PATH];
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+
+    FILE *fp = fopen(tmp_path, "wb");
     if (!fp) {
-        LOG_ERROR("Failed to create file: %s", path);
+        LOG_ERROR("Failed to create tmp file: %s", tmp_path);
         return LDMD_ERROR_IO;
     }
-    
+
     size_t len = strlen(content);
     size_t written = fwrite(content, 1, len, fp);
     fclose(fp);
-    
+
     if (written != len) {
+        unlink(tmp_path);
         LOG_ERROR("Failed to write file: %s", path);
         return LDMD_ERROR_IO;
     }
-    
+
+    if (rename(tmp_path, path) != 0) {
+        unlink(tmp_path);
+        LOG_ERROR("Failed to rename tmp to: %s", path);
+        return LDMD_ERROR_IO;
+    }
+
     return LDMD_OK;
 }
 

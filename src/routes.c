@@ -3,6 +3,7 @@
 #include "rbac.h"
 #include "workspace.h"
 #include "project.h"
+#include "collab.h"
 #include "markdown.h"
 #include "template.h"
 #include "utils.h"
@@ -32,76 +33,8 @@ static void activity_log_insert(ldmd_database_t *db, int64_t user_id, const char
     }
 }
 
-// Snapshot the current on-disk content of a document into document_revisions
-// before overwriting it.  No-op if the file is empty or doesn't exist yet.
-//
-// Debounce: if a revision for this document already exists within the last
-// AUDIT_DEBOUNCE_SECS seconds, skip — the existing snapshot already captures
-// the start of this editing burst.
-//
-// Cap: after inserting, prune revisions beyond AUDIT_MAX_REVISIONS so disk
-// usage stays bounded (≈ AUDIT_MAX_REVISIONS × avg_doc_size per document).
-#define AUDIT_DEBOUNCE_SECS 300    /* 5 minutes */
-#define AUDIT_MAX_REVISIONS 4096  /* revisions kept per document */
 #define CHAT_MAX_MESSAGE_LEN 4000
 #define CHAT_PAGE_SIZE 50
-
-static void audit_snapshot(ldmd_database_t *db, ldmd_config_t *cfg,
-                            const ldmd_document_t *doc, int64_t saved_by) {
-    /* ── Debounce check ── */
-    {
-        sqlite3_stmt *chk;
-        const char *chk_sql =
-            "SELECT 1 FROM document_revisions"
-            " WHERE document_id = ?1 AND saved_at >= ?2 LIMIT 1";
-        bool recent = false;
-        if (sqlite3_prepare_v2(db->db, chk_sql, -1, &chk, NULL) == SQLITE_OK) {
-            sqlite3_bind_int64(chk, 1, doc->id);
-            sqlite3_bind_int64(chk, 2, (int64_t)(time(NULL) - AUDIT_DEBOUNCE_SECS));
-            if (sqlite3_step(chk) == SQLITE_ROW) recent = true;
-            sqlite3_finalize(chk);
-        }
-        if (recent) return;
-    }
-
-    char *old = NULL;
-    if (utils_read_file(doc->path, &old) != LDMD_OK || !old) return;
-    if (old[0] == '\0') { free(old); return; } /* skip blank initial saves */
-
-    sqlite3_stmt *stmt;
-    const char *sql =
-        "INSERT INTO document_revisions (document_id, saved_by, saved_at, content)"
-        " VALUES (?, ?, ?, ?)";
-    if (sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL) == SQLITE_OK) {
-        sqlite3_bind_int64(stmt, 1, doc->id);
-        sqlite3_bind_int64(stmt, 2, saved_by);
-        sqlite3_bind_int64(stmt, 3, (int64_t)time(NULL));
-        sqlite3_bind_text (stmt, 4, old, -1, SQLITE_TRANSIENT);
-        sqlite3_step(stmt);
-        sqlite3_finalize(stmt);
-    }
-    free(old);
-    (void)cfg;
-
-    /* ── Prune old revisions beyond the cap ── */
-    {
-        sqlite3_stmt *del;
-        const char *del_sql =
-            "DELETE FROM document_revisions"
-            " WHERE document_id = ?1"
-            "   AND id NOT IN ("
-            "     SELECT id FROM document_revisions"
-            "     WHERE document_id = ?1"
-            "     ORDER BY id DESC LIMIT ?2"
-            "   )";
-        if (sqlite3_prepare_v2(db->db, del_sql, -1, &del, NULL) == SQLITE_OK) {
-            sqlite3_bind_int64(del, 1, doc->id);
-            sqlite3_bind_int  (del, 2, AUDIT_MAX_REVISIONS);
-            sqlite3_step(del);
-            sqlite3_finalize(del);
-        }
-    }
-}
 
 static void chat_append_json_message(cJSON *arr, sqlite3_stmt *stmt) {
     cJSON *item = cJSON_CreateObject();
@@ -2132,15 +2065,17 @@ void route_api_documents_content(http_request_t *req, const char *doc_uuid) {
             return;
         }
         
-        const char *content = json_get_string(json, "content");
-        audit_snapshot(req->server->db, req->server->config, &doc, req->user.id);
-        document_save_content(req->server->config, &doc, content);
-        
-        doc.updated_by = req->user.id;
-        document_update(req->server->db, &doc);
-        activity_log_insert(req->server->db, req->user.id, "doc_save");
-        
+        const char *content_str = json_get_string(json, "content");
+        if (!content_str) content_str = "";
+        document_audit_snapshot(req->server->db, &doc, req->user.id);
+        document_save_content(req->server->config, &doc, content_str);
+        if (req->server->collab) {
+            collab_notify_replace(req->server->collab, doc.uuid, content_str,
+                                  req->user.id, req->user.username);
+        }
         cJSON_Delete(json);
+        db_document_save_flush(req->server->db, doc.id, req->user.id, (time_t)time(NULL));
+        activity_log_insert(req->server->db, req->user.id, "doc_save");
         http_respond_json(req->conn, 200, "{\"success\":true}");
     }
 }
@@ -3203,7 +3138,7 @@ void route_api_documents_presign(http_request_t *req, const char *doc_uuid) {
  * ──────────────────────────────────────────────────────────────── */
 void route_raw_get(http_request_t *req, const char *token) {
     char doc_uuid[LDMD_UUID_LENGTH];
-    if (presign_validate(token, doc_uuid) != LDMD_OK) {
+    if (presign_validate(token, doc_uuid, NULL) != LDMD_OK) {
         http_respond_error(req->conn, 403, "Invalid or expired token");
         return;
     }
@@ -3246,7 +3181,8 @@ void route_raw_get(http_request_t *req, const char *token) {
  * ──────────────────────────────────────────────────────────────── */
 void route_raw_put(http_request_t *req, const char *token) {
     char doc_uuid[LDMD_UUID_LENGTH];
-    if (presign_validate(token, doc_uuid) != LDMD_OK) {
+    int64_t presign_user_id = 0;
+    if (presign_validate(token, doc_uuid, &presign_user_id) != LDMD_OK) {
         http_respond_error(req->conn, 403, "Invalid or expired token");
         return;
     }
@@ -3267,17 +3203,21 @@ void route_raw_put(http_request_t *req, const char *token) {
     if (body_len > 0) memcpy(content, req->hm->body.buf, body_len);
     content[body_len] = '\0';
 
-    /* Snapshot the old content before overwriting (token-based; attribute to last editor) */
-    audit_snapshot(req->server->db, req->server->config, &doc,
-                   doc.updated_by ? doc.updated_by : doc.created_by);
-
+    document_audit_snapshot(req->server->db, &doc, presign_user_id);
     document_save_content(req->server->config, &doc, content);
+
+    if (req->server->collab) {
+        ldmd_user_t pu;
+        const char *pu_name = "";
+        if (presign_user_id > 0 &&
+            db_user_get_by_id(req->server->db, presign_user_id, &pu) == LDMD_OK)
+            pu_name = pu.username;
+        collab_notify_replace(req->server->collab, doc_uuid, content,
+                              presign_user_id, pu_name);
+    }
     free(content);
 
-    /* Record update metadata without needing a user_id (token-based access). */
-    doc.updated_at = (time_t)time(NULL);
-    document_update(req->server->db, &doc);
-
+    db_document_save_flush(req->server->db, doc.id, presign_user_id, (time_t)time(NULL));
     http_respond_json(req->conn, 200, "{\"success\":true}");
 }
 

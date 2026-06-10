@@ -226,4 +226,18 @@ void document_delete_media(ldmd_config_t *config, const char *doc_uuid);
 void document_media_path(ldmd_config_t *config, const char *doc_uuid,
                          char *path_out, size_t path_size);
 
+#define AUDIT_MAX_REVISIONS 4096
+
+/**
+ * Snapshot the current on-disk content of a document into document_revisions
+ * before it is overwritten.  No-op if the file is empty or does not exist.
+ * Debounced: skips if a revision already exists within the last 5 minutes.
+ * Prunes revisions beyond the per-document cap after inserting.
+ * @param db       Database handle
+ * @param doc      Document whose content to snapshot
+ * @param saved_by User ID to attribute the snapshot to
+ */
+void document_audit_snapshot(ldmd_database_t *db, const ldmd_document_t *doc,
+                              int64_t saved_by);
+
 #endif // PROJECT_H

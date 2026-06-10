@@ -122,6 +122,7 @@ struct ldmd_document {
     int64_t updated_by;
     time_t created_at;
     time_t updated_at;
+    int64_t version;
 };
 
 // Session structure

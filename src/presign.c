@@ -66,7 +66,8 @@ ldmd_error_t presign_create(const char *doc_uuid, int64_t user_id,
     return LDMD_OK;
 }
 
-ldmd_error_t presign_validate(const char *token, char *doc_uuid_out) {
+ldmd_error_t presign_validate(const char *token, char *doc_uuid_out,
+                              int64_t *user_id_out) {
     if (!token || token[0] == '\0') return LDMD_ERROR_UNAUTHORIZED;
 
     time_t now = time(NULL);
@@ -84,9 +85,10 @@ ldmd_error_t presign_validate(const char *token, char *doc_uuid_out) {
             return LDMD_ERROR_UNAUTHORIZED;
         }
 
-        if (doc_uuid_out) {
+        if (doc_uuid_out)
             ldmd_strlcpy(doc_uuid_out, g_store[i].doc_uuid, LDMD_UUID_LENGTH);
-        }
+        if (user_id_out)
+            *user_id_out = g_store[i].user_id;
 
         pthread_mutex_unlock(&g_mutex);
         return LDMD_OK;

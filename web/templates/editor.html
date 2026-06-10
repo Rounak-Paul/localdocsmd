@@ -196,6 +196,7 @@ main.container { max-width:100%!important; width:100%!important; margin:0!import
 .save-status.status-unsaved { color:var(--warning-color); background:rgba(245,158,11,.1); }
 .save-status.status-saving  { color:var(--text-muted); }
 .save-status.status-error   { color:var(--danger-color); background:rgba(239,68,68,.1); }
+.save-status.status-info    { color:var(--primary-color,#4f8ef7); }
 .editor-status-bar .save-status { margin-left:auto; font-size:inherit; padding:0; border-radius:0; background:transparent; }
 
 /* Action dropdowns */
@@ -1243,7 +1244,7 @@ window.insertMarkdown = function(before, after='') {
 };
 
 /* ─────────────────────────────────────────────────────────────────
-   VIEWER PRESENCE
+   VIEWER PRESENCE (HTTP fallback when WS not connected)
    ───────────────────────────────────────────────────────────────── */
 async function pingServer(){ try{ await fetch(`/api/documents/${DOC_UUID}/ping`,{method:'POST'}); }catch{} }
 async function pollViewers(){
@@ -1256,6 +1257,253 @@ async function pollViewers(){
         if(vs.length>max) html+=`<span class="viewer-chip-more">+${vs.length-max}</span>`;
         viewerEl.innerHTML=html;
     }catch{}
+}
+function updatePresenceFromList(users){
+    const vs=(users||[]).filter(u=>u.username!==CURRENT_USER);
+    if(!vs.length){viewerEl.innerHTML='';return;}
+    const max=4;let html='';
+    vs.slice(0,max).forEach(v=>{html+=`<span class="viewer-chip" title="${v.username}">${v.username.charAt(0).toUpperCase()}</span>`;});
+    if(vs.length>max) html+=`<span class="viewer-chip-more">+${vs.length-max}</span>`;
+    viewerEl.innerHTML=html;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   COLLABORATIVE EDITING — Operational Transform
+   ───────────────────────────────────────────────────────────────── */
+let otWs             = null;
+let otCollabId       = null;
+let otVersion        = 0;
+let otShadow         = '';    // server canonical content at otVersion
+let otSent           = [];    // ops sent to server, waiting for ack
+let otPending        = [];    // ops accumulated locally, not yet sent
+let otWaitingAck     = false; // true while waiting for ack of otSent
+let otFlushTimer     = null;
+let otReconnectTimer = null;
+let otConnected      = false;
+let otEverConnected  = false; // distinguishes first connect from reconnect
+let _otPrevContent   = '';
+
+/* Compute minimal insert/delete ops from oldText → newText. */
+function computeOps(oldText, newText) {
+    const ops = [];
+    let lo = 0;
+    const minLen = Math.min(oldText.length, newText.length);
+    while (lo < minLen && oldText[lo] === newText[lo]) lo++;
+    let oe = oldText.length, ne = newText.length;
+    while (oe > lo && ne > lo && oldText[oe-1] === newText[ne-1]) { oe--; ne--; }
+    if (oe > lo) ops.push({t:'d', pos:lo, len:oe-lo});
+    if (ne > lo) ops.push({t:'i', pos:lo, text:newText.slice(lo, ne)});
+    return ops;
+}
+
+/* Apply an array of ops to text. */
+function applyOps(text, ops) {
+    for (const op of ops) {
+        if (op.t === 'i') text = text.slice(0, op.pos) + op.text + text.slice(op.pos);
+        else              text = text.slice(0, op.pos) + text.slice(op.pos + op.len);
+    }
+    return text;
+}
+
+/* Transform op a to apply after concurrent op b on the same base. */
+function xfOp(a, b) {
+    a = Object.assign({}, a);
+    if (b.t === 'i') {
+        const bLen = b.text.length;
+        if (a.t === 'i') {
+            if (b.pos <= a.pos) a.pos += bLen;
+        } else {
+            if (b.pos <= a.pos)          a.pos += bLen;
+            else if (b.pos < a.pos + a.len) a.len += bLen;
+        }
+    } else {
+        const bLen = b.len, bEnd = b.pos + bLen;
+        if (a.t === 'i') {
+            if (bEnd <= a.pos)      a.pos -= bLen;
+            else if (b.pos < a.pos) a.pos  = b.pos;
+        } else {
+            const aEnd = a.pos + a.len;
+            if (bEnd <= a.pos) {
+                a.pos -= bLen;
+            } else if (b.pos < aEnd) {
+                const delBefore  = b.pos < a.pos ? Math.min(bEnd, a.pos) - b.pos : 0;
+                const ovStart    = Math.max(a.pos, b.pos);
+                const ovEnd      = Math.min(aEnd, bEnd);
+                const delInside  = ovEnd > ovStart ? ovEnd - ovStart : 0;
+                a.pos -= delBefore;
+                a.len  = Math.max(0, a.len - delInside);
+            }
+        }
+    }
+    return a;
+}
+
+function xfOps(ops, against) {
+    return ops.map(op => { for (const b of against) op = xfOp(op, b); return op; });
+}
+
+/* Adjust a cursor position through a set of ops. */
+function adjustPos(pos, ops) {
+    for (const op of ops) {
+        if (op.t === 'i') { if (op.pos <= pos) pos += op.text.length; }
+        else { if (op.pos + op.len <= pos) pos -= op.len; else if (op.pos < pos) pos = op.pos; }
+    }
+    return pos;
+}
+
+/*
+ * Move otPending → otSent and transmit.
+ * Only fires if not already waiting for an ack.
+ * Called directly or via the 50 ms debounce timer.
+ */
+function otDoFlush() {
+    clearTimeout(otFlushTimer);
+    otFlushTimer = null;
+    if (!otConnected || !otWs || otWaitingAck || otPending.length === 0) return;
+    otSent       = otPending;
+    otPending    = [];
+    otWaitingAck = true;
+    otWs.send(JSON.stringify({type:'op', base_version:otVersion, collab_id:otCollabId, ops:otSent}));
+}
+
+/* Schedule a flush; resets the debounce window on each call. */
+function scheduleOtFlush() {
+    clearTimeout(otFlushTimer);
+    otFlushTimer = setTimeout(otDoFlush, 50);
+}
+
+function otConnect() {
+    if (otWs) { try { otWs.close(); } catch(e){} }
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    let ws;
+    try { ws = new WebSocket(`${proto}//${location.host}/ws/documents/${DOC_UUID}`); }
+    catch(e) { scheduleOtReconnect(); return; }
+    otWs = ws;
+
+    ws.onopen = function() { /* wait for init before marking connected */ };
+
+    ws.onmessage = function(e) {
+        let msg;
+        try { msg = JSON.parse(e.data); } catch(ex) { return; }
+
+        /* ── init ── */
+        if (msg.type === 'init') {
+            otVersion    = msg.version;
+            otCollabId   = msg.collab_id;
+            otShadow     = msg.content;
+            otSent       = [];
+            otWaitingAck = false;
+            otConnected  = true;
+
+            if (!otEverConnected) {
+                /* First connect — always trust server content. */
+                otEverConnected = true;
+                otPending = [];
+                if (editorEl.value !== msg.content) {
+                    editorEl.value = msg.content;
+                    content = msg.content;
+                    lastSaved = msg.content;
+                    debouncedRender(); updateStatusBar();
+                }
+                _otPrevContent = msg.content;
+            } else {
+                /* Reconnect — recover any local edits not yet confirmed. */
+                otPending = computeOps(msg.content, editorEl.value);
+                _otPrevContent = editorEl.value;
+                if (otPending.length > 0) otDoFlush();
+            }
+            setSaveStatus('saved', '● Live');
+            return;
+        }
+
+        /* ── ops ── */
+        if (msg.type === 'ops') {
+            const serverOps = msg.ops || [];
+            if (!serverOps.length) return;
+
+            if (msg.collab_id === otCollabId) {
+                /*
+                 * Ack of our own batch. The server may have transformed our ops
+                 * against concurrent edits; use the returned ops to advance shadow.
+                 * The editor already shows the correct state — don't touch it.
+                 */
+                otShadow     = applyOps(otShadow, serverOps);
+                otVersion    = msg.version;
+                otSent       = [];
+                otWaitingAck = false;
+                setSaveStatus('saved', '● Live');
+                /* Send any ops that accumulated while we were waiting. */
+                if (otPending.length > 0) otDoFlush();
+            } else {
+                /*
+                 * Concurrent ops from another client.
+                 * Transform server ops to apply on top of our local (sent+pending) work,
+                 * then transform our local work to apply on top of the server op.
+                 */
+                const allLocal  = [...otSent, ...otPending];
+                const xfServer  = xfOps(serverOps, allLocal);
+                otSent          = xfOps(otSent,    serverOps);
+                otPending       = xfOps(otPending, serverOps);
+                otShadow        = applyOps(otShadow, serverOps);
+                otVersion       = msg.version;
+
+                if (xfServer.length > 0) {
+                    const ss     = editorEl.selectionStart;
+                    const se     = editorEl.selectionEnd;
+                    const newVal = applyOps(editorEl.value, xfServer);
+                    if (newVal !== editorEl.value) {
+                        editorEl.value          = newVal;
+                        content                 = newVal;
+                        _otPrevContent          = newVal;
+                        editorEl.selectionStart = adjustPos(ss, xfServer);
+                        editorEl.selectionEnd   = adjustPos(se, xfServer);
+                        debouncedRender(); updateStatusBar();
+                    }
+                }
+            }
+            return;
+        }
+
+        /* ── replace (raw PUT / HTTP PUT from another user) ── */
+        if (msg.type === 'replace') {
+            otVersion    = msg.version;
+            otShadow     = msg.content;
+            otSent       = [];
+            otPending    = [];
+            otWaitingAck = false;
+            const ss = editorEl.selectionStart, se = editorEl.selectionEnd;
+            editorEl.value          = msg.content;
+            content                 = msg.content;
+            lastSaved               = msg.content;
+            _otPrevContent          = msg.content;
+            editorEl.selectionStart = Math.min(ss, msg.content.length);
+            editorEl.selectionEnd   = Math.min(se, msg.content.length);
+            debouncedRender(); updateStatusBar();
+            showToast(`Updated by ${msg.by || 'another user'}`, 2500);
+            return;
+        }
+
+        /* ── presence ── */
+        if (msg.type === 'presence') {
+            updatePresenceFromList(msg.users || []);
+            return;
+        }
+    };
+
+    ws.onerror = function() { /* onclose fires next and handles reconnect */ };
+
+    ws.onclose = function() {
+        otConnected  = false;
+        otWaitingAck = false;
+        otWs         = null;
+        setSaveStatus('unsaved', 'Offline');
+        scheduleOtReconnect();
+    };
+}
+
+function scheduleOtReconnect() {
+    clearTimeout(otReconnectTimer);
+    otReconnectTimer = setTimeout(otConnect, 3000);
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -1277,8 +1525,24 @@ document.addEventListener('DOMContentLoaded', function(){
     pingServer(); setInterval(pingServer,15000);
     pollViewers(); setInterval(pollViewers,5000);
 
+    _otPrevContent = content;
+    otConnect();
+
     editorEl.addEventListener('input', function(){
-        content=editorEl.value; scheduleAutosave(); debouncedRender(); updateStatusBar();
+        const newContent = editorEl.value;
+        content = newContent;
+        if (otConnected) {
+            const ops = computeOps(_otPrevContent, newContent);
+            _otPrevContent = newContent;
+            if (ops.length > 0) {
+                otPending = otPending.concat(ops);
+                scheduleOtFlush();
+            }
+        } else {
+            _otPrevContent = newContent;
+            scheduleAutosave();
+        }
+        debouncedRender(); updateStatusBar();
     });
     const onCursor=()=>{ requestAnimationFrame(updateStatusBar); };
     editorEl.addEventListener('keyup',onCursor); editorEl.addEventListener('click',onCursor); editorEl.addEventListener('select',onCursor);
@@ -1295,7 +1559,10 @@ document.addEventListener('DOMContentLoaded', function(){
             const s=this.selectionStart,en=this.selectionEnd;
             if(e.shiftKey){const before=this.value.substring(0,s),ls=before.lastIndexOf('\n')+1,lc=this.value.substring(ls,s);if(lc.startsWith('    ')||lc.startsWith('\t')){const n=lc.startsWith('    ')?4:1;this.value=this.value.substring(0,ls)+this.value.substring(ls+n);this.selectionStart=this.selectionEnd=s-n;}}
             else{this.value=this.value.substring(0,s)+'    '+this.value.substring(en);this.selectionStart=this.selectionEnd=s+4;}
-            content=this.value; scheduleAutosave(); debouncedRender(); updateStatusBar();
+            const newVal=this.value;
+            if(otConnected){const ops=computeOps(_otPrevContent,newVal);_otPrevContent=newVal;if(ops.length>0){otPending=otPending.concat(ops);scheduleOtFlush();}}
+            else{_otPrevContent=newVal;scheduleAutosave();}
+            content=newVal; debouncedRender(); updateStatusBar();
         }
     });
 
@@ -1309,7 +1576,9 @@ document.addEventListener('DOMContentLoaded', function(){
     document.addEventListener('click',e=>{
         if(!e.target.closest('.act-dropdown')) closeAllDropdowns();
     });
-    window.addEventListener('beforeunload',e=>{if(content!==lastSaved){e.preventDefault();e.returnValue='';}});
+    window.addEventListener('beforeunload',e=>{
+        if(otSent.length>0||otPending.length>0||content!==lastSaved){e.preventDefault();e.returnValue='';}
+    });
 
     // Move media panel elements to body (escape stacking context)
     ['media-panel','media-overlay','editor-drop-overlay'].forEach(id=>{const el=document.getElementById(id);if(el) document.body.appendChild(el);});

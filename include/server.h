@@ -4,6 +4,7 @@
 #include "localdocsmd.h"
 #include "config.h"
 #include "database.h"
+#include "collab.h"
 #include "mongoose.h"
 #include <pthread.h>
 
@@ -95,6 +96,7 @@ struct ldmd_server {
     ldmd_database_t    *db;       /* main-thread DB connection   */
     bool                running;
     ldmd_thread_pool_t *pool;     /* NULL when num_threads == 0  */
+    collab_manager_t   *collab;   /* real-time collaboration manager */
 };
 
 /**

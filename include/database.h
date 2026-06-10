@@ -125,6 +125,26 @@ ldmd_error_t db_password_forgot_list_pending(ldmd_database_t *db,
 ldmd_error_t db_password_forgot_update(ldmd_database_t *db, ldmd_password_forgot_t *request);
 ldmd_error_t db_password_forgot_count_pending(ldmd_database_t *db, int *count);
 
+/**
+ * Run non-destructive schema migrations on startup.
+ * Safe to call on both fresh and existing databases.
+ * Uses PRAGMA user_version to track applied migrations.
+ * @param db Database handle
+ * @return LDMD_OK or error code
+ */
+ldmd_error_t db_run_migrations(ldmd_database_t *db);
+
+/**
+ * Update document metadata after a collab flush: bumps version atomically.
+ * @param db         Database handle
+ * @param doc_id     Document ID
+ * @param updated_by User responsible for the flush
+ * @param updated_at Timestamp to record
+ * @return LDMD_OK or error code
+ */
+ldmd_error_t db_document_save_flush(ldmd_database_t *db, int64_t doc_id,
+                                    int64_t updated_by, time_t updated_at);
+
 // Document viewer presence (ephemeral heartbeat tracking)
 ldmd_error_t db_document_viewer_ping(ldmd_database_t *db,
                                      const char *document_uuid,
