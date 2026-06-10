@@ -70,6 +70,25 @@ Client→Server:
 - WS onclose (if init never received): readOnly=false to allow offline editing
 - Ctrl+S / saveDocument() is a no-op when WS is connected (shows "● Live"); only runs HTTP PUT when offline
 
+## OT Tie-Breaking Rule (critical for convergence)
+
+For concurrent inserts at the **same position**, the op that the server applied first wins — it
+stays at its position and the later-arriving op is shifted right. Both sides must agree on this:
+
+| Side | Call | a | b | rule |
+|------|------|---|---|------|
+| Server | `transform_op(arriving, history)` | arriving (later) | history (first) | `b->pos <= a->pos` → shift a |
+| Client | `xfOps(serverOps, allLocal, false)` | server op (first) | local op (later) | `b.pos < a.pos` (strict) → don't shift a |
+| Client | `xfOps(otSent/otPending, serverOps)` | local (later) | server (first) | `b.pos <= a.pos` → shift a |
+
+The `bWins` parameter on `xfOp`/`xfOps` encodes this:
+- `bWins=true` (default): `b.pos <= a.pos` — b wins on tie
+- `bWins=false`: `b.pos < a.pos` — a wins on tie (used for `xfOps(serverOps, allLocal, false)`)
+
+Without this, concurrent inserts at the same character position diverge permanently.
+The reconnect path (`computeOps(server_content, editor_value)`) then materialises the
+divergence as real ops, producing the "extra content at the end after refresh" symptom.
+
 ## Raw Path Attribution
 presign_validate() now returns user_id alongside doc_uuid.
 raw PUT attributes saves to the user who generated the presign token (not the last editor).

@@ -1309,15 +1309,22 @@ function applyOps(text, ops) {
     return text;
 }
 
-/* Transform op a to apply after concurrent op b on the same base. */
-function xfOp(a, b) {
+/*
+ * Transform op a to apply after concurrent op b on the same base.
+ * bWins controls the insert-insert tie-break at the same position:
+ *   true  (default) — b wins; a is shifted right (use when b is the authoritative/server op)
+ *   false           — a wins; a stays in place  (use when a is the authoritative/server op)
+ */
+function xfOp(a, b, bWins) {
     a = Object.assign({}, a);
     if (b.t === 'i') {
         const bLen = b.text.length;
         if (a.t === 'i') {
-            if (b.pos <= a.pos) a.pos += bLen;
+            /* bWins=true  → shift a when b.pos <= a.pos (b has priority on tie)
+             * bWins=false → shift a only when b.pos <  a.pos (a has priority on tie) */
+            if (bWins !== false ? b.pos <= a.pos : b.pos < a.pos) a.pos += bLen;
         } else {
-            if (b.pos <= a.pos)          a.pos += bLen;
+            if (b.pos <= a.pos)             a.pos += bLen;
             else if (b.pos < a.pos + a.len) a.len += bLen;
         }
     } else {
@@ -1342,8 +1349,8 @@ function xfOp(a, b) {
     return a;
 }
 
-function xfOps(ops, against) {
-    return ops.map(op => { for (const b of against) op = xfOp(op, b); return op; });
+function xfOps(ops, against, bWins) {
+    return ops.map(op => { for (const b of against) op = xfOp(op, b, bWins); return op; });
 }
 
 /* Adjust a cursor position through a set of ops. */
@@ -1444,7 +1451,10 @@ function otConnect() {
                  * then transform our local work to apply on top of the server op.
                  */
                 const allLocal  = [...otSent, ...otPending];
-                const xfServer  = xfOps(serverOps, allLocal);
+                /* Server op is 'a', local op is 'b'. Server was applied first, so it wins
+                 * insert-insert ties — pass bWins=false so a (server op) is not shifted. */
+                const xfServer  = xfOps(serverOps, allLocal,  false);
+                /* Local op is 'a', server op is 'b'. Server wins — default bWins=true. */
                 otSent          = xfOps(otSent,    serverOps);
                 otPending       = xfOps(otPending, serverOps);
                 otShadow        = applyOps(otShadow, serverOps);

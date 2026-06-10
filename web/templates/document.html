@@ -65,7 +65,7 @@
                     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                 </svg>
-                Share Link
+                Edit Link
             </button>
 
             <button class="btn" id="chat-btn" onclick="toggleChat()" title="Open document chat">
@@ -180,11 +180,16 @@
             </div>
             <button onclick="closeModal('history-modal')" class="btn-close">&times;</button>
         </div>
+        <div class="rev-tabs" id="history-modal-tabs" style="display:none">
+            <button class="rev-tab active" onclick="_switchRevTab('content')">Content</button>
+            <button class="rev-tab" onclick="_switchRevTab('diff')">Diff</button>
+        </div>
         <div class="history-modal-body">
             <div class="history-modal-loading" id="history-modal-loading">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin" style="opacity:.4"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
             </div>
             <div class="history-modal-content-area markdown-body" id="history-modal-content" style="display:none"></div>
+            <div class="diff-view" id="history-modal-diff" style="display:none"></div>
         </div>
         <div class="modal-footer" id="history-modal-footer" style="display:none">
             <button class="btn btn-primary" id="history-restore-btn" onclick="restoreRevision()">Restore this version</button>
@@ -225,7 +230,7 @@
                     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                 </svg>
-                External Edit Link
+                Edit Link
             </h3>
             <button onclick="closeModal('presign-modal')" class="btn-close">&times;</button>
         </div>
@@ -755,6 +760,39 @@ kbd { display: inline-flex; align-items: center; justify-content: center; font-f
     background: var(--bg-color); border: 1px solid var(--border-color);
     border-radius: var(--radius-sm); padding: 16px 20px;
     max-height: 55vh; overflow-y: auto;
+}
+.rev-tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border-color);
+    padding: 0 20px; background: var(--sidebar-bg, var(--bg-color));
+}
+.rev-tab {
+    padding: 7px 14px; background: none; border: none; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; color: var(--text-muted); font-size: .78rem; font-weight: 500;
+    cursor: pointer; font-family: inherit; transition: color .12s, border-color .12s;
+}
+.rev-tab:hover { color: var(--text-color); }
+.rev-tab.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+.diff-view {
+    background: var(--bg-color); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); max-height: 55vh; overflow-y: auto; overflow-x: auto;
+    font-family: var(--mono-font, 'ui-monospace', monospace); font-size: .76rem; line-height: 1.6;
+}
+.diff-line {
+    display: flex; align-items: baseline; padding: 0 10px; min-width: 0;
+}
+.diff-line-add  { background: rgba(0,160,60,.12); }
+.diff-line-remove { background: rgba(200,0,0,.12); }
+.diff-line-ctx { color: var(--text-muted); }
+.diff-line-sig {
+    min-width: 14px; margin-right: 8px; opacity: .7; user-select: none;
+    font-weight: 600; flex-shrink: 0;
+}
+.diff-line-add    .diff-line-sig { color: #2a9d45; }
+.diff-line-remove .diff-line-sig { color: #c0392b; }
+.diff-line-text { white-space: pre-wrap; word-break: break-all; flex: 1; }
+.diff-empty {
+    display: flex; align-items: center; justify-content: center;
+    height: 72px; color: var(--text-muted); font-size: .85rem;
 }
 .modal-footer {
     display: flex; gap: 8px; justify-content: flex-end;
@@ -1560,8 +1598,10 @@ let _historyOpen   = false;
 let _historyItems  = [];      // loaded revisions
 let _historyBefore = null;    // pagination cursor (smallest id seen)
 let _historyDone   = false;   // no more pages
-let _pendingRevId  = null;    // revision being previewed/restored
-let _pendingContent = null;   // content of pending revision
+let _pendingRevId    = null;   // revision being previewed/restored
+let _pendingContent  = null;   // content of pending revision
+let _pendingRevIndex = 0;      // index in _historyItems of the pending revision
+let _diffLoaded      = false;  // diff has been computed for current open revision
 let _chatOpen     = false;
 let _chatItems    = [];
 let _chatBefore   = null;
@@ -1825,16 +1865,27 @@ function _updateSlotLabel(total, max) {
 }
 
 window.openRevision = async function(revId) {
-    _pendingRevId = revId;
-    _pendingContent = null;
+    _pendingRevId    = revId;
+    _pendingContent  = null;
+    _pendingRevIndex = _historyItems.findIndex(r => r.id === revId);
+    _diffLoaded      = false;
     closeModal('history-restore-confirm');
 
-    const modal = document.getElementById('history-modal');
+    const modal    = document.getElementById('history-modal');
+    const tabsEl   = document.getElementById('history-modal-tabs');
+    const contentEl = document.getElementById('history-modal-content');
+    const diffEl    = document.getElementById('history-modal-diff');
+
     modal.style.display = 'flex';
+    tabsEl.style.display = 'none';
     document.getElementById('history-modal-loading').style.display = 'flex';
-    document.getElementById('history-modal-content').style.display = 'none';
+    contentEl.style.display = 'none';
+    diffEl.style.display    = 'none';
     document.getElementById('history-modal-footer').style.display = 'none';
     document.getElementById('history-modal-meta').textContent = '';
+
+    /* Reset to Content tab */
+    tabsEl.querySelectorAll('.rev-tab').forEach((t, i) => t.classList.toggle('active', i === 0));
 
     const resp = await fetch(`/api/documents/${_docUuidForHistory}/history/${revId}`);
     if (!resp.ok) {
@@ -1848,7 +1899,6 @@ window.openRevision = async function(revId) {
     document.getElementById('history-modal-meta').textContent =
         `Saved by ${rev.username} · ${_fmtDate(rev.saved_at)}`;
 
-    const contentEl = document.getElementById('history-modal-content');
     contentEl.innerHTML = typeof marked !== 'undefined'
         ? marked.parse(rev.content || '')
         : `<pre style="white-space:pre-wrap">${(rev.content||'').replace(/</g,'&lt;')}</pre>`;
@@ -1856,7 +1906,138 @@ window.openRevision = async function(revId) {
     document.getElementById('history-modal-loading').style.display = 'none';
     contentEl.style.display = 'block';
     document.getElementById('history-modal-footer').style.display = 'flex';
+
+    /* Show diff tab when an older revision exists to diff against */
+    if (_pendingRevIndex < _historyItems.length - 1) tabsEl.style.display = 'flex';
 };
+
+/* Switch between Content and Diff tabs in the history modal. */
+window._switchRevTab = function(mode) {
+    const tabsEl    = document.getElementById('history-modal-tabs');
+    const contentEl = document.getElementById('history-modal-content');
+    const diffEl    = document.getElementById('history-modal-diff');
+    tabsEl.querySelectorAll('.rev-tab').forEach((t, i) =>
+        t.classList.toggle('active', (i === 0) === (mode === 'content')));
+    if (mode === 'content') {
+        contentEl.style.display = 'block';
+        diffEl.style.display    = 'none';
+    } else {
+        contentEl.style.display = 'none';
+        diffEl.style.display    = 'block';
+        if (!_diffLoaded) _loadDiff();
+    }
+};
+
+/* Fetch the next-newer revision and render a line diff against the current one. */
+async function _loadDiff() {
+    _diffLoaded = true;
+    const diffEl   = document.getElementById('history-modal-diff');
+    diffEl.innerHTML = '<div class="diff-empty">Loading diff…</div>';
+
+    const olderRev = _historyItems[_pendingRevIndex + 1];
+    const resp = await fetch(`/api/documents/${_docUuidForHistory}/history/${olderRev.id}`);
+    if (!resp.ok) {
+        diffEl.innerHTML = '<div class="diff-empty">Failed to load diff.</div>';
+        return;
+    }
+    const older     = await resp.json();
+    const oldLines  = (older.content   || '').split('\n');
+    const newLines  = (_pendingContent || '').split('\n');
+
+    if (oldLines.length + newLines.length > 3000) {
+        diffEl.innerHTML = '<div class="diff-empty">Document too large to diff in browser.</div>';
+        return;
+    }
+
+    const hunks = _myersDiff(oldLines, newLines);
+    if (hunks.length === 0) {
+        diffEl.innerHTML = '<div class="diff-empty">No differences.</div>';
+        return;
+    }
+
+    const frag = document.createDocumentFragment();
+    for (const line of hunks) {
+        const row  = document.createElement('div');
+        row.className = 'diff-line' +
+            (line.type === 'add'    ? ' diff-line-add'    :
+             line.type === 'remove' ? ' diff-line-remove' : ' diff-line-ctx');
+        const sig = document.createElement('span');
+        sig.className   = 'diff-line-sig';
+        sig.textContent = line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' ';
+        const txt = document.createElement('span');
+        txt.className   = 'diff-line-text';
+        txt.textContent = line.text;
+        row.appendChild(sig);
+        row.appendChild(txt);
+        frag.appendChild(row);
+    }
+    diffEl.innerHTML = '';
+    diffEl.appendChild(frag);
+}
+
+/* Myers shortest-edit-script diff on string arrays.
+ * @param a  Old lines
+ * @param b  New lines
+ * @returns  Array of {type:'add'|'remove'|'ctx', text:string}
+ */
+function _myersDiff(a, b) {
+    const N = a.length, M = b.length;
+    if (N === 0 && M === 0) return [];
+    if (N === 0) return b.map(t => ({ type: 'add',    text: t }));
+    if (M === 0) return a.map(t => ({ type: 'remove', text: t }));
+
+    const MAX    = N + M;
+    const offset = MAX;
+    const V      = new Int32Array(2 * MAX + 2);
+    const trace  = [];
+
+    for (let d = 0; d <= MAX; d++) {
+        trace.push(new Int32Array(V));
+        for (let k = -d; k <= d; k += 2) {
+            let x;
+            if (k === -d || (k !== d && V[k - 1 + offset] < V[k + 1 + offset])) {
+                x = V[k + 1 + offset];
+            } else {
+                x = V[k - 1 + offset] + 1;
+            }
+            let y = x - k;
+            while (x < N && y < M && a[x] === b[y]) { x++; y++; }
+            V[k + offset] = x;
+            if (x >= N && y >= M) return _myersBacktrack(trace, a, b, d, offset);
+        }
+    }
+    return _myersBacktrack(trace, a, b, MAX, offset);
+}
+
+/* Reconstruct the edit path from the Myers trace.
+ * @param trace   Snapshots of the furthest-reaching array per edit-distance step
+ * @param a       Old lines
+ * @param b       New lines
+ * @param D       Final edit distance
+ * @param offset  Index offset (= MAX) used when indexing the trace arrays
+ */
+function _myersBacktrack(trace, a, b, D, offset) {
+    const result = [];
+    let x = a.length, y = b.length;
+
+    for (let d = D; d > 0; d--) {
+        const V  = trace[d - 1];
+        const k  = x - y;
+        let prevK;
+        if (k === -d || (k !== d && V[k - 1 + offset] < V[k + 1 + offset])) {
+            prevK = k + 1;
+        } else {
+            prevK = k - 1;
+        }
+        const prevX = V[prevK + offset];
+        const prevY = prevX - prevK;
+        while (x > prevX && y > prevY) { x--; y--; result.unshift({ type: 'ctx',    text: a[x] }); }
+        if (x === prevX) { y--; result.unshift({ type: 'add',    text: b[y] }); }
+        else             { x--; result.unshift({ type: 'remove', text: a[x] }); }
+    }
+    while (x > 0 && y > 0) { x--; y--; result.unshift({ type: 'ctx', text: a[x] }); }
+    return result;
+}
 
 window.restoreRevision = function() {
     closeModal('history-modal');

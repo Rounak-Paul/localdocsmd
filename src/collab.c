@@ -523,6 +523,14 @@ void collab_ws_message(collab_manager_t *cm, struct mg_connection *c,
         }
     }
 
+    if (valid_ops == 0) {
+        pthread_mutex_unlock(&doc->mutex);
+        pthread_mutex_unlock(&cm->docs_mutex);
+        free(client_ops);
+        cJSON_Delete(msg);
+        return;
+    }
+
     /* Apply transformed ops to canonical content */
     char *new_content = doc->content ? strdup(doc->content) : strdup("");
     if (!new_content) {
@@ -606,8 +614,9 @@ void collab_notify_replace(collab_manager_t *cm, const char *doc_uuid,
 
     collab_notify_t *n = calloc(1, sizeof(collab_notify_t));
     if (!n) return;
+    n->content = strdup(content);
+    if (!n->content) { free(n); return; }
     ldmd_strlcpy(n->doc_uuid, doc_uuid, sizeof(n->doc_uuid));
-    n->content     = strdup(content);
     n->by_user_id  = by_user_id;
     ldmd_strlcpy(n->by_username, by_username ? by_username : "", sizeof(n->by_username));
 
