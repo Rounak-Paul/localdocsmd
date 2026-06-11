@@ -11,7 +11,7 @@
 #define COLLAB_MAX_DOCS           64
 #define COLLAB_MAX_CLIENTS        32
 #define COLLAB_OP_HISTORY         2000
-#define COLLAB_FLUSH_SECS         0.1
+#define COLLAB_FLUSH_SECS         5.0
 /* Session stays alive this many seconds after the last client disconnects.
  * Ensures a page refresh reconnects to the in-memory canonical content
  * rather than potentially stale on-disk content. */
