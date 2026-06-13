@@ -1441,8 +1441,8 @@ function renderMarkdown(src) {
 /* Apply an array of OT ops to a text string (same logic as editor). */
 function applyOps(text, ops) {
     for (const op of ops) {
-        if (op.t === 'i') text = text.slice(0, op.pos) + op.text + text.slice(op.pos);
-        else              text = text.slice(0, op.pos) + text.slice(op.pos + op.len);
+        if (op.t === 'i') text = text.slice(0, op.pos) + (op.text || '') + text.slice(op.pos);
+        else              text = text.slice(0, op.pos) + text.slice(op.pos + (op.len || 0));
     }
     return text;
 }

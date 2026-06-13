@@ -183,6 +183,119 @@ empty, `otWaitingAck=true`, but nothing was sent — state machine stuck.
 Fixed: wrap in try/catch; on catch, restore `otPending = otSent.concat(otPending)`,
 clear `otSent`, reset `otWaitingAck`. Reconnect will recover correctly.
 
+### Second full audit fixes (2026-06-13)
+
+**C server (`collab.c`):**
+- **Eviction with unflushed dirty data**: `collab_tick` could evict a doc after a failed
+  flush (flush leaves `dirty=true`), permanently losing the in-memory content. Fixed by
+  only evicting when `!doc->dirty`.
+- **`parse_op` strdup OOM crash**: `strlen(op_out->text)` called when strdup returns NULL.
+  Added NULL check returning false on strdup failure.
+- **`base_version` integer overflow**: Client could send a huge float `base_version`
+  (e.g. 9e18) which cast to `int` wraps/overflows, bypassing version checks. Added
+  explicit range guard: reject if `< 0 || > INT_MAX` before casting.
+- **`COLLAB_FLUSH_SECS` type**: Was `5.0` (float literal) compared to `time_t` (integer).
+  Changed to `5` for clean integer arithmetic.
+
+**JS client (`editor.html`):**
+- **`xfOp`/`applyOps`/`adjustPos` null guards**: `b.text.length` throws if text is
+  undefined; `b.len` arithmetic with undefined produces NaN silently corrupting transforms.
+  `applyOps` with null `op.text` would produce literal `"null"` in content.
+  Added `b.text ? b.text.length : 0`, `b.len || 0`, `op.text || ''`, `op.len || 0`
+  guards throughout. Defensive against any malformed message from the server.
+
+### Third full audit fixes (2026-06-13)
+
+**JS view (`document.html`):**
+- **`applyOps` missing null guards**: `document.html` had its own copy of `applyOps`
+  without the null guards added to `editor.html` in the second audit. `op.text` (undefined
+  on malformed insert) would concatenate as the string `"undefined"` into `rawMarkdown`
+  (corrupting the live view), and `op.len` (undefined on malformed delete) would produce
+  `NaN` offsets making `text.slice(NaN)` return an empty string (dropping the rest of the
+  document). Fixed: `op.text || ''` and `op.len || 0` in `document.html:applyOps`.
+
+**No new C server issues found (third audit).** Verified:
+- `history_push` ring-buffer correctness — both branches correct, no double-free.
+- `apply_op` bounds clamping — full coverage for insert and delete.
+- `transform_op` delete-delete overlap formula — correct.
+- `history_gap` detection (`oldest_idx = ops_start % SIZE`) — no-op since `ops_start` is
+  always in `[0, COLLAB_OP_HISTORY)`, always points to actual oldest entry.
+- `collab_notify_replace` drain: `queue->content` nulled before `docs_mutex` released;
+  `free(NULL)` at end is safe for the doc-found path.
+- Locking model: all WS/tick functions on main thread; `docs_mutex` guards client slot reads
+  in broadcasts; `doc->mutex` guards content mutations. No races.
+- `otSent = []` cleared on every `init` (not just first-connect); reconnect computes fresh
+  diff from server canonical state to editor — correctly subsumes old pending ops.
+- `xfOps` bWins inversion for advancement is symmetric and consistent with server `hcopy`
+  advancement (`b_wins=false` in `transform_op(hcopy, old_ci, false)`).
+- Multi-op batch version tagging (all ops in one batch share same `doc->version`) is correct
+  — server's `> base_version` filter processes the whole batch atomically.
+
+### Fourth full audit fixes (2026-06-13)
+
+**C server (`collab.c`):**
+- **`history_push` strdup OOM → dangling pointer**: `doc->ops[idx] = *op` copies the
+  `client_ops[i].text` pointer into the history slot. If `strdup` then fails, `text` stays
+  as the original (soon-to-be-freed) pointer. When the caller frees `client_ops[i].text`
+  after broadcast, the history slot holds a dangling pointer — use-after-free on the next
+  transform that reads that history op. Fixed: on strdup failure set `doc->ops[idx].len = 0`
+  (text implicitly NULL from the failed strdup return). Both branches (not-full and full)
+  patched identically.
+
+**C server (`server.c`):**
+- **WS upgrade proceeds on `calloc` OOM**: If `calloc(ws_conn_data_t)` fails, the old code
+  still called `mg_ws_upgrade()` and skipped `collab_ws_connect`. The client got an open WS
+  connection that never received an `init` message — the editor would hang at "Syncing…"
+  until the WS was eventually closed. Fixed: return HTTP 503 immediately on OOM before
+  upgrading, so the client sees a proper error and retries.
+
+**No new JS issues found (fourth audit).** Verified:
+- `computeOps` edge cases: both-empty, prefix-only, suffix-only, identical — all correct.
+- `_otPrevContent` tracking consistent across all paths (input, programmatic, init, replace,
+  concurrent ops).
+- `saveDocument` no-op when connected; `persistDocument` correctly guards re-entrant saves.
+- Shift+Tab no-change path: `otApplyLocalChange` called with unchanged value → empty ops →
+  no mutation. Harmless.
+- `pool_pop_response` wakeup race: response always pushed before `mg_wakeup`, so the
+  MG_EV_WAKEUP handler always finds the item. Stale-conn path handled by `mg_wakeup` return.
+- `http_respond_error` JSON buffer (256 bytes) adequate for all literal message strings.
+- Error messages in `routes.c` all string literals — no user-controlled data in JSON errors.
+
+### Fifth full audit fixes — stability / memory exhaustion (2026-06-13)
+
+**C server (`collab.c` + `collab.h`):**
+
+- **No WS frame size limit**: `collab_ws_message` accepted frames of arbitrary size, allocating
+  `malloc(len+1)` unconditionally. A malicious or buggy client could send a multi-gigabyte WS
+  frame causing heap exhaustion and OOM crash. Fixed: reject frames larger than
+  `COLLAB_MAX_WS_MSG_BYTES` (10 MB) at the top of `collab_ws_message` before any allocation.
+
+- **`parse_op` float-to-int overflow on `pos` and `len`**: `(int)jp->valuedouble` without a
+  pre-cast range check. A `pos` value of `3e9` would overflow a 32-bit int to a large negative,
+  pass the `< 0` clamp (clamped to 0), and produce a silently wrong op. A `len` value similarly
+  overflows. Fixed: reject any `pos` or `len` double outside `[0, 2147483647]` before casting,
+  matching the existing `base_version` guard. (Post-cast negative-check removed since it is now
+  unreachable.)
+
+- **`(int)strlen(doc->content)` integer overflow**: On a document larger than ~2 GB (pathological
+  but possible on 64-bit systems), `strlen` returns `size_t > INT_MAX` and the cast wraps
+  negative, making all `parse_op` clamping wrong. Fixed: compute `strlen` as `size_t`, check
+  against `COLLAB_MAX_CONTENT_BYTES` before casting to `int`. Ops that arrive when the document
+  is already over the limit get a `replace` resync, preventing further growth.
+
+- **`collab_notify_replace` accepts arbitrarily large content**: A raw PUT with a 200 MB body
+  would `strdup` it into the notify queue (200 MB) then assign it to `doc->content` (another
+  allocation), plus cJSON would serialise it for broadcast (third copy). Fixed: reject content
+  larger than `COLLAB_MAX_CONTENT_BYTES` in `collab_notify_replace` before `strdup`.
+
+- **`strdup("")` OOM on first connect leaves active doc slot with NULL content**: If `strdup("")`
+  fails when no disk content exists, `doc->active = true` but `doc->content = NULL`. A later
+  `collab_ws_message` would call `strlen(NULL)` — undefined behaviour / crash. Fixed: on strdup
+  failure, immediately deactivate the slot, destroy its mutex, unlock, and send an error frame.
+
+- **Added constants to `collab.h`**: `COLLAB_MAX_WS_MSG_BYTES` (10 MB) and
+  `COLLAB_MAX_CONTENT_BYTES` (50 MB) as named limits for all size enforcement points.
+
 ### Multi-editor OT divergence — Root cause 1: wrong base for otPending
 **Root cause**: The concurrent-ops path in `editor.html` used `allLocal = [...otSent, ...otPending]`
 and called `xfOps(serverOps, allLocal, false)`. This treats `otPending` as concurrent to

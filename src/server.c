@@ -362,16 +362,19 @@ static void http_handler(struct mg_connection *c, int ev, void *ev_data) {
             doc_uuid[ulen] = '\0';
 
             ws_conn_data_t *wd = calloc(1, sizeof(ws_conn_data_t));
-            if (wd) {
-                ldmd_strlcpy(wd->doc_uuid, doc_uuid, sizeof(wd->doc_uuid));
-                wd->user_id = user.id;
-                ldmd_strlcpy(wd->username, user.username, sizeof(wd->username));
-                *(ws_conn_data_t **)c->data = wd;
+            if (!wd) {
+                mg_http_reply(c, 503, "Content-Type: text/plain\r\n",
+                              "Out of memory\n");
+                return;
             }
+            ldmd_strlcpy(wd->doc_uuid, doc_uuid, sizeof(wd->doc_uuid));
+            wd->user_id = user.id;
+            ldmd_strlcpy(wd->username, user.username, sizeof(wd->username));
+            *(ws_conn_data_t **)c->data = wd;
 
             mg_ws_upgrade(c, hm, NULL);
 
-            if (wd && server->collab)
+            if (server->collab)
                 collab_ws_connect(server->collab, server->db, server->config,
                                   c, doc_uuid, user.id, user.username);
             return;
@@ -415,6 +418,16 @@ static void http_handler(struct mg_connection *c, int ev, void *ev_data) {
             ? hm->query.len : sizeof(item->query_buf) - 1;
         memcpy(item->query_buf, hm->query.buf, n);
         item->query_buf[n] = '\0';
+
+        /* Enforce body size limit before allocating. */
+        if (server->config->max_body_size > 0 &&
+            hm->body.len > server->config->max_body_size) {
+            mg_http_reply(c, 413,
+                          "Content-Type: application/json\r\n",
+                          "{\"error\":\"Request body too large\"}");
+            work_item_free(item);
+            return;
+        }
 
         /* Deep-copy body */
         if (hm->body.len > 0) {

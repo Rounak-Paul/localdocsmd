@@ -1306,8 +1306,8 @@ function computeOps(oldText, newText) {
 /* Apply an array of ops to text. */
 function applyOps(text, ops) {
     for (const op of ops) {
-        if (op.t === 'i') text = text.slice(0, op.pos) + op.text + text.slice(op.pos);
-        else              text = text.slice(0, op.pos) + text.slice(op.pos + op.len);
+        if (op.t === 'i') text = text.slice(0, op.pos) + (op.text || '') + text.slice(op.pos);
+        else              text = text.slice(0, op.pos) + text.slice(op.pos + (op.len || 0));
     }
     return text;
 }
@@ -1321,7 +1321,7 @@ function applyOps(text, ops) {
 function xfOp(a, b, bWins) {
     a = Object.assign({}, a);
     if (b.t === 'i') {
-        const bLen = b.text.length;
+        const bLen = b.text ? b.text.length : 0;
         if (a.t === 'i') {
             /* bWins=true  → shift a when b.pos <= a.pos (b has priority on tie)
              * bWins=false → shift a only when b.pos <  a.pos (a has priority on tie) */
@@ -1331,7 +1331,7 @@ function xfOp(a, b, bWins) {
             else if (b.pos < a.pos + a.len) a.len += bLen;
         }
     } else {
-        const bLen = b.len, bEnd = b.pos + bLen;
+        const bLen = b.len || 0, bEnd = b.pos + bLen;
         if (a.t === 'i') {
             if (bEnd <= a.pos)      a.pos -= bLen;
             else if (b.pos < a.pos) a.pos  = b.pos;
@@ -1379,8 +1379,14 @@ function xfOps(ops, against, bWins) {
 /* Adjust a cursor position through a set of ops. */
 function adjustPos(pos, ops) {
     for (const op of ops) {
-        if (op.t === 'i') { if (op.pos <= pos) pos += op.text.length; }
-        else { if (op.pos + op.len <= pos) pos -= op.len; else if (op.pos < pos) pos = op.pos; }
+        if (op.t === 'i') {
+            const len = op.text ? op.text.length : 0;
+            if (op.pos <= pos) pos += len;
+        } else {
+            const len = op.len || 0;
+            if (op.pos + len <= pos) pos -= len;
+            else if (op.pos < pos) pos = op.pos;
+        }
     }
     return pos;
 }

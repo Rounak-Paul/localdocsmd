@@ -95,16 +95,20 @@ static void history_push(collab_doc_t *doc, const collab_op_t *op) {
         int idx = (doc->ops_start + doc->ops_count) % COLLAB_OP_HISTORY;
         op_free_text(&doc->ops[idx]);
         doc->ops[idx] = *op;
-        if (op->type == 'i' && op->text)
+        if (op->type == 'i' && op->text) {
             doc->ops[idx].text = strdup(op->text);
+            if (!doc->ops[idx].text) doc->ops[idx].len = 0;
+        }
         doc->ops_count++;
     } else {
         /* Ring is full — overwrite the oldest slot, then advance start. */
         int idx = doc->ops_start;
         op_free_text(&doc->ops[idx]);
         doc->ops[idx] = *op;
-        if (op->type == 'i' && op->text)
+        if (op->type == 'i' && op->text) {
             doc->ops[idx].text = strdup(op->text);
+            if (!doc->ops[idx].text) doc->ops[idx].len = 0;
+        }
         doc->ops_start = (doc->ops_start + 1) % COLLAB_OP_HISTORY;
     }
 }
@@ -248,8 +252,10 @@ static bool parse_op(const cJSON *jop, collab_op_t *op_out, int content_len) {
     if (!jt || !cJSON_IsString(jt) || !jp || !cJSON_IsNumber(jp)) return false;
 
     const char *t = jt->valuestring;
-    op_out->pos = (int)jp->valuedouble;
-    if (op_out->pos < 0) op_out->pos = 0;
+    /* Guard float-to-int cast: values outside [0, INT_MAX] would wrap on cast. */
+    double pos_raw = jp->valuedouble;
+    if (pos_raw < 0.0 || pos_raw > 2147483647.0) return false;
+    op_out->pos = (int)pos_raw;
     if (op_out->pos > content_len) op_out->pos = content_len;
 
     if (strcmp(t, "i") == 0) {
@@ -257,13 +263,15 @@ static bool parse_op(const cJSON *jop, collab_op_t *op_out, int content_len) {
         if (!jtxt || !cJSON_IsString(jtxt)) return false;
         op_out->type = 'i';
         op_out->text = strdup(jtxt->valuestring);
+        if (!op_out->text) return false;
         op_out->len  = (int)strlen(op_out->text);
     } else if (strcmp(t, "d") == 0) {
         cJSON *jlen = cJSON_GetObjectItem(jop, "len");
         if (!jlen || !cJSON_IsNumber(jlen)) return false;
+        double len_raw = jlen->valuedouble;
+        if (len_raw < 0.0 || len_raw > 2147483647.0) return false;
         op_out->type = 'd';
-        op_out->len  = (int)jlen->valuedouble;
-        if (op_out->len < 0) op_out->len = 0;
+        op_out->len  = (int)len_raw;
         int max_del = content_len - op_out->pos;
         if (op_out->len > max_del) op_out->len = max_del;
     } else {
@@ -350,7 +358,19 @@ void collab_ws_connect(collab_manager_t *cm, ldmd_database_t *db, ldmd_config_t 
         /* Load content from disk */
         char *disk_content = NULL;
         document_load_content(cfg, &ldoc, &disk_content);
-        doc->content = disk_content ? disk_content : strdup("");
+        if (disk_content) {
+            doc->content = disk_content;
+        } else {
+            doc->content = strdup("");
+            if (!doc->content) {
+                /* OOM — release the slot we just allocated and fail cleanly. */
+                doc->active = false;
+                pthread_mutex_destroy(&doc->mutex);
+                pthread_mutex_unlock(&cm->docs_mutex);
+                mg_ws_send(c, "{\"type\":\"error\",\"msg\":\"out of memory\"}", 38, WEBSOCKET_OP_TEXT);
+                return;
+            }
+        }
         doc->version = (int)ldoc.version;
     }
 
@@ -446,6 +466,7 @@ void collab_ws_disconnect(collab_manager_t *cm, ldmd_database_t *db, ldmd_config
 void collab_ws_message(collab_manager_t *cm, struct mg_connection *c,
                         const char *data, size_t len) {
     if (!cm || !c || !data || len == 0) return;
+    if (len > COLLAB_MAX_WS_MSG_BYTES) return;
 
     ws_conn_data_t *wd = *(ws_conn_data_t **)c->data;
     if (!wd) return;
@@ -479,7 +500,9 @@ void collab_ws_message(collab_manager_t *cm, struct mg_connection *c,
         return;
     }
 
-    int base_version = (int)jbase->valuedouble;
+    double bv_raw = jbase->valuedouble;
+    if (bv_raw < 0 || bv_raw > 2147483647.0) { cJSON_Delete(msg); return; }
+    int base_version = (int)bv_raw;
     /* Use the server-assigned collab_id from connection data, not the client-supplied
      * one — prevents a client from spoofing another session's collab_id. */
     const char *sender_collab_id = wd->collab_id;
@@ -526,7 +549,24 @@ void collab_ws_message(collab_manager_t *cm, struct mg_connection *c,
         return;
     }
     int valid_ops  = 0;
-    int running_len = doc->content ? (int)strlen(doc->content) : 0;
+    size_t cur_content_len = doc->content ? strlen(doc->content) : 0;
+    if (cur_content_len > (size_t)COLLAB_MAX_CONTENT_BYTES) {
+        /* Document already too large — reject all ops and force client resync. */
+        pthread_mutex_unlock(&doc->mutex);
+        pthread_mutex_unlock(&cm->docs_mutex);
+        free(client_ops);
+        cJSON_Delete(msg);
+        cJSON *rep = cJSON_CreateObject();
+        cJSON_AddStringToObject(rep, "type",    "replace");
+        cJSON_AddNumberToObject (rep, "version", doc->version);
+        cJSON_AddStringToObject (rep, "content", doc->content ? doc->content : "");
+        cJSON_AddStringToObject (rep, "by",      "");
+        char *repjson = cJSON_PrintUnformatted(rep);
+        cJSON_Delete(rep);
+        if (repjson) { mg_ws_send(c, repjson, strlen(repjson), WEBSOCKET_OP_TEXT); free(repjson); }
+        return;
+    }
+    int running_len = (int)cur_content_len;
     for (int i = 0; i < n_ops; i++) {
         cJSON *jop = cJSON_GetArrayItem(jops, i);
         if (!jop) continue;
@@ -694,6 +734,7 @@ void collab_notify_replace(collab_manager_t *cm, const char *doc_uuid,
                             const char *content, int64_t by_user_id,
                             const char *by_username) {
     if (!cm || !doc_uuid || !content) return;
+    if (strlen(content) > COLLAB_MAX_CONTENT_BYTES) return;
 
     collab_notify_t *n = calloc(1, sizeof(collab_notify_t));
     if (!n) return;
@@ -777,8 +818,8 @@ void collab_tick(collab_manager_t *cm, ldmd_database_t *db, ldmd_config_t *cfg) 
                 flush_doc(doc, db, cfg);
                 pthread_mutex_unlock(&doc->mutex);
             }
-            /* Evict only after the grace period expires. */
-            if (now - doc->last_empty_at >= COLLAB_SESSION_GRACE_SECS) {
+            /* Evict only after the grace period expires and no pending dirty data. */
+            if (now - doc->last_empty_at >= COLLAB_SESSION_GRACE_SECS && !doc->dirty) {
                 free_doc_content(doc);
                 pthread_mutex_destroy(&doc->mutex);
                 doc->active = false;

@@ -11,11 +11,18 @@
 #define COLLAB_MAX_DOCS           64
 #define COLLAB_MAX_CLIENTS        32
 #define COLLAB_OP_HISTORY         2000
-#define COLLAB_FLUSH_SECS         5.0
+#define COLLAB_FLUSH_SECS         5
 /* Session stays alive this many seconds after the last client disconnects.
  * Ensures a page refresh reconnects to the in-memory canonical content
  * rather than potentially stale on-disk content. */
 #define COLLAB_SESSION_GRACE_SECS 10
+/* Maximum WebSocket frame size accepted for OT messages (10 MB).
+ * Frames larger than this are dropped to prevent memory exhaustion. */
+#define COLLAB_MAX_WS_MSG_BYTES   (10 * 1024 * 1024)
+/* Maximum document content size tracked in-memory (50 MB).
+ * Ops that would push content beyond this are rejected and the client
+ * receives a replace resync so it stays in a known-good state. */
+#define COLLAB_MAX_CONTENT_BYTES  (50 * 1024 * 1024)
 
 /**
  * Per-WebSocket-connection metadata stored in mg_connection->data as a pointer.
