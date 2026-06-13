@@ -149,6 +149,40 @@ producing wrong transforms.
 ### replace message toast
 Empty `by` field (resync messages) no longer shows a misleading toast.
 
+## Complete Audit Fixes (2026-06-13)
+
+### history_push double-free (memory corruption)
+When ring buffer is full: `idx = (start + count) % SIZE = start`. Old code freed
+`doc->ops[idx]`, wrote new op, then freed `doc->ops[ops_start]` again (same slot) —
+double-free on the just-written text. Fixed by splitting into two branches: not-full
+(append at end, increment count) and full (overwrite oldest, advance start).
+
+### apply_op: no bounds check on insert position
+If transform produces out-of-range pos, `memcpy(r, text, op->pos)` over-reads.
+Fixed: clamp `ipos = clamp(op->pos, 0, tlen)` before all memcpy calls for both insert and delete.
+Also use `strlen(op->text)` for ilen to guard against len/text mismatch.
+
+### parse_op: single content_len for all ops in a batch
+All batch ops were parsed using server content_len (state before batch). op[1] was
+designed for the state after op[0]. Fix: maintain `running_len` during parse loop,
+advancing it by each successfully parsed op's effect (insert adds, delete subtracts).
+
+### Stale position clamp in apply loop removed
+The old `client_ops[i+1].pos > nc_len` clamp after each apply was unnecessary after
+parse now handles clamping per-op, and apply_op now clamps internally. Removed.
+
+### Spoofed collab_id in op messages
+Server used `jcid->valuestring` (client-supplied) as `sender_collab_id`. A malicious
+client could send another session's collab_id, causing the real owner to treat the
+broadcast as its own ack. Fixed: use `wd->collab_id` (server-assigned at connect time).
+
+### otWs.send() uncaught exception (client)
+`otWs.send()` can throw `InvalidStateError` if WS enters CLOSING state between the
+`otConnected` check and the actual send. On throw, `otSent` had ops, `otPending` was
+empty, `otWaitingAck=true`, but nothing was sent — state machine stuck.
+Fixed: wrap in try/catch; on catch, restore `otPending = otSent.concat(otPending)`,
+clear `otSent`, reset `otWaitingAck`. Reconnect will recover correctly.
+
 ### Multi-editor OT divergence — Root cause 1: wrong base for otPending
 **Root cause**: The concurrent-ops path in `editor.html` used `allLocal = [...otSent, ...otPending]`
 and called `xfOps(serverOps, allLocal, false)`. This treats `otPending` as concurrent to

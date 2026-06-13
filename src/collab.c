@@ -18,24 +18,26 @@ static void op_free_text(collab_op_t *op) {
 static char *apply_op(const char *text, const collab_op_t *op) {
     size_t tlen = strlen(text);
     if (op->type == 'i') {
-        size_t ilen = (size_t)op->len;
+        int ipos = op->pos < 0 ? 0 : (op->pos > (int)tlen ? (int)tlen : op->pos);
+        size_t ilen = op->text ? strlen(op->text) : 0;
         char *r = malloc(tlen + ilen + 1);
         if (!r) return NULL;
-        memcpy(r, text, (size_t)op->pos);
-        memcpy(r + op->pos, op->text, ilen);
-        memcpy(r + op->pos + ilen, text + op->pos, tlen - (size_t)op->pos);
+        memcpy(r, text, (size_t)ipos);
+        if (ilen) memcpy(r + ipos, op->text, ilen);
+        memcpy(r + ipos + ilen, text + ipos, tlen - (size_t)ipos);
         r[tlen + ilen] = '\0';
         return r;
     } else {
-        int end = op->pos + op->len;
+        int pos = op->pos < 0 ? 0 : (op->pos > (int)tlen ? (int)tlen : op->pos);
+        int end = pos + op->len;
         if (end > (int)tlen) end = (int)tlen;
-        int actual = end - op->pos;
+        int actual = end - pos;
         if (actual <= 0) return strdup(text);
         size_t nlen = tlen - (size_t)actual;
         char *r = malloc(nlen + 1);
         if (!r) return NULL;
-        memcpy(r, text, (size_t)op->pos);
-        memcpy(r + op->pos, text + end, tlen - (size_t)end);
+        memcpy(r, text, (size_t)pos);
+        memcpy(r + pos, text + end, tlen - (size_t)end);
         r[nlen] = '\0';
         return r;
     }
@@ -89,15 +91,20 @@ static collab_op_t transform_op(collab_op_t a, const collab_op_t *b, bool b_wins
 /* ── Op history ring buffer ───────────────────────────────────────── */
 
 static void history_push(collab_doc_t *doc, const collab_op_t *op) {
-    int idx = (doc->ops_start + doc->ops_count) % COLLAB_OP_HISTORY;
-    op_free_text(&doc->ops[idx]);
-    doc->ops[idx] = *op;
-    if (op->type == 'i' && op->text)
-        doc->ops[idx].text = strdup(op->text);
     if (doc->ops_count < COLLAB_OP_HISTORY) {
+        int idx = (doc->ops_start + doc->ops_count) % COLLAB_OP_HISTORY;
+        op_free_text(&doc->ops[idx]);
+        doc->ops[idx] = *op;
+        if (op->type == 'i' && op->text)
+            doc->ops[idx].text = strdup(op->text);
         doc->ops_count++;
     } else {
-        op_free_text(&doc->ops[doc->ops_start]);
+        /* Ring is full — overwrite the oldest slot, then advance start. */
+        int idx = doc->ops_start;
+        op_free_text(&doc->ops[idx]);
+        doc->ops[idx] = *op;
+        if (op->type == 'i' && op->text)
+            doc->ops[idx].text = strdup(op->text);
         doc->ops_start = (doc->ops_start + 1) % COLLAB_OP_HISTORY;
     }
 }
@@ -473,7 +480,9 @@ void collab_ws_message(collab_manager_t *cm, struct mg_connection *c,
     }
 
     int base_version = (int)jbase->valuedouble;
-    const char *sender_collab_id = jcid->valuestring;
+    /* Use the server-assigned collab_id from connection data, not the client-supplied
+     * one — prevents a client from spoofing another session's collab_id. */
+    const char *sender_collab_id = wd->collab_id;
     int n_ops = cJSON_GetArraySize(jops);
     if (n_ops <= 0 || n_ops > 512) { cJSON_Delete(msg); return; }
 
@@ -507,9 +516,8 @@ void collab_ws_message(collab_manager_t *cm, struct mg_connection *c,
         return;
     }
 
-    int content_len = doc->content ? (int)strlen(doc->content) : 0;
-
-    /* Parse client ops */
+    /* Parse client ops, tracking running content length so each op's pos/len
+     * is clamped against the correct base (after all prior ops in this batch). */
     collab_op_t *client_ops = calloc((size_t)n_ops, sizeof(collab_op_t));
     if (!client_ops) {
         pthread_mutex_unlock(&doc->mutex);
@@ -517,11 +525,17 @@ void collab_ws_message(collab_manager_t *cm, struct mg_connection *c,
         cJSON_Delete(msg);
         return;
     }
-    int valid_ops = 0;
+    int valid_ops  = 0;
+    int running_len = doc->content ? (int)strlen(doc->content) : 0;
     for (int i = 0; i < n_ops; i++) {
         cJSON *jop = cJSON_GetArrayItem(jops, i);
         if (!jop) continue;
-        if (parse_op(jop, &client_ops[valid_ops], content_len)) {
+        if (parse_op(jop, &client_ops[valid_ops], running_len)) {
+            /* Advance running_len for the next op in the batch. */
+            const collab_op_t *cop = &client_ops[valid_ops];
+            if (cop->type == 'i') running_len += cop->len;
+            else                  running_len -= cop->len;
+            if (running_len < 0) running_len = 0;
             valid_ops++;
         }
     }
@@ -621,10 +635,6 @@ void collab_ws_message(collab_manager_t *cm, struct mg_connection *c,
         if (!tmp) { oom = true; break; }
         free(new_content);
         new_content = tmp;
-        /* Clamp positions for subsequent ops */
-        int nc_len = (int)strlen(new_content);
-        if (i + 1 < valid_ops && client_ops[i+1].pos > nc_len)
-            client_ops[i+1].pos = nc_len;
     }
     if (oom) {
         free(new_content);

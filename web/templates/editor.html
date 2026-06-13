@@ -1417,7 +1417,14 @@ function otDoFlush() {
     otSent       = otPending;
     otPending    = [];
     otWaitingAck = true;
-    otWs.send(JSON.stringify({type:'op', base_version:otVersion, collab_id:otCollabId, ops:otSent}));
+    try {
+        otWs.send(JSON.stringify({type:'op', base_version:otVersion, collab_id:otCollabId, ops:otSent}));
+    } catch(_) {
+        /* WS closed between check and send — onclose will reconnect and recover. */
+        otWaitingAck = false;
+        otPending    = otSent.concat(otPending);
+        otSent       = [];
+    }
 }
 
 /* Schedule a flush; resets the debounce window on each call. */
