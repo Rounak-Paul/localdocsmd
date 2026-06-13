@@ -1756,6 +1756,65 @@ body {
     min-height: 100vh;
 }
 
+body.has-bg-canvas {
+    background: transparent;
+}
+
+#bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    pointer-events: none;
+}
+
+/* Tints the canvas with the theme base colour — thin enough that
+   the animation is clearly visible through all surfaces. */
+#bg-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--bg-color);
+    opacity: 0.60;
+    transition: opacity 0.4s ease;
+}
+
+/* When a canvas background is active, all opaque surfaces become
+   semi-transparent so the animation shows through everywhere. */
+body.has-bg-canvas .navbar {
+    background: color-mix(in srgb, var(--navbar-bg) 70%, transparent) !important;
+    backdrop-filter: blur(14px);
+}
+
+/* Editor page is position:fixed z-index:1 — must be cleared explicitly */
+body.has-bg-canvas .editor-page {
+    background: transparent !important;
+}
+
+body.has-bg-canvas .doc-body,
+body.has-bg-canvas .editor-pane,
+body.has-bg-canvas .preview-pane {
+    background: color-mix(in srgb, var(--card-bg) 55%, transparent) !important;
+    backdrop-filter: blur(4px);
+}
+
+body.has-bg-canvas .pane-header {
+    background: color-mix(in srgb, var(--divider) 60%, transparent) !important;
+}
+
+body.has-bg-canvas .card,
+body.has-bg-canvas .modal-content,
+body.has-bg-canvas .nav-popup-menu,
+body.has-bg-canvas .user-dropdown,
+body.has-bg-canvas .toc-sidebar,
+body.has-bg-canvas .history-drawer,
+body.has-bg-canvas .chat-drawer {
+    background: color-mix(in srgb, var(--card-bg) 78%, transparent) !important;
+    backdrop-filter: blur(10px);
+}
+
 ::selection {
     background: var(--primary-color);
     color: white;
@@ -2165,6 +2224,46 @@ body {
     font-size: 0.78rem;
     color: var(--text-muted);
     text-align: center;
+}
+
+/* ========================================
+   Background picker dropdown
+   ======================================== */
+
+.bg-popup {
+    min-width: 210px;
+}
+
+.bg-list {
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 0.25rem 0;
+}
+
+.bg-list::-webkit-scrollbar { width: 4px; }
+.bg-list::-webkit-scrollbar-track { background: transparent; }
+.bg-list::-webkit-scrollbar-thumb { background: var(--border-color); }
+
+.nav-bg-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.bg-preview {
+    width: 28px;
+    height: 18px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.15);
+    overflow: hidden;
+    position: relative;
+}
+
+.bg-preview canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 /* ========================================

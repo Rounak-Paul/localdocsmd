@@ -181,6 +181,15 @@ static void set_navbar(template_ctx_t *ctx, http_request_t *req) {
         "<button class=\"nav-popup-item nav-reading-font-item\" data-reading-font=\"cascadia-cove\" onclick=\"setReadingFont('cascadia-cove')\">CaskaydiaCove NF</button>"
         "<button class=\"nav-popup-item nav-reading-font-item\" data-reading-font=\"jetbrains-mono\" onclick=\"setReadingFont('jetbrains-mono')\">JetBrainsMono NF</button>"
         "</div>"
+        "</div>"
+        "<div class=\"nav-popup-wrap\">"
+        "<button class=\"nav-popup-btn\" onclick=\"toggleNavPopup('bg-dd')\" title=\"Background\">"
+        "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><circle cx=\"8.5\" cy=\"8.5\" r=\"1.5\"/><polyline points=\"21 15 16 10 5 21\"/></svg>"
+        "</button>"
+        "<div class=\"nav-popup-menu bg-popup\" id=\"bg-dd\">"
+        "<div class=\"nav-popup-hdr\">Background</div>"
+        "<div class=\"bg-list\" id=\"bg-list\"></div>"
+        "</div>"
         "</div>");
 
     if (n < 0) n = 0;
