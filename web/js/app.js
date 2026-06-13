@@ -28,6 +28,175 @@ function applyReadingFont(stack) {
 }
 
 /**
+ * Full theme registry. Each entry drives: the navbar swatch, mermaid themeVariables,
+ * and Plotly colour palette. Add new themes here + a matching CSS [data-theme] block.
+ * Fields: id, label, swatch (bg hex), swatchBorder (hex),
+ *   mermaid { mainBkg, nodeBorder, lineColor, textColor, clusterBkg, edgeLabelBg },
+ *   plot { bg, text, grid, tick, line }
+ */
+const THEMES = [
+    { id:'midnight',       label:'Midnight',        swatch:'#06080f', swatchBorder:'#60a5fa',
+      mermaid:{ mainBkg:'#0a0e1a', nodeBorder:'#60a5fa', lineColor:'#7890b8', textColor:'#e8eef8', clusterBkg:'#0a0e1a', edgeLabelBg:'#0a0e1a' },
+      plot:{ bg:'#0a0e1a', text:'#e8eef8', grid:'#162030', tick:'#7890b8', line:'#1e2d40' } },
+
+    { id:'daylight',       label:'Daylight',        swatch:'#fdf8f0', swatchBorder:'#c2610a',
+      mermaid:{ mainBkg:'#fffcf7', nodeBorder:'#c2610a', lineColor:'#7a5535', textColor:'#2c1a0a', clusterBkg:'#f0e4d0', edgeLabelBg:'#fffcf7' },
+      plot:{ bg:'#fffcf7', text:'#2c1a0a', grid:'#e8d5bc', tick:'#7a5535', line:'#d4b896' } },
+
+    { id:'catppuccin',     label:'Catppuccin',      swatch:'#1e1e2e', swatchBorder:'#cba6f7',
+      mermaid:{ mainBkg:'#181825', nodeBorder:'#cba6f7', lineColor:'#a6adc8', textColor:'#cdd6f4', clusterBkg:'#181825', edgeLabelBg:'#181825' },
+      plot:{ bg:'#181825', text:'#cdd6f4', grid:'#313244', tick:'#a6adc8', line:'#45475a' } },
+
+    { id:'obsidian',       label:'Obsidian',        swatch:'#1a1625', swatchBorder:'#7c6f9e',
+      mermaid:{ mainBkg:'#242038', nodeBorder:'#7c6f9e', lineColor:'#8e8ea0', textColor:'#dcddde', clusterBkg:'#1e1a2e', edgeLabelBg:'#242038' },
+      plot:{ bg:'#242038', text:'#dcddde', grid:'#2e2a40', tick:'#8e8ea0', line:'#3a3550' } },
+
+    { id:'oled',           label:'OLED',            swatch:'#000000', swatchBorder:'#00e5ff',
+      mermaid:{ mainBkg:'#0a0a0a', nodeBorder:'#00e5ff', lineColor:'#808080', textColor:'#e8e8e8', clusterBkg:'#050505', edgeLabelBg:'#0a0a0a' },
+      plot:{ bg:'#0a0a0a', text:'#e8e8e8', grid:'#1a1a1a', tick:'#808080', line:'#2a2a2a' } },
+
+    { id:'dracula',        label:'Dracula',         swatch:'#282a36', swatchBorder:'#bd93f9',
+      mermaid:{ mainBkg:'#21222c', nodeBorder:'#bd93f9', lineColor:'#6272a4', textColor:'#f8f8f2', clusterBkg:'#21222c', edgeLabelBg:'#21222c' },
+      plot:{ bg:'#21222c', text:'#f8f8f2', grid:'#44475a', tick:'#6272a4', line:'#44475a' } },
+
+    { id:'nord',           label:'Nord',            swatch:'#2e3440', swatchBorder:'#88c0d0',
+      mermaid:{ mainBkg:'#3b4252', nodeBorder:'#88c0d0', lineColor:'#9099aa', textColor:'#eceff4', clusterBkg:'#3b4252', edgeLabelBg:'#3b4252' },
+      plot:{ bg:'#3b4252', text:'#eceff4', grid:'#434c5e', tick:'#9099aa', line:'#4c566a' } },
+
+    { id:'gruvbox',        label:'Gruvbox',         swatch:'#282828', swatchBorder:'#fabd2f',
+      mermaid:{ mainBkg:'#282828', nodeBorder:'#fabd2f', lineColor:'#928374', textColor:'#ebdbb2', clusterBkg:'#3c3836', edgeLabelBg:'#282828' },
+      plot:{ bg:'#282828', text:'#ebdbb2', grid:'#3c3836', tick:'#928374', line:'#504945' } },
+
+    { id:'solarized-light',label:'Solarized Light', swatch:'#fdf6e3', swatchBorder:'#268bd2',
+      mermaid:{ mainBkg:'#eee8d5', nodeBorder:'#268bd2', lineColor:'#839496', textColor:'#657b83', clusterBkg:'#e8e2d0', edgeLabelBg:'#fdf6e3' },
+      plot:{ bg:'#eee8d5', text:'#657b83', grid:'#d3cbb8', tick:'#839496', line:'#b9b2a0' } },
+
+    { id:'solarized-dark', label:'Solarized Dark',  swatch:'#002b36', swatchBorder:'#268bd2',
+      mermaid:{ mainBkg:'#073642', nodeBorder:'#268bd2', lineColor:'#657b83', textColor:'#839496', clusterBkg:'#073642', edgeLabelBg:'#073642' },
+      plot:{ bg:'#073642', text:'#839496', grid:'#073642', tick:'#657b83', line:'#0a4050' } },
+
+    { id:'tokyo-night',    label:'Tokyo Night',     swatch:'#1a1b26', swatchBorder:'#7aa2f7',
+      mermaid:{ mainBkg:'#24283b', nodeBorder:'#7aa2f7', lineColor:'#565f89', textColor:'#c0caf5', clusterBkg:'#1f2335', edgeLabelBg:'#24283b' },
+      plot:{ bg:'#24283b', text:'#c0caf5', grid:'#292e42', tick:'#565f89', line:'#3b4261' } },
+
+    { id:'monokai',        label:'Monokai',         swatch:'#272822', swatchBorder:'#a6e22e',
+      mermaid:{ mainBkg:'#1e1f1a', nodeBorder:'#a6e22e', lineColor:'#75715e', textColor:'#f8f8f2', clusterBkg:'#1e1f1a', edgeLabelBg:'#1e1f1a' },
+      plot:{ bg:'#1e1f1a', text:'#f8f8f2', grid:'#3e3d32', tick:'#75715e', line:'#49483e' } },
+
+    { id:'github-light',   label:'GitHub Light',    swatch:'#ffffff', swatchBorder:'#0969da',
+      mermaid:{ mainBkg:'#f6f8fa', nodeBorder:'#0969da', lineColor:'#656d76', textColor:'#1f2328', clusterBkg:'#eaeef2', edgeLabelBg:'#ffffff' },
+      plot:{ bg:'#f6f8fa', text:'#1f2328', grid:'#d0d7de', tick:'#656d76', line:'#8c959f' } },
+
+    { id:'github-dark',    label:'GitHub Dark',     swatch:'#0d1117', swatchBorder:'#58a6ff',
+      mermaid:{ mainBkg:'#161b22', nodeBorder:'#58a6ff', lineColor:'#8b949e', textColor:'#e6edf3', clusterBkg:'#161b22', edgeLabelBg:'#161b22' },
+      plot:{ bg:'#161b22', text:'#e6edf3', grid:'#30363d', tick:'#8b949e', line:'#30363d' } },
+
+    { id:'forest',         label:'Forest',          swatch:'#0f1c0f', swatchBorder:'#4caf50',
+      mermaid:{ mainBkg:'#162416', nodeBorder:'#4caf50', lineColor:'#7ea87e', textColor:'#dcedc8', clusterBkg:'#132113', edgeLabelBg:'#162416' },
+      plot:{ bg:'#162416', text:'#dcedc8', grid:'#1c2e1c', tick:'#7ea87e', line:'#243c24' } },
+
+    { id:'rose',           label:'Rose',            swatch:'#1a0a0e', swatchBorder:'#f43f5e',
+      mermaid:{ mainBkg:'#220d12', nodeBorder:'#f43f5e', lineColor:'#be7b86', textColor:'#ffe4e6', clusterBkg:'#1a0a0e', edgeLabelBg:'#220d12' },
+      plot:{ bg:'#220d12', text:'#ffe4e6', grid:'#2e1018', tick:'#be7b86', line:'#3a1420' } },
+
+    { id:'sunset',         label:'Sunset',          swatch:'#18100a', swatchBorder:'#f97316',
+      mermaid:{ mainBkg:'#201408', nodeBorder:'#f97316', lineColor:'#c07040', textColor:'#fff7ed', clusterBkg:'#180e05', edgeLabelBg:'#201408' },
+      plot:{ bg:'#201408', text:'#fff7ed', grid:'#2a1c0e', tick:'#c07040', line:'#3a2810' } },
+
+    { id:'ocean',          label:'Ocean',           swatch:'#061820', swatchBorder:'#06b6d4',
+      mermaid:{ mainBkg:'#0a2233', nodeBorder:'#06b6d4', lineColor:'#4e9aaa', textColor:'#cffafe', clusterBkg:'#061820', edgeLabelBg:'#0a2233' },
+      plot:{ bg:'#0a2233', text:'#cffafe', grid:'#0e2d42', tick:'#4e9aaa', line:'#163a50' } },
+
+    { id:'aurora',         label:'Aurora',          swatch:'#0c0a1a', swatchBorder:'#a78bfa',
+      mermaid:{ mainBkg:'#13102a', nodeBorder:'#a78bfa', lineColor:'#7c6aa6', textColor:'#ede9fe', clusterBkg:'#0c0a1a', edgeLabelBg:'#13102a' },
+      plot:{ bg:'#13102a', text:'#ede9fe', grid:'#1a1636', tick:'#7c6aa6', line:'#24205a' } },
+
+    { id:'slate',          label:'Slate',           swatch:'#0f172a', swatchBorder:'#94a3b8',
+      mermaid:{ mainBkg:'#1e293b', nodeBorder:'#94a3b8', lineColor:'#64748b', textColor:'#e2e8f0', clusterBkg:'#0f172a', edgeLabelBg:'#1e293b' },
+      plot:{ bg:'#1e293b', text:'#e2e8f0', grid:'#263244', tick:'#64748b', line:'#334155' } },
+
+    { id:'copper',         label:'Copper',          swatch:'#1a1208', swatchBorder:'#b87333',
+      mermaid:{ mainBkg:'#221608', nodeBorder:'#b87333', lineColor:'#a07840', textColor:'#fef3e2', clusterBkg:'#180f05', edgeLabelBg:'#221608' },
+      plot:{ bg:'#221608', text:'#fef3e2', grid:'#2e1e0c', tick:'#a07840', line:'#3c2a10' } },
+
+    { id:'sakura',         label:'Sakura',          swatch:'#fdf2f8', swatchBorder:'#e879a0',
+      mermaid:{ mainBkg:'#fce7f3', nodeBorder:'#e879a0', lineColor:'#a0608a', textColor:'#4a1535', clusterBkg:'#fde8f4', edgeLabelBg:'#fdf2f8' },
+      plot:{ bg:'#fce7f3', text:'#4a1535', grid:'#f0b8d0', tick:'#a0608a', line:'#e879a0' } },
+
+    { id:'terminal',       label:'Terminal',        swatch:'#000000', swatchBorder:'#00ff41',
+      mermaid:{ mainBkg:'#0a0a0a', nodeBorder:'#00ff41', lineColor:'#007a1e', textColor:'#00ff41', clusterBkg:'#050505', edgeLabelBg:'#000000' },
+      plot:{ bg:'#0a0a0a', text:'#00ff41', grid:'#1a1a1a', tick:'#007a1e', line:'#003010' } },
+
+    { id:'coffee',         label:'Coffee',          swatch:'#1a1410', swatchBorder:'#c8924a',
+      mermaid:{ mainBkg:'#241e18', nodeBorder:'#c8924a', lineColor:'#987850', textColor:'#f5e6d0', clusterBkg:'#1a1410', edgeLabelBg:'#241e18' },
+      plot:{ bg:'#241e18', text:'#f5e6d0', grid:'#2e2620', tick:'#987850', line:'#3a3020' } },
+
+    { id:'arctic',         label:'Arctic',          swatch:'#f0f6fc', swatchBorder:'#5e9fd8',
+      mermaid:{ mainBkg:'#e4eef8', nodeBorder:'#5e9fd8', lineColor:'#4a7098', textColor:'#0d2340', clusterBkg:'#e4eef8', edgeLabelBg:'#f0f6fc' },
+      plot:{ bg:'#e4eef8', text:'#0d2340', grid:'#c4d8ee', tick:'#4a7098', line:'#94bade' } },
+
+    { id:'hc-light',       label:'HC Light',        swatch:'#ffffff', swatchBorder:'#000000',
+      mermaid:{ mainBkg:'#ffffff', nodeBorder:'#000000', lineColor:'#000000', textColor:'#000000', clusterBkg:'#f0f0f0', edgeLabelBg:'#ffffff' },
+      plot:{ bg:'#ffffff', text:'#000000', grid:'#767676', tick:'#000000', line:'#000000' } },
+
+    { id:'hc-dark',        label:'HC Dark',         swatch:'#000000', swatchBorder:'#ffffff',
+      mermaid:{ mainBkg:'#0d0d0d', nodeBorder:'#ffff00', lineColor:'#ffffff', textColor:'#ffffff', clusterBkg:'#0d0d0d', edgeLabelBg:'#0d0d0d' },
+      plot:{ bg:'#0d0d0d', text:'#ffffff', grid:'#767676', tick:'#ffffff', line:'#767676' } },
+];
+
+/**
+ * Populates #theme-list with buttons generated from THEMES, marks the active
+ * entry, and attaches hover-preview listeners. Hovering previews the theme
+ * visually (CSS only, no Mermaid/Plotly re-render); clicking commits it.
+ */
+function initThemeList() {
+    const list = document.getElementById('theme-list');
+    if (!list) return;
+    list.innerHTML = THEMES.map(t =>
+        `<button class="nav-popup-item nav-theme-item" data-theme="${t.id}">`+
+        `<span class="theme-swatch" style="background:${t.swatch};border-color:${t.swatchBorder}"></span>`+
+        `${t.label}</button>`
+    ).join('');
+    const saved = localStorage.getItem('ldmd-theme') || 'midnight';
+    list.querySelectorAll('.nav-theme-item').forEach(b => {
+        b.classList.toggle('active', b.dataset.theme === saved);
+        b.addEventListener('mouseenter', () => {
+            document.documentElement.setAttribute('data-theme', b.dataset.theme);
+        });
+        b.addEventListener('mouseleave', () => {
+            const current = localStorage.getItem('ldmd-theme') || 'midnight';
+            document.documentElement.setAttribute('data-theme', current);
+        });
+        b.addEventListener('click', () => setTheme(b.dataset.theme));
+    });
+}
+
+/**
+ * Filters the theme list to entries whose label contains the query string
+ * (case-insensitive). Shows a no-results message when nothing matches.
+ * @param {string} q - Search query
+ */
+function filterThemes(q) {
+    const list = document.getElementById('theme-list');
+    if (!list) return;
+    const lq = q.trim().toLowerCase();
+    let visible = 0;
+    list.querySelectorAll('.nav-theme-item').forEach(b => {
+        const match = !lq || b.textContent.trim().toLowerCase().includes(lq);
+        b.style.display = match ? '' : 'none';
+        if (match) visible++;
+    });
+    let noRes = list.querySelector('.theme-no-results');
+    if (!visible) {
+        if (!noRes) { noRes = document.createElement('div'); noRes.className = 'theme-no-results'; list.appendChild(noRes); }
+        noRes.textContent = 'No themes match "' + q.trim() + '"';
+        noRes.style.display = '';
+    } else if (noRes) {
+        noRes.style.display = 'none';
+    }
+}
+
+/**
  * Mermaid initialize config per UI theme. Uses themeVariables so colours
  * match the active palette exactly rather than relying on Mermaid's own
  * built-in dark/default tokens which ignore our CSS variables.
@@ -35,93 +204,20 @@ function applyReadingFont(stack) {
  * @returns {object} Mermaid initialize options object
  */
 function mermaidConfigFor(theme) {
-    const configs = {
-        'daylight': {
-            theme: 'base',
-            themeVariables: {
-                primaryColor: '#f5ede0', primaryTextColor: '#2c1a0a',
-                primaryBorderColor: '#c2610a', lineColor: '#7a5535',
-                secondaryColor: '#fdf8f0', tertiaryColor: '#fffcf7',
-                background: '#fdf8f0', mainBkg: '#fffcf7',
-                nodeBorder: '#c2610a', clusterBkg: '#f0e4d0',
-                titleColor: '#2c1a0a', edgeLabelBackground: '#fffcf7',
-                fontFamily: 'inherit', fontSize: '13px',
-            },
-        },
-        'hc-light': {
-            theme: 'base',
-            themeVariables: {
-                primaryColor: '#dbeafe', primaryTextColor: '#000000',
-                primaryBorderColor: '#000000', lineColor: '#000000',
-                secondaryColor: '#f0fdf4', tertiaryColor: '#fffbeb',
-                background: '#ffffff', mainBkg: '#ffffff',
-                nodeBorder: '#000000', clusterBkg: '#f0f0f0',
-                titleColor: '#000000', edgeLabelBackground: '#ffffff',
-                fontFamily: 'inherit', fontSize: '13px',
-            },
-        },
-        'midnight': {
-            theme: 'base',
-            themeVariables: {
-                primaryColor: '#0d1628', primaryTextColor: '#e8eef8',
-                primaryBorderColor: '#60a5fa', lineColor: '#7890b8',
-                secondaryColor: '#080c18', tertiaryColor: '#06080f',
-                background: '#06080f', mainBkg: '#0a0e1a',
-                nodeBorder: '#60a5fa', clusterBkg: '#0a0e1a',
-                titleColor: '#e8eef8', edgeLabelBackground: '#0a0e1a',
-                fontFamily: 'inherit', fontSize: '13px',
-            },
-        },
-        'catppuccin': {
-            theme: 'base',
-            themeVariables: {
-                primaryColor: '#313244', primaryTextColor: '#cdd6f4',
-                primaryBorderColor: '#cba6f7', lineColor: '#a6adc8',
-                secondaryColor: '#1e1e2e', tertiaryColor: '#11111b',
-                background: '#1e1e2e', mainBkg: '#181825',
-                nodeBorder: '#cba6f7', clusterBkg: '#181825',
-                titleColor: '#cdd6f4', edgeLabelBackground: '#181825',
-                fontFamily: 'inherit', fontSize: '13px',
-            },
-        },
-        'oled': {
-            theme: 'base',
-            themeVariables: {
-                primaryColor: '#0a1a1a', primaryTextColor: '#e8e8e8',
-                primaryBorderColor: '#00e5ff', lineColor: '#808080',
-                secondaryColor: '#050505', tertiaryColor: '#020202',
-                background: '#000000', mainBkg: '#0a0a0a',
-                nodeBorder: '#00e5ff', clusterBkg: '#050505',
-                titleColor: '#e8e8e8', edgeLabelBackground: '#0a0a0a',
-                fontFamily: 'inherit', fontSize: '13px',
-            },
-        },
-        'obsidian': {
-            theme: 'base',
-            themeVariables: {
-                primaryColor: '#2a2139', primaryTextColor: '#dcddde',
-                primaryBorderColor: '#7c6f9e', lineColor: '#8e8ea0',
-                secondaryColor: '#1e1a2e', tertiaryColor: '#16131f',
-                background: '#1a1625', mainBkg: '#242038',
-                nodeBorder: '#7c6f9e', clusterBkg: '#1e1a2e',
-                titleColor: '#dcddde', edgeLabelBackground: '#242038',
-                fontFamily: 'inherit', fontSize: '13px',
-            },
-        },
-        'hc-dark': {
-            theme: 'base',
-            themeVariables: {
-                primaryColor: '#1a1a00', primaryTextColor: '#ffffff',
-                primaryBorderColor: '#ffff00', lineColor: '#ffffff',
-                secondaryColor: '#0d0d00', tertiaryColor: '#000000',
-                background: '#000000', mainBkg: '#0d0d0d',
-                nodeBorder: '#ffff00', clusterBkg: '#0d0d0d',
-                titleColor: '#ffffff', edgeLabelBackground: '#0d0d0d',
-                fontFamily: 'inherit', fontSize: '13px',
-            },
+    const t = THEMES.find(x => x.id === theme) || THEMES[0];
+    const m = t.mermaid;
+    return {
+        theme: 'base',
+        themeVariables: {
+            primaryColor: m.mainBkg, primaryTextColor: m.textColor,
+            primaryBorderColor: m.nodeBorder, lineColor: m.lineColor,
+            secondaryColor: m.clusterBkg, tertiaryColor: m.clusterBkg,
+            background: m.mainBkg, mainBkg: m.mainBkg,
+            nodeBorder: m.nodeBorder, clusterBkg: m.clusterBkg,
+            titleColor: m.textColor, edgeLabelBackground: m.edgeLabelBg,
+            fontFamily: 'inherit', fontSize: '13px',
         },
     };
-    return configs[theme] || configs['midnight'];
 }
 
 /**
@@ -131,18 +227,8 @@ function mermaidConfigFor(theme) {
  * @returns {{ bg: string, text: string, grid: string, tick: string, line: string }}
  */
 function plotColorsFor(theme) {
-    const map = {
-        // theme:     [bg,        text,      grid,      tick,      axis-line ]
-        'daylight':  ['#fffcf7', '#2c1a0a', '#e8d5bc', '#7a5535', '#d4b896'],
-        'hc-light':  ['#ffffff', '#000000', '#767676', '#000000', '#000000'],
-        'midnight':  ['#0a0e1a', '#e8eef8', '#162030', '#7890b8', '#1e2d40'],
-        'catppuccin':['#181825', '#cdd6f4', '#313244', '#a6adc8', '#45475a'],
-        'oled':      ['#0a0a0a', '#e8e8e8', '#1a1a1a', '#808080', '#2a2a2a'],
-        'obsidian':  ['#242038', '#dcddde', '#2e2a40', '#8e8ea0', '#3a3550'],
-        'hc-dark':   ['#0d0d0d', '#ffffff', '#767676', '#ffffff', '#767676'],
-    };
-    const d = map[theme] || map['midnight'];
-    return { bg: d[0], text: d[1], grid: d[2], tick: d[3], line: d[4] };
+    const t = THEMES.find(x => x.id === theme) || THEMES[0];
+    return t.plot;
 }
 
 /**
@@ -205,6 +291,9 @@ function setTheme(theme) {
         b.classList.toggle('active', b.dataset.theme === theme));
     rethemeMermaid(mermaidConfigFor(theme));
     rethemePlots(theme);
+    // Close the dropdown after selection
+    document.querySelectorAll('.nav-popup-menu.open').forEach(m => m.classList.remove('open'));
+    document.querySelectorAll('.nav-popup-btn.active').forEach(b => b.classList.remove('active'));
 }
 
 // Nav popup toggle (click-based)
@@ -217,6 +306,10 @@ function toggleNavPopup(id) {
     if (!wasOpen) {
         el.classList.add('open');
         el.previousElementSibling.classList.add('active');
+        if (id === 'theme-dd') {
+            const inp = document.getElementById('theme-search');
+            if (inp) { inp.value = ''; filterThemes(''); inp.focus(); }
+        }
     }
 }
 
@@ -258,11 +351,8 @@ window.setReadingFont = setReadingFont;
 
 // Mark active theme/font once the DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    const savedTheme = localStorage.getItem('ldmd-theme');
-    if (savedTheme) {
-        document.querySelectorAll('.nav-theme-item').forEach(b =>
-            b.classList.toggle('active', b.dataset.theme === savedTheme));
-    }
+    initThemeList();
+
     const savedFont = localStorage.getItem('ldmd-font') || 'departure-mono';
     document.querySelectorAll('.nav-font-item').forEach(b =>
         b.classList.toggle('active', b.dataset.font === savedFont));
