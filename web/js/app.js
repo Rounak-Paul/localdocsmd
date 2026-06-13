@@ -918,7 +918,7 @@ void main(){
             gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
             function frame(){
                 if(!stop.active){window.removeEventListener('resize',resize);return;}
-                t+=1;
+                t+=0.15;
                 gl.useProgram(prog);
                 const {p:[r1,g1,b1],a:[r2,g2,b2]}=_themeRGB();
                 gl.uniform2f(uRes,canvas.width,canvas.height);
@@ -1138,7 +1138,7 @@ void main() {
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
             function frame() {
                 if (!stop.active) { window.removeEventListener('resize', resize); return; }
-                t += 1;
+                t += 0.1;
                 gl.useProgram(prog);
                 const { p:[r1,g1,b1], a:[r2,g2,b2] } = _themeRGB();
                 gl.uniform2f(uRes, canvas.width, canvas.height);

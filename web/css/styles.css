@@ -1782,10 +1782,12 @@ body.has-bg-canvas {
 }
 
 /* When a canvas background is active, all opaque surfaces become
-   semi-transparent so the animation shows through everywhere. */
+   frosted-glass — semi-transparent with strong blur and saturation boost. */
 body.has-bg-canvas .navbar {
-    background: color-mix(in srgb, var(--navbar-bg) 70%, transparent) !important;
-    backdrop-filter: blur(14px);
+    background: color-mix(in srgb, var(--navbar-bg) 55%, transparent) !important;
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border-bottom-color: color-mix(in srgb, var(--navbar-border) 60%, transparent) !important;
 }
 
 /* Editor page is position:fixed z-index:1 — must be cleared explicitly */
@@ -1793,26 +1795,48 @@ body.has-bg-canvas .editor-page {
     background: transparent !important;
 }
 
-body.has-bg-canvas .doc-body,
+/* Primary content surfaces — strong frosted glass */
+body.has-bg-canvas .doc-body {
+    background: color-mix(in srgb, var(--card-bg) 45%, transparent) !important;
+    backdrop-filter: blur(28px) saturate(150%);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+    border-color: color-mix(in srgb, var(--card-border) 50%, transparent) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+}
+
 body.has-bg-canvas .editor-pane,
 body.has-bg-canvas .preview-pane {
-    background: color-mix(in srgb, var(--card-bg) 55%, transparent) !important;
-    backdrop-filter: blur(4px);
+    background: color-mix(in srgb, var(--card-bg) 42%, transparent) !important;
+    backdrop-filter: blur(24px) saturate(145%);
+    -webkit-backdrop-filter: blur(24px) saturate(145%);
 }
 
 body.has-bg-canvas .pane-header {
-    background: color-mix(in srgb, var(--divider) 60%, transparent) !important;
+    background: color-mix(in srgb, var(--divider) 45%, transparent) !important;
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
 }
 
-body.has-bg-canvas .card,
-body.has-bg-canvas .modal-content,
-body.has-bg-canvas .nav-popup-menu,
-body.has-bg-canvas .user-dropdown,
+/* Sidebars and drawers — slightly more opaque so text stays readable */
 body.has-bg-canvas .toc-sidebar,
 body.has-bg-canvas .history-drawer,
 body.has-bg-canvas .chat-drawer {
-    background: color-mix(in srgb, var(--card-bg) 78%, transparent) !important;
-    backdrop-filter: blur(10px);
+    background: color-mix(in srgb, var(--card-bg) 58%, transparent) !important;
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    border-color: color-mix(in srgb, var(--border-color) 45%, transparent) !important;
+}
+
+/* Floating surfaces — modals, dropdowns, popups */
+body.has-bg-canvas .card,
+body.has-bg-canvas .modal-content,
+body.has-bg-canvas .nav-popup-menu,
+body.has-bg-canvas .user-dropdown {
+    background: color-mix(in srgb, var(--card-bg) 62%, transparent) !important;
+    backdrop-filter: blur(32px) saturate(160%);
+    -webkit-backdrop-filter: blur(32px) saturate(160%);
+    border-color: color-mix(in srgb, var(--card-border) 55%, transparent) !important;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.10) !important;
 }
 
 ::selection {
