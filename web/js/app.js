@@ -660,88 +660,112 @@ const BACKGROUNDS = [
          */
         render(canvas, stop) {
             const ctx = canvas.getContext('2d');
-            let W, H, cols, drops;
-            const FS = 15;
+            const FS   = 16;
             const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*<>{}[]|/\\;:?!=+-';
-            function mkDrop() {
+            let W, H, ROWS, cols, streams;
+
+            /* Each stream mirrors a cmatrix column:
+               head  — current row the leading glyph occupies
+               len   — trail length in rows
+               ticks — frames-per-step (speed tier: 1 = fastest, 3 = slowest)
+               timer — countdown to next step
+               active — whether the stream is currently falling              */
+            function mkStream() {
                 return {
-                    y:      Math.random() * -120,
-                    speed:  0.04 + Math.random() * 0.10,
-                    len:    8  + Math.floor(Math.random() * 24),
-                    chars:  [],
-                    mutate: Math.random() * 0.08,
+                    head:   -Math.floor(Math.random() * ROWS),
+                    len:    Math.floor(8 + Math.random() * 20),
+                    ticks:  4 + Math.floor(Math.random() * 4),
+                    timer:  0,
+                    active: true,
                 };
             }
+
             function resize() {
-                W = canvas.width  = window.innerWidth;
-                H = canvas.height = window.innerHeight;
-                cols  = Math.floor(W / FS);
-                drops = Array.from({ length: cols }, mkDrop);
+                W    = canvas.width  = window.innerWidth;
+                H    = canvas.height = window.innerHeight;
+                ROWS = Math.ceil(H / FS) + 2;
+                cols = Math.floor(W / FS);
+                /* Fill canvas with background so existing pixels are correct */
+                ctx.clearRect(0, 0, W, H);
+                streams = Array.from({ length: cols }, mkStream);
             }
             resize();
             window.addEventListener('resize', resize);
 
-            // Off-screen buffer — glyphs are drawn here, composited to main canvas
-            const buf = document.createElement('canvas');
-            const bctx = buf.getContext('2d');
-            function resizeBuf() { buf.width = W; buf.height = H; }
-            resizeBuf();
-            window.addEventListener('resize', resizeBuf);
-
+            let frame_count = 0;
             function frame() {
-                if (!stop.active) {
-                    window.removeEventListener('resize', resize);
-                    window.removeEventListener('resize', resizeBuf);
-                    return;
-                }
+                if (!stop.active) { window.removeEventListener('resize', resize); return; }
+                frame_count++;
                 const { p:[r,g,b] } = _themeRGB();
-
-                // Fade trail toward transparent so theme background shows through
-                ctx.globalCompositeOperation = 'destination-out';
-                ctx.fillStyle = 'rgba(0,0,0,0.10)';
-                ctx.fillRect(0, 0, W, H);
-                ctx.globalCompositeOperation = 'source-over';
-
                 ctx.font = `bold ${FS}px monospace`;
 
                 for (let i = 0; i < cols; i++) {
-                    const d = drops[i];
-                    d.y += d.speed;
+                    const s = streams[i];
+                    if (!s.active) continue;
 
-                    // Mutate one random glyph in the trail each frame
-                    if (Math.random() < d.mutate) {
-                        const idx = Math.floor(Math.random() * d.chars.length);
-                        d.chars[idx] = CHARS[Math.floor(Math.random() * CHARS.length)];
-                    }
-
-                    // Push new head character
-                    d.chars.unshift(CHARS[Math.floor(Math.random() * CHARS.length)]);
-                    if (d.chars.length > d.len) d.chars.length = d.len;
+                    /* Only advance this column on its own tick cadence */
+                    s.timer++;
+                    if (s.timer < s.ticks) continue;
+                    s.timer = 0;
 
                     const x = i * FS;
 
-                    // Draw trail — brightness decays toward tail
-                    for (let j = 0; j < d.chars.length; j++) {
-                        const gy = Math.floor(d.y - j * FS);
-                        if (gy < -FS || gy > H) continue;
-                        const fade = 1 - j / d.len;
-                        if (j === 0) {
-                            // Head: near-white flash
-                            ctx.fillStyle = `rgba(200,255,220,${(0.85 + Math.random()*0.15).toFixed(2)})`;
-                        } else if (j === 1) {
-                            // Second char: bright theme colour
-                            ctx.fillStyle = `rgba(${r},${g},${b},0.95)`;
-                        } else {
-                            // Trail: dim with fade
-                            const a = (fade * 0.75).toFixed(2);
-                            ctx.fillStyle = `rgba(${Math.round(r*fade)},${Math.round(g*fade)},${Math.round(b*fade)},${a})`;
-                        }
-                        ctx.fillText(d.chars[j], x, gy);
+                    /* Erase the tail cell — clear that exact cell to transparent */
+                    const tailRow = s.head - s.len;
+                    if (tailRow >= 0 && tailRow < ROWS) {
+                        ctx.clearRect(x, tailRow * FS, FS, FS);
                     }
 
-                    // Reset column when head exits bottom
-                    if (d.y - d.len * FS > H && Math.random() > 0.96) {
-                        Object.assign(d, mkDrop());
+                    /* Advance head one row */
+                    s.head++;
+
+                    /* Draw the new head character — bright white */
+                    if (s.head >= 0 && s.head < ROWS) {
+                        ctx.fillStyle = `rgba(210,255,225,0.95)`;
+                        ctx.fillText(
+                            CHARS[Math.floor(Math.random() * CHARS.length)],
+                            x, s.head * FS + FS
+                        );
+                    }
+
+                    /* Re-colour the previous head cell to dim theme colour
+                       (simulates cmatrix switching the old head to a trail glyph) */
+                    const prevRow = s.head - 1;
+                    if (prevRow >= 0 && prevRow < ROWS) {
+                        ctx.clearRect(x, prevRow * FS, FS, FS);
+                        ctx.fillStyle = `rgba(${r},${g},${b},0.92)`;
+                        ctx.fillText(
+                            CHARS[Math.floor(Math.random() * CHARS.length)],
+                            x, prevRow * FS + FS
+                        );
+                    }
+
+                    /* Dim mid-trail characters — walk the visible trail and
+                       reduce alpha slightly each tick to create brightness gradient */
+                    for (let j = 2; j < s.len; j++) {
+                        const tr = s.head - j;
+                        if (tr < 0 || tr >= ROWS) continue;
+                        /* Fade: brightest near head, darkest at tail */
+                        const fade = 1 - j / s.len;
+                        ctx.globalCompositeOperation = 'destination-out';
+                        ctx.fillStyle = 'rgba(0,0,0,0.06)';
+                        ctx.fillRect(x, tr * FS, FS, FS);
+                        ctx.globalCompositeOperation = 'source-over';
+                        /* Occasionally mutate a trail glyph */
+                        if (Math.random() < 0.04) {
+                            ctx.fillStyle = `rgba(${Math.round(r*fade)},${Math.round(g*fade)},${Math.round(b*fade)},${(fade*0.85).toFixed(2)})`;
+                            ctx.fillText(
+                                CHARS[Math.floor(Math.random() * CHARS.length)],
+                                x, tr * FS + FS
+                            );
+                        }
+                    }
+
+                    /* Stream finished — reset after random pause */
+                    if (s.head - s.len > ROWS) {
+                        s.head   = -Math.floor(Math.random() * ROWS * 0.5);
+                        s.len    = Math.floor(8 + Math.random() * 20);
+                        s.ticks  = 4 + Math.floor(Math.random() * 4);
                     }
                 }
 
