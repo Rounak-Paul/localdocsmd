@@ -505,8 +505,13 @@ main.container { padding: 0; height: calc(100vh - 64px); overflow: hidden; }
 .line-content { display: inline; }
 
 /* ── Mermaid ─────────────────────────────────────────────────── */
-.mermaid { background: var(--divider); border-radius: 8px; padding: 16px; margin: 16px 0; text-align: center; overflow-x: auto; cursor: zoom-in; }
-.mermaid-error { color: #ef4444; font-size: .8rem; padding: 8px; text-align: center; cursor: default; }
+.mermaid { background: var(--divider); border-radius: 8px; padding: 16px; margin: 16px 0; text-align: center; position: relative; overflow: hidden; min-height: 60px; }
+.mermaid svg { display: block; max-width: none; }
+.mermaid-error { color: #ef4444; font-size: .8rem; padding: 8px; text-align: center; cursor: default; white-space: pre-wrap; font-family: var(--font-mono); }
+.mermaid-toolbar { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; z-index: 10; }
+.mermaid:hover .mermaid-toolbar { opacity: 1; }
+.mermaid-tb-btn { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-secondary); font-size: .85rem; line-height: 1; cursor: pointer; padding: 0; }
+.mermaid-tb-btn:hover { background: var(--hover-bg); color: var(--text-color); }
 
 /* ── Zoom/Pan Lightbox ───────────────────────────────────────── */
 .zoom-lightbox {
@@ -516,7 +521,7 @@ main.container { padding: 0; height: calc(100vh - 64px); overflow: hidden; }
 }
 .zoom-lightbox.dragging { cursor: grabbing; }
 .zoom-lightbox-close {
-    position: absolute; top: 16px; right: 20px; z-index: 2001;
+    position: absolute; top: 52px; right: 20px; z-index: 2001;
     background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
     color: #fff; font-size: 1.3rem; width: 36px; height: 36px;
     border-radius: 50%; cursor: pointer; line-height: 1;
@@ -822,6 +827,10 @@ const presenceEl = document.getElementById('doc-viewer-presence');
 let rawMarkdown   = '';
 let mermaidLoaded = false;
 let plotlyLoaded  = false;
+
+// Mermaid CDN — v11 supports all diagram types: flowchart, sequence, class, state,
+// er, gantt, pie, quadrant, xychart, mindmap, timeline, sankey, block, packet, kanban.
+const MERMAID_CDN = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
 
 /* ── Live-view WS state ──────────────────────────────────────── */
 let _liveWs            = null;
@@ -1221,36 +1230,86 @@ function renderMath() {
 }
 
 /* ── Mermaid ─────────────────────────────────────────────────── */
+
+/**
+ * Loads mermaid@11 from CDN (once) and initialises it with the active theme config.
+ * Sets window._mermaid. Throws if loading fails.
+ */
+async function _loadMermaid() {
+    if (mermaidLoaded) return;
+    const m = await import(MERMAID_CDN);
+    window._mermaid = m.default;
+    const cfg = (typeof mermaidConfigFor === 'function')
+        ? mermaidConfigFor(document.documentElement.getAttribute('data-theme') || 'midnight')
+        : { theme: 'dark' };
+    window._mermaid.initialize({
+        startOnLoad:   false,
+        securityLevel: 'loose',
+        suppressErrors: true,
+        // elk layout engine for complex diagrams (loaded on-demand by mermaid itself)
+        layout: 'dagre',
+        ...cfg,
+    });
+    mermaidLoaded = true;
+}
+
+/**
+ * Sanitises a mermaid source string to fix common syntax issues that cause
+ * parse failures: windows line endings, smart quotes, zero-width chars.
+ * @param {string} src
+ * @returns {string}
+ */
+function _sanitizeMermaidSrc(src) {
+    return src
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .replace(/[​-‍﻿]/g, '')  // zero-width chars
+        .replace(/[""]/g, '"')
+        .replace(/['']/g, "'")
+        .trim();
+}
+
+/**
+ * Renders all unprocessed .mermaid divs within contentEl.
+ * Attaches inline pan/zoom interaction to each rendered diagram.
+ * Errors are shown inline with the original source for easy debugging.
+ */
 async function renderMermaid() {
-    const divs = contentEl.querySelectorAll('.mermaid:not([data-processed])');
+    const divs = Array.from(contentEl.querySelectorAll('.mermaid:not([data-processed])'));
     if (!divs.length) return;
-    if (!mermaidLoaded) {
-        try {
-            const m = await import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs');
-            window._mermaid = m.default;
-            const _mCfg = (typeof mermaidConfigFor === 'function')
-                ? mermaidConfigFor(document.documentElement.getAttribute('data-theme') || 'midnight')
-                : { theme: 'dark' };
-            window._mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', ..._mCfg });
-            mermaidLoaded = true;
-        } catch(e) { console.warn('Mermaid load failed', e); return; }
+    try {
+        await _loadMermaid();
+    } catch(e) {
+        console.warn('Mermaid load failed:', e);
+        divs.forEach(d => { d.innerHTML = `<div class="mermaid-error">Could not load Mermaid renderer.</div>`; d.setAttribute('data-processed', '1'); });
+        return;
     }
+
     for (const div of divs) {
-        const src = div.getAttribute('data-source') || div.textContent.trim();
+        const raw = div.getAttribute('data-source') || div.textContent.trim();
+        const src = _sanitizeMermaidSrc(raw);
         div.setAttribute('data-processed', '1');
+        div.textContent = '';
+
         try {
-            const id = 'md-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+            const id = 'mmd-' + Math.random().toString(36).slice(2, 10);
             const { svg } = await window._mermaid.render(id, src);
             div.innerHTML = svg;
+            // Remove mermaid-injected fixed width/height so diagram is responsive
             const svgEl = div.querySelector('svg');
             if (svgEl) {
-                div.addEventListener('click', () => {
-                    const clone = svgEl.cloneNode(true);
-                    clone.style.cssText = 'display:block;cursor:default';
-                    openLightbox(clone);
-                });
+                svgEl.removeAttribute('width');
+                svgEl.removeAttribute('height');
+                svgEl.style.maxWidth = '100%';
             }
-        } catch(e) { div.innerHTML = `<div class="mermaid-error">Mermaid error: ${e.message}</div>`; }
+            if (typeof _attachMermaidInteraction === 'function') {
+                _attachMermaidInteraction(div);
+            }
+        } catch(e) {
+            const msg = (e && e.message) ? e.message : String(e);
+            div.innerHTML =
+                `<div class="mermaid-error">⚠ Mermaid error: ${msg}\n\n${escHtml(src)}</div>`;
+        }
     }
 }
 
@@ -2256,6 +2315,7 @@ function openLightbox(node) {
     document.addEventListener('mousemove', _lbOnMousemove);
     document.addEventListener('mouseup',   _lbOnMouseup);
 }
+window.openLightbox = openLightbox;
 
 window.closeLightbox = function() {
     const lb    = document.getElementById('zoom-lightbox');

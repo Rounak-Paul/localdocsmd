@@ -52,10 +52,27 @@
   - `rethemePlots(theme)` — `Plotly.relayout()` all `[id^="plot-"]` with full axis/legend/font colours
 - `setTheme()` calls both after switching `data-theme`
 - `renderPlots()` / `renderSinglePlot()` now accept a `colors` object (not raw CSS var strings) for reliable Plotly rendering (rgba strings silently fail in Plotly)
-- Themes: 66 total; Backgrounds: 13 (none + particles, waves, matrix, aurora, starfield, plasma, geometric, bubbles, grid-pulse, fireflies, rain, circuit) — `midnight`, `daylight`, `catppuccin`, `obsidian`, `oled`, `hc-light`, `hc-dark`, `dracula`, `nord`, `gruvbox`, `solarized-light`, `solarized-dark`, `tokyo-night`, `monokai`, `github-light`, `github-dark`, `forest`, `rose`, `sunset`, `ocean`, `aurora`, `slate`, `copper`, `sakura`, `terminal`, `coffee`, `arctic`, plus 39 new: `cyberpunk`, `neon`, `synthwave`, `retro`, `amber`, `mint`, `lavender`, `peach`, `sky`, `lemon`, `moonlight`, `kanagawa`, `everforest`, `rose-pine`, `ayu-dark`, `ayu-light`, `one-dark`, `one-light`, `material-dark`, `material-light`, `palenight`, `panda`, `horizon`, `pitch-black`, `paper`, `newspaper`, `ink`, `dusk`, `pastel`, `teal`, `woodland`, `desert`, `volcano`, `deep-sea`, `grape`, `ash`, `crimson`, `ice`, `coral`
+- Themes: 66 total; 10 background renderers (none, particles, waves, matrix, aurora, starfield, metaballs, flowfield, fireflies, circuit, voronoi)
 - Navbar picker HTML generated in `src/routes.c` → `set_navbar()` (buffer: 16384 bytes, well within)
-- Background system: `BACKGROUNDS` array in `app.js`; `setBg(id)` starts renderer; `#bg-canvas` (z-index -2) + `#bg-overlay` (z-index -1, theme-tinted via `var(--bg-color)` at 72% opacity); `body.has-bg-canvas` clears body bg; previews animated in dropdown; `ldmd-bg` localStorage key
 - `markdown-body pre` uses `var(--code-bg)` / `var(--code-border)` (not hardcoded dark colors)
+
+## JS Module Structure (load order)
+1. `web/js/themes.js` — THEMES array, `mermaidConfigFor(theme)`, `plotColorsFor(theme)` — pure data, no DOM
+2. `web/js/backgrounds.js` — `_themeRGB()`, `_glProgram()`, BACKGROUNDS array, `setBg(id)`, `initBgList()`, `_drawBgSwatch()`
+3. `web/js/app.js` — fonts, theme switching, nav popup, modal, toast, `debounce()`, `formatRelativeTime()`, `api()`, `rethemeMermaid()`, `rethemePlots()`, `_attachMermaidInteraction()`
+   - All three are classic `<script>` tags (not ES modules), loaded in order from `layout.html`
+   - To add a new module: create `web/js/<name>.js`, expose globals needed by app.js, add `<script>` before `app.js` in layout.html
+
+## Mermaid (document.html)
+- Loaded from CDN: `mermaid@11` (ESM import, on demand) — supports all diagram types
+- `MERMAID_CDN` constant at top of inline `<script>` block
+- `_loadMermaid()` — loads + initialises once with active theme config
+- `_sanitizeMermaidSrc(src)` — strips CRLF, zero-width chars, smart quotes before render
+- `renderMermaid()` — processes all `.mermaid:not([data-processed])` divs; calls `_attachMermaidInteraction(div)` from app.js
+- `_attachMermaidInteraction(div)` (app.js) — inline pan/zoom (mousewheel + drag + pinch), floating toolbar (zoom in/out/reset/fullscreen)
+- `rethemeMermaid(mConfig)` (app.js) — re-renders all `.mermaid[data-processed]` on theme change, re-attaches interaction
+- Errors shown inline with source for debugging
+- SVG responsive: width/height attributes removed after render, maxWidth:100%
 
 ## Image Zoom
 - Click handlers added to all `img` elements in `postProcess()`
