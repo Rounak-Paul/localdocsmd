@@ -52,7 +52,7 @@
   - `rethemePlots(theme)` — `Plotly.relayout()` all `[id^="plot-"]` with full axis/legend/font colours
 - `setTheme()` calls both after switching `data-theme`
 - `renderPlots()` / `renderSinglePlot()` now accept a `colors` object (not raw CSS var strings) for reliable Plotly rendering (rgba strings silently fail in Plotly)
-- Themes: `midnight`, `daylight`, `catppuccin`, `obsidian`, `oled`, `hc-light`, `hc-dark`
+- Themes: 66 total — `midnight`, `daylight`, `catppuccin`, `obsidian`, `oled`, `hc-light`, `hc-dark`, `dracula`, `nord`, `gruvbox`, `solarized-light`, `solarized-dark`, `tokyo-night`, `monokai`, `github-light`, `github-dark`, `forest`, `rose`, `sunset`, `ocean`, `aurora`, `slate`, `copper`, `sakura`, `terminal`, `coffee`, `arctic`, plus 39 new: `cyberpunk`, `neon`, `synthwave`, `retro`, `amber`, `mint`, `lavender`, `peach`, `sky`, `lemon`, `moonlight`, `kanagawa`, `everforest`, `rose-pine`, `ayu-dark`, `ayu-light`, `one-dark`, `one-light`, `material-dark`, `material-light`, `palenight`, `panda`, `horizon`, `pitch-black`, `paper`, `newspaper`, `ink`, `dusk`, `pastel`, `teal`, `woodland`, `desert`, `volcano`, `deep-sea`, `grape`, `ash`, `crimson`, `ice`, `coral`
 - Navbar picker HTML generated in `src/routes.c` → `set_navbar()` (buffer: 16384 bytes, well within)
 - `markdown-body pre` uses `var(--code-bg)` / `var(--code-border)` (not hardcoded dark colors)
 
