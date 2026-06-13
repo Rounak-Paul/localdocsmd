@@ -27,12 +27,184 @@ function applyReadingFont(stack) {
     document.documentElement.style.setProperty('--font-reading', stack);
 }
 
+/**
+ * Mermaid initialize config per UI theme. Uses themeVariables so colours
+ * match the active palette exactly rather than relying on Mermaid's own
+ * built-in dark/default tokens which ignore our CSS variables.
+ * @param {string} theme - UI theme name
+ * @returns {object} Mermaid initialize options object
+ */
+function mermaidConfigFor(theme) {
+    const configs = {
+        'daylight': {
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#f5ede0', primaryTextColor: '#2c1a0a',
+                primaryBorderColor: '#c2610a', lineColor: '#7a5535',
+                secondaryColor: '#fdf8f0', tertiaryColor: '#fffcf7',
+                background: '#fdf8f0', mainBkg: '#fffcf7',
+                nodeBorder: '#c2610a', clusterBkg: '#f0e4d0',
+                titleColor: '#2c1a0a', edgeLabelBackground: '#fffcf7',
+                fontFamily: 'inherit', fontSize: '13px',
+            },
+        },
+        'hc-light': {
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#dbeafe', primaryTextColor: '#000000',
+                primaryBorderColor: '#000000', lineColor: '#000000',
+                secondaryColor: '#f0fdf4', tertiaryColor: '#fffbeb',
+                background: '#ffffff', mainBkg: '#ffffff',
+                nodeBorder: '#000000', clusterBkg: '#f0f0f0',
+                titleColor: '#000000', edgeLabelBackground: '#ffffff',
+                fontFamily: 'inherit', fontSize: '13px',
+            },
+        },
+        'midnight': {
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#0d1628', primaryTextColor: '#e8eef8',
+                primaryBorderColor: '#60a5fa', lineColor: '#7890b8',
+                secondaryColor: '#080c18', tertiaryColor: '#06080f',
+                background: '#06080f', mainBkg: '#0a0e1a',
+                nodeBorder: '#60a5fa', clusterBkg: '#0a0e1a',
+                titleColor: '#e8eef8', edgeLabelBackground: '#0a0e1a',
+                fontFamily: 'inherit', fontSize: '13px',
+            },
+        },
+        'catppuccin': {
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#313244', primaryTextColor: '#cdd6f4',
+                primaryBorderColor: '#cba6f7', lineColor: '#a6adc8',
+                secondaryColor: '#1e1e2e', tertiaryColor: '#11111b',
+                background: '#1e1e2e', mainBkg: '#181825',
+                nodeBorder: '#cba6f7', clusterBkg: '#181825',
+                titleColor: '#cdd6f4', edgeLabelBackground: '#181825',
+                fontFamily: 'inherit', fontSize: '13px',
+            },
+        },
+        'oled': {
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#0a1a1a', primaryTextColor: '#e8e8e8',
+                primaryBorderColor: '#00e5ff', lineColor: '#808080',
+                secondaryColor: '#050505', tertiaryColor: '#020202',
+                background: '#000000', mainBkg: '#0a0a0a',
+                nodeBorder: '#00e5ff', clusterBkg: '#050505',
+                titleColor: '#e8e8e8', edgeLabelBackground: '#0a0a0a',
+                fontFamily: 'inherit', fontSize: '13px',
+            },
+        },
+        'obsidian': {
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#2a2139', primaryTextColor: '#dcddde',
+                primaryBorderColor: '#7c6f9e', lineColor: '#8e8ea0',
+                secondaryColor: '#1e1a2e', tertiaryColor: '#16131f',
+                background: '#1a1625', mainBkg: '#242038',
+                nodeBorder: '#7c6f9e', clusterBkg: '#1e1a2e',
+                titleColor: '#dcddde', edgeLabelBackground: '#242038',
+                fontFamily: 'inherit', fontSize: '13px',
+            },
+        },
+        'hc-dark': {
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#1a1a00', primaryTextColor: '#ffffff',
+                primaryBorderColor: '#ffff00', lineColor: '#ffffff',
+                secondaryColor: '#0d0d00', tertiaryColor: '#000000',
+                background: '#000000', mainBkg: '#0d0d0d',
+                nodeBorder: '#ffff00', clusterBkg: '#0d0d0d',
+                titleColor: '#ffffff', edgeLabelBackground: '#0d0d0d',
+                fontFamily: 'inherit', fontSize: '13px',
+            },
+        },
+    };
+    return configs[theme] || configs['midnight'];
+}
+
+/**
+ * Returns Plotly layout colours tuned for readability in the given theme.
+ * Solid opaque colours are required — Plotly ignores rgba for some properties.
+ * @param {string} theme - UI theme name
+ * @returns {{ bg: string, text: string, grid: string, tick: string, line: string }}
+ */
+function plotColorsFor(theme) {
+    const map = {
+        // theme:     [bg,        text,      grid,      tick,      axis-line ]
+        'daylight':  ['#fffcf7', '#2c1a0a', '#e8d5bc', '#7a5535', '#d4b896'],
+        'hc-light':  ['#ffffff', '#000000', '#767676', '#000000', '#000000'],
+        'midnight':  ['#0a0e1a', '#e8eef8', '#162030', '#7890b8', '#1e2d40'],
+        'catppuccin':['#181825', '#cdd6f4', '#313244', '#a6adc8', '#45475a'],
+        'oled':      ['#0a0a0a', '#e8e8e8', '#1a1a1a', '#808080', '#2a2a2a'],
+        'obsidian':  ['#242038', '#dcddde', '#2e2a40', '#8e8ea0', '#3a3550'],
+        'hc-dark':   ['#0d0d0d', '#ffffff', '#767676', '#ffffff', '#767676'],
+    };
+    const d = map[theme] || map['midnight'];
+    return { bg: d[0], text: d[1], grid: d[2], tick: d[3], line: d[4] };
+}
+
+/**
+ * Applies current theme colours to all rendered Plotly charts on the page.
+ * @param {string} [theme] - UI theme name; reads data-theme attribute if omitted
+ */
+function rethemePlots(theme) {
+    if (typeof Plotly === 'undefined') return;
+    const t = theme || document.documentElement.getAttribute('data-theme') || 'midnight';
+    const { bg, text, grid, tick, line } = plotColorsFor(t);
+    const axisCommon = {
+        gridcolor: grid, zerolinecolor: grid,
+        tickcolor: tick, linecolor: line,
+        tickfont: { color: tick }, title: { font: { color: text } },
+    };
+    document.querySelectorAll('[id^="plot-"]').forEach(el => {
+        try {
+            Plotly.relayout(el.id, {
+                paper_bgcolor: bg, plot_bgcolor: bg,
+                'font.color': text,
+                'legend.font.color': text, 'legend.bgcolor': bg, 'legend.bordercolor': grid,
+                xaxis: axisCommon, yaxis: axisCommon,
+                'scene.bgcolor': bg,
+                'scene.xaxis.gridcolor': grid, 'scene.xaxis.backgroundcolor': bg,
+                'scene.xaxis.tickcolor': tick, 'scene.xaxis.linecolor': line,
+                'scene.yaxis.gridcolor': grid, 'scene.yaxis.backgroundcolor': bg,
+                'scene.yaxis.tickcolor': tick, 'scene.yaxis.linecolor': line,
+                'scene.zaxis.gridcolor': grid, 'scene.zaxis.backgroundcolor': bg,
+                'scene.zaxis.tickcolor': tick, 'scene.zaxis.linecolor': line,
+            });
+        } catch(_) {}
+    });
+}
+
+/**
+ * Re-renders all Mermaid diagrams that have already been processed, applying
+ * theme variables matching the active UI theme.
+ * @param {object} mConfig - Mermaid initialize options from mermaidConfigFor()
+ */
+async function rethemeMermaid(mConfig) {
+    if (!window._mermaid) return;
+    window._mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', ...mConfig });
+    const divs = document.querySelectorAll('.mermaid[data-processed]');
+    for (const div of divs) {
+        const src = div.getAttribute('data-source');
+        if (!src) continue;
+        try {
+            const id = 'mermaid-retheme-' + Math.random().toString(36).slice(2);
+            const { svg } = await window._mermaid.render(id, src);
+            div.innerHTML = svg;
+        } catch(_) {}
+    }
+}
+
 // Theme management
 function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('ldmd-theme', theme);
     document.querySelectorAll('.nav-theme-item').forEach(b =>
         b.classList.toggle('active', b.dataset.theme === theme));
+    rethemeMermaid(mermaidConfigFor(theme));
+    rethemePlots(theme);
 }
 
 // Nav popup toggle (click-based)

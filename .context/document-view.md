@@ -37,6 +37,24 @@
 - Rendered async via `renderMermaid()` using `window._mermaid.render(id, src)`
 - After render: click handler added to `.mermaid` div → opens zoom/pan lightbox
 - SVG cloned, sized from viewBox to fit 90% viewport, shown in lightbox
+- Theme-aware: on first load, reads current `data-theme` and calls `mermaidThemeFor()` from `app.js`
+- On theme switch: `setTheme()` in `app.js` calls `rethemeMermaid()` to re-render all `.mermaid[data-processed]` divs
+
+## Plotly
+- Rendered via `renderPlots()` / `renderSinglePlot()` — reads CSS vars (`--card-bg`, `--text-color`, `--border-color`) at render time
+- On theme switch: `setTheme()` in `app.js` calls `rethemePlots()` → `Plotly.relayout()` on all `[id^="plot-"]` elements
+
+## Theming System
+- `app.js` exports:
+  - `mermaidConfigFor(theme)` — returns full Mermaid `initialize()` config with `themeVariables` per theme (not just a token); ensures diagrams match each palette
+  - `plotColorsFor(theme)` — returns `{ bg, text, grid, tick, line }` as solid hex colours per theme; used at initial render and on re-theme
+  - `rethemeMermaid(mConfig)` — re-renders all `.mermaid[data-processed]` with new config
+  - `rethemePlots(theme)` — `Plotly.relayout()` all `[id^="plot-"]` with full axis/legend/font colours
+- `setTheme()` calls both after switching `data-theme`
+- `renderPlots()` / `renderSinglePlot()` now accept a `colors` object (not raw CSS var strings) for reliable Plotly rendering (rgba strings silently fail in Plotly)
+- Themes: `midnight`, `daylight`, `catppuccin`, `obsidian`, `oled`, `hc-light`, `hc-dark`
+- Navbar picker HTML generated in `src/routes.c` → `set_navbar()` (buffer: 16384 bytes, well within)
+- `markdown-body pre` uses `var(--code-bg)` / `var(--code-border)` (not hardcoded dark colors)
 
 ## Image Zoom
 - Click handlers added to all `img` elements in `postProcess()`

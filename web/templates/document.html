@@ -1228,7 +1228,10 @@ async function renderMermaid() {
         try {
             const m = await import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs');
             window._mermaid = m.default;
-            window._mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
+            const _mCfg = (typeof mermaidConfigFor === 'function')
+                ? mermaidConfigFor(document.documentElement.getAttribute('data-theme') || 'midnight')
+                : { theme: 'dark' };
+            window._mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', ..._mCfg });
             mermaidLoaded = true;
         } catch(e) { console.warn('Mermaid load failed', e); return; }
     }
@@ -1343,18 +1346,19 @@ async function renderPlots() {
     const divs = Array.from(contentEl.querySelectorAll('.plot-container:not([data-processed])'));
     if (!divs.length) return;
     try { await loadPlotly(); } catch(e) { divs.forEach(d=>{ d.innerHTML='<div class="plot-error">Failed to load Plotly</div>'; d.setAttribute('data-processed','1'); }); return; }
-    const styles = getComputedStyle(document.documentElement);
-    const bg   = styles.getPropertyValue('--card-bg').trim()    || '#161b22';
-    const text = styles.getPropertyValue('--text-color').trim() || '#e6edf3';
-    const grid = styles.getPropertyValue('--border-color').trim()|| '#30363d';
+    const theme = document.documentElement.getAttribute('data-theme') || 'midnight';
+    const colors = (typeof plotColorsFor === 'function') ? plotColorsFor(theme) : { bg:'#0c121c', text:'#f1f5f9', grid:'#1e2d3d', tick:'#8b949e', line:'#2d3d4d' };
     const is3dTest = /surface|sphere|cylinder|cone|box|torus|plane|scatter3d|line3d|arrow3d|helix|parametric\s*\(|parametricSurface/;
-    divs.filter(d=>!is3dTest.test(d.getAttribute('data-source')||'')).forEach(d=>renderSinglePlot(d,bg,text,grid));
-    divs.filter(d=> is3dTest.test(d.getAttribute('data-source')||'')).forEach((d,i)=>setTimeout(()=>renderSinglePlot(d,bg,text,grid),i*120));
+    divs.filter(d=>!is3dTest.test(d.getAttribute('data-source')||'')).forEach(d=>renderSinglePlot(d,colors));
+    divs.filter(d=> is3dTest.test(d.getAttribute('data-source')||'')).forEach((d,i)=>setTimeout(()=>renderSinglePlot(d,colors),i*120));
 }
 
-function renderSinglePlot(div, bg, text, grid) {
+function renderSinglePlot(div, colors) {
+    const { bg, text, grid, tick, line } = colors;
     const source = div.getAttribute('data-source') || '';
     div.setAttribute('data-processed', '1');
+    const axisStyle = { gridcolor:grid, zerolinecolor:grid, tickcolor:tick, linecolor:line,
+                        tickfont:{color:tick}, title:{font:{color:text}} };
     try {
         const { traces, layout: ul, is3d } = executePlotScript(source);
         if (!traces || !traces.length) throw new Error('No traces');
@@ -1365,12 +1369,17 @@ function renderSinglePlot(div, bg, text, grid) {
         const layout = is3d ? {
             paper_bgcolor:bg, plot_bgcolor:bg, font:{color:text}, autosize:true, height:plotH,
             margin:{l:0,r:0,t:ul.title?40:10,b:0},
-            scene:{aspectmode:'cube',xaxis:{gridcolor:grid,backgroundcolor:bg},yaxis:{gridcolor:grid,backgroundcolor:bg},zaxis:{gridcolor:grid,backgroundcolor:bg},bgcolor:bg,camera:{eye:{x:1.5,y:1.5,z:1.2}}},
+            legend:{font:{color:text},bgcolor:bg,bordercolor:grid},
+            scene:{aspectmode:'cube',bgcolor:bg,camera:{eye:{x:1.5,y:1.5,z:1.2}},
+                xaxis:{...axisStyle,backgroundcolor:bg},
+                yaxis:{...axisStyle,backgroundcolor:bg},
+                zaxis:{...axisStyle,backgroundcolor:bg}},
             showlegend:traces.length>1,...ul
         } : {
             paper_bgcolor:bg, plot_bgcolor:bg, font:{color:text}, autosize:true, height:plotH,
             margin:{l:50,r:20,t:ul.title?40:20,b:40},
-            xaxis:{gridcolor:grid,zerolinecolor:grid}, yaxis:{gridcolor:grid,zerolinecolor:grid},
+            legend:{font:{color:text},bgcolor:bg,bordercolor:grid},
+            xaxis:axisStyle, yaxis:axisStyle,
             showlegend:traces.length>1,...ul
         };
         Plotly.newPlot(pid, traces, layout, { responsive: false, displayModeBar: true, displaylogo: false });
