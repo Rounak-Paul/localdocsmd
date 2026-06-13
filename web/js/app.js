@@ -576,7 +576,7 @@ const BACKGROUNDS = [
             function resize() { W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
             function mkPt() {
                 return { x:Math.random()*W, y:Math.random()*H,
-                         vx:(Math.random()-0.5)*0.18, vy:(Math.random()-0.5)*0.18, r:Math.random()*2.5+1.5 };
+                         vx:(Math.random()-0.5)*0.08, vy:(Math.random()-0.5)*0.08, r:Math.random()*2.5+1.5 };
             }
             resize(); pts=Array.from({length:N},mkPt);
             window.addEventListener('resize', resize);
@@ -621,10 +621,10 @@ const BACKGROUNDS = [
             function resize() { W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
             resize(); window.addEventListener('resize', resize);
             const layers = [
-                { amp:0.05, freq:0.010, speed:0.006, y:0.50, useAccent:false, alpha:0.40 },
-                { amp:0.04, freq:0.016, speed:0.008, y:0.62, useAccent:true,  alpha:0.32 },
-                { amp:0.045,freq:0.008, speed:0.005, y:0.72, useAccent:false, alpha:0.36 },
-                { amp:0.03, freq:0.020, speed:0.010, y:0.82, useAccent:true,  alpha:0.28 },
+                { amp:0.04, freq:0.010, speed:0.003, y:0.50, useAccent:false, alpha:0.40 },
+                { amp:0.03, freq:0.016, speed:0.004, y:0.62, useAccent:true,  alpha:0.32 },
+                { amp:0.035,freq:0.008, speed:0.002, y:0.72, useAccent:false, alpha:0.36 },
+                { amp:0.025,freq:0.020, speed:0.005, y:0.82, useAccent:true,  alpha:0.28 },
             ];
             function frame() {
                 if (!stop.active) { window.removeEventListener('resize',resize); return; }
@@ -666,7 +666,7 @@ const BACKGROUNDS = [
             function mkDrop() {
                 return {
                     y:      Math.random() * -120,
-                    speed:  0.1 + Math.random() * 0.22,
+                    speed:  0.04 + Math.random() * 0.10,
                     len:    8  + Math.floor(Math.random() * 24),
                     chars:  [],
                     mutate: Math.random() * 0.08,
@@ -696,9 +696,11 @@ const BACKGROUNDS = [
                 }
                 const { p:[r,g,b] } = _themeRGB();
 
-                // Fade trail: semi-transparent dark fill over previous frame
-                ctx.fillStyle = `rgba(0,0,0,0.08)`;
+                // Fade trail toward transparent so theme background shows through
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.fillStyle = 'rgba(0,0,0,0.10)';
                 ctx.fillRect(0, 0, W, H);
+                ctx.globalCompositeOperation = 'source-over';
 
                 ctx.font = `bold ${FS}px monospace`;
 
@@ -846,14 +848,17 @@ void main(){
             function mkStar(){
                 const angle=Math.random()*Math.PI*2, dist=Math.random()*3;
                 return {x:W/2+Math.cos(angle)*dist, y:H/2+Math.sin(angle)*dist,
-                        px:W/2, py:H/2, speed:0.15+Math.random()*0.35, size:Math.random()*2+0.5};
+                        px:W/2, py:H/2, speed:0.05+Math.random()*0.12, size:Math.random()*2+0.5};
             }
             resize(); stars=Array.from({length:N},mkStar);
             window.addEventListener('resize',resize);
             function frame(){
                 if(!stop.active){window.removeEventListener('resize',resize);return;}
                 const {p:[r,g,b]}=_themeRGB();
-                ctx.fillStyle=`rgba(${r},${g},${b},0.12)`; ctx.fillRect(0,0,W,H);
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.fillStyle = 'rgba(0,0,0,0.14)';
+                ctx.fillRect(0,0,W,H);
+                ctx.globalCompositeOperation = 'source-over';
                 for(const s of stars){
                     s.px=s.x; s.py=s.y;
                     const dx=s.x-W/2, dy=s.y-H/2, len=Math.sqrt(dx*dx+dy*dy);
@@ -943,7 +948,7 @@ void main(){
          */
         render(canvas, stop) {
             const ctx=canvas.getContext('2d');
-            let W,H,t=0; const N=1800;
+            let W,H,t=0; const N=1200;
             let pts;
             function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
             function noise2(x,y,t){
@@ -952,23 +957,27 @@ void main(){
                        +Math.sin((x+y)*0.006+t*0.35);
                 return s;
             }
-            function mkPt(){ return {x:Math.random()*W,y:Math.random()*H,life:Math.random()*120+60}; }
+            function mkPt(){ return {x:Math.random()*W,y:Math.random()*H,life:Math.random()*200+100}; }
             resize(); pts=Array.from({length:N},mkPt);
             window.addEventListener('resize',resize);
             function frame(){
                 if(!stop.active){window.removeEventListener('resize',resize);return;}
-                t+=0.005;
+                t+=0.0008;
                 const {p:[r,g,b],a:[r2,g2,b2]}=_themeRGB();
-                ctx.fillStyle='rgba(0,0,0,0.04)'; ctx.fillRect(0,0,W,H);
-                ctx.lineWidth=0.8;
+                /* Erase slowly enough that trails are visible but fast enough they don't dirty */
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.fillStyle = 'rgba(0,0,0,0.07)';
+                ctx.fillRect(0,0,W,H);
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.lineWidth=0.9;
                 for(const p of pts){
                     const angle=noise2(p.x,p.y,t)*Math.PI*2;
                     const px=p.x, py=p.y;
-                    p.x+=Math.cos(angle)*0.5; p.y+=Math.sin(angle)*0.5;
+                    p.x+=Math.cos(angle)*0.22; p.y+=Math.sin(angle)*0.22;
                     p.life--;
-                    const mix=0.5+0.5*Math.sin(t+p.x/W*Math.PI);
+                    const mix=0.5+0.5*Math.sin(t*80+p.x/W*Math.PI);
                     const cr=Math.round(r+(r2-r)*mix), cg=Math.round(g+(g2-g)*mix), cb=Math.round(b+(b2-b)*mix);
-                    const alpha=Math.min(1,p.life/30)*0.7;
+                    const alpha=Math.min(1,p.life/80)*0.55;
                     ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(p.x,p.y);
                     ctx.strokeStyle=`rgba(${cr},${cg},${cb},${alpha.toFixed(2)})`; ctx.stroke();
                     if(p.life<=0||p.x<0||p.x>W||p.y<0||p.y>H){const n=mkPt(); p.x=n.x; p.y=n.y; p.life=n.life;}
@@ -998,13 +1007,13 @@ void main(){
             window.addEventListener('resize',resize);
             function frame(){
                 if(!stop.active){window.removeEventListener('resize',resize);return;}
-                t+=0.003;
+                t+=0.0015;
                 const {a:[r,g,b]}=_themeRGB();
                 ctx.clearRect(0,0,W,H);
                 for(const f of ff){
                     f.phase+=f.pspeed;
                     const angle=Math.sin(t*0.5+f.seed)*Math.PI*2+Math.cos(t*0.3+f.seed*0.7)*Math.PI;
-                    f.vx+=Math.cos(angle)*0.012; f.vy+=Math.sin(angle)*0.012;
+                    f.vx+=Math.cos(angle)*0.006; f.vy+=Math.sin(angle)*0.006;
                     f.vx*=0.95; f.vy*=0.95;
                     f.x+=f.vx; f.y+=f.vy;
                     if(f.x<0)f.x=W; if(f.x>W)f.x=0; if(f.y<0)f.y=H; if(f.y>H)f.y=0;
@@ -1051,7 +1060,7 @@ void main(){
             resize(); window.addEventListener('resize',resize);
             function frame(){
                 if(!stop.active){window.removeEventListener('resize',resize);return;}
-                ctx.clearRect(0,0,W,H); t+=0.2;
+                ctx.clearRect(0,0,W,H); t+=0.08;
                 const {p:[r,g,b]}=_themeRGB();
                 ctx.strokeStyle=`rgba(${r},${g},${b},0.25)`; ctx.lineWidth=1;
                 for(const s of segs){
@@ -1060,7 +1069,7 @@ void main(){
                     ctx.fillStyle=`rgba(${r},${g},${b},0.55)`; ctx.fill();
                 }
                 for(const p of pulses){
-                    p.t=(p.t+0.0018)%1;
+                    p.t=(p.t+0.0008)%1;
                     const px=p.seg.x1+(p.seg.x2-p.seg.x1)*p.t;
                     const py=p.seg.y1+(p.seg.y2-p.seg.y1)*p.t;
                     const grad=ctx.createRadialGradient(px,py,0,px,py,10);
@@ -1183,7 +1192,7 @@ function _ensureBgElements() {
 }
 
 /**
- * Stops any running background animation and tears down canvas elements.
+ * Stops any running background animation and restores normal body/html backgrounds.
  */
 function _stopBg() {
     if (_bgStop) { _bgStop.active = false; _bgStop = null; }
@@ -1192,11 +1201,12 @@ function _stopBg() {
         if (ctx) ctx.clearRect(0, 0, _bgCanvas.width, _bgCanvas.height);
     }
     document.body.classList.remove('has-bg-canvas');
-    if (_bgOverlay) _bgOverlay.style.display = 'none';
 }
 
 /**
  * Sets the active live background, persists to localStorage, updates active state.
+ * Pins the <html> element background to the canvas base colour so no light bg
+ * from the viewport (behind body) bleeds through.
  * @param {string} id - Background id from BACKGROUNDS registry.
  */
 function setBg(id) {
@@ -1210,7 +1220,6 @@ function setBg(id) {
 
     _ensureBgElements();
     document.body.classList.add('has-bg-canvas');
-    _bgOverlay.style.display = 'block';
     _bgStop = { active: true };
     bg.render(_bgCanvas, _bgStop);
 }
