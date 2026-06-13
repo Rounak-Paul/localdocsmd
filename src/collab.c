@@ -44,12 +44,15 @@ static char *apply_op(const char *text, const collab_op_t *op) {
 /**
  * Transform op_a as if op_b was already applied to the same base state.
  * Returns a new op_a adjusted to apply correctly after op_b.
+ * b_wins controls insert-insert tie-breaking at the same position:
+ *   true  — b wins; a is shifted right (use when b was applied first / is authoritative)
+ *   false — a wins; a stays in place  (use when a was applied first)
  * The caller must free result.text for inserts.
  */
-static collab_op_t transform_op(collab_op_t a, const collab_op_t *b) {
+static collab_op_t transform_op(collab_op_t a, const collab_op_t *b, bool b_wins) {
     if (b->type == 'i') {
         if (a.type == 'i') {
-            if (b->pos <= a.pos) a.pos += b->len;
+            if (b_wins ? b->pos <= a.pos : b->pos < a.pos) a.pos += b->len;
         } else {
             if (b->pos <= a.pos)
                 a.pos += b->len;
@@ -485,6 +488,25 @@ void collab_ws_message(collab_manager_t *cm, struct mg_connection *c,
 
     pthread_mutex_lock(&doc->mutex);
 
+    /* Reject ops from a client that claims to be ahead of the server — this
+     * indicates a corrupted client state (e.g. stale reconnect with wrong version).
+     * Also reject a base_version so far behind that we've evicted its history. */
+    if (base_version > doc->version) {
+        pthread_mutex_unlock(&doc->mutex);
+        pthread_mutex_unlock(&cm->docs_mutex);
+        cJSON_Delete(msg);
+        /* Send the client a replace so it resync's to canonical state. */
+        cJSON *rep = cJSON_CreateObject();
+        cJSON_AddStringToObject(rep, "type",    "replace");
+        cJSON_AddNumberToObject (rep, "version", doc->version);
+        cJSON_AddStringToObject (rep, "content", doc->content ? doc->content : "");
+        cJSON_AddStringToObject (rep, "by",      "");
+        char *repjson = cJSON_PrintUnformatted(rep);
+        cJSON_Delete(rep);
+        if (repjson) { mg_ws_send(c, repjson, strlen(repjson), WEBSOCKET_OP_TEXT); free(repjson); }
+        return;
+    }
+
     int content_len = doc->content ? (int)strlen(doc->content) : 0;
 
     /* Parse client ops */
@@ -507,19 +529,70 @@ void collab_ws_message(collab_manager_t *cm, struct mg_connection *c,
     /* Transform client ops against server ops since base_version */
     if (base_version < doc->version) {
         int history_total = doc->ops_count;
-        /* Walk history ops from base_version to current, transforming */
+
+        /* Check if history covers all versions since base_version. The oldest op
+         * in history tells us the earliest version we can transform from.  If
+         * the client is further behind than our ring buffer covers, we cannot
+         * correctly transform — force a full resync instead of producing garbage. */
+        bool history_gap = false;
+        if (history_total > 0) {
+            int oldest_idx = doc->ops_start % COLLAB_OP_HISTORY;
+            if (doc->ops[oldest_idx].version > base_version + 1) {
+                history_gap = true;
+            }
+        } else if (doc->version > base_version) {
+            /* No history at all but server is ahead — shouldn't happen normally,
+             * but treat it as a gap to be safe. */
+            history_gap = true;
+        }
+
+        if (history_gap) {
+            /* Client is too far behind; free parsed ops and resync. */
+            pthread_mutex_unlock(&doc->mutex);
+            pthread_mutex_unlock(&cm->docs_mutex);
+            for (int i = 0; i < valid_ops; i++)
+                if (client_ops[i].type == 'i') free(client_ops[i].text);
+            free(client_ops);
+            cJSON_Delete(msg);
+            cJSON *rep = cJSON_CreateObject();
+            cJSON_AddStringToObject(rep, "type",    "replace");
+            cJSON_AddNumberToObject (rep, "version", doc->version);
+            cJSON_AddStringToObject (rep, "content", doc->content ? doc->content : "");
+            cJSON_AddStringToObject (rep, "by",      "");
+            char *repjson = cJSON_PrintUnformatted(rep);
+            cJSON_Delete(rep);
+            if (repjson) { mg_ws_send(c, repjson, strlen(repjson), WEBSOCKET_OP_TEXT); free(repjson); }
+            return;
+        }
+
+        /* Walk history ops from base_version to current, transforming in order.
+         *
+         * For each history op we maintain a working copy (hcopy) that advances past
+         * each client op as we process them.  This is necessary because client_ops
+         * are sequential — client_ops[i+1] was computed after client_ops[i] was
+         * applied, so the history op's effective position changes as we move through
+         * the client batch.  Without advancing hcopy, positions in later client ops
+         * are transformed against the wrong base. */
         for (int h = 0; h < history_total; h++) {
             int hidx = (doc->ops_start + h) % COLLAB_OP_HISTORY;
             if (doc->ops[hidx].version <= base_version) continue;
+
+            collab_op_t hcopy = doc->ops[hidx];
+            if (hcopy.type == 'i' && hcopy.text) hcopy.text = strdup(hcopy.text);
+
             for (int i = 0; i < valid_ops; i++) {
-                collab_op_t old_text_holder = client_ops[i];
-                client_ops[i] = transform_op(client_ops[i], &doc->ops[hidx]);
-                /* If text pointer changed (it shouldn't here), keep original */
-                if (client_ops[i].type == 'i' && client_ops[i].text == NULL &&
-                    old_text_holder.type == 'i') {
-                    client_ops[i].text = old_text_holder.text;
-                }
+                collab_op_t old_ci   = client_ops[i];
+                char       *saved    = (client_ops[i].type == 'i') ? client_ops[i].text : NULL;
+                /* history op (hcopy) was applied first on server — it wins ties */
+                client_ops[i]        = transform_op(client_ops[i], &hcopy, true);
+                if (client_ops[i].type == 'i' && client_ops[i].text == NULL)
+                    client_ops[i].text = saved;
+                /* Advance hcopy past old_ci: old_ci is client (arrived second), so
+                 * hcopy (history) still wins ties when we advance it past old_ci. */
+                hcopy = transform_op(hcopy, &old_ci, false);
             }
+
+            if (hcopy.type == 'i') free(hcopy.text);
         }
     }
 

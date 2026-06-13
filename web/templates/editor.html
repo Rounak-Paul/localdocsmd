@@ -1209,8 +1209,7 @@ window.insertMediaIntoEditor = function(url, name, contentType) {
     editorEl.value = editorEl.value.substring(0, s) + md + editorEl.value.substring(e);
     editorEl.selectionStart = editorEl.selectionEnd = s + md.length;
     editorEl.focus();
-    content = editorEl.value;
-    scheduleAutosave();
+    otApplyLocalChange(editorEl.value);
     debouncedRender();
     updateStatusBar();
 };
@@ -1244,7 +1243,9 @@ window.insertMarkdown = function(before, after='') {
     const s=editorEl.selectionStart, e=editorEl.selectionEnd, sel=editorEl.value.substring(s,e);
     editorEl.value=editorEl.value.substring(0,s)+before+sel+after+editorEl.value.substring(e);
     editorEl.selectionStart=s+before.length; editorEl.selectionEnd=sel?s+before.length+sel.length:s+before.length;
-    editorEl.focus(); content=editorEl.value; setSaveStatus('unsaved','Unsaved changes'); debouncedRender(); updateStatusBar();
+    editorEl.focus();
+    otApplyLocalChange(editorEl.value);
+    debouncedRender(); updateStatusBar();
 };
 
 /* ─────────────────────────────────────────────────────────────────
@@ -1286,6 +1287,8 @@ let otReconnectTimer = null;
 let otConnected      = false;
 let otEverConnected  = false; // distinguishes first connect from reconnect
 let _otPrevContent   = '';
+/* Set when pagehide fires so BFCache restoration triggers a clean reconnect. */
+let _otPageHidden    = false;
 
 /* Compute minimal insert/delete ops from oldText → newText. */
 function computeOps(oldText, newText) {
@@ -1349,8 +1352,28 @@ function xfOp(a, b, bWins) {
     return a;
 }
 
+/*
+ * Transform a sequential batch of ops (ops) against another sequential batch (against).
+ * Both batches were applied to the same base document; this finds the adjusted form of
+ * ops that can be applied after against has already been applied.
+ *
+ * For each op in against, we advance a working copy of it past each op in ops so that
+ * subsequent ops in ops (which were computed after earlier ops in ops were applied) see
+ * the correct position for the against op. Without this, a delete+insert pair in ops
+ * would be transformed incorrectly because the insert's base already reflects the delete.
+ */
 function xfOps(ops, against, bWins) {
-    return ops.map(op => { for (const b of against) op = xfOp(op, b, bWins); return op; });
+    if (against.length === 0) return ops.map(op => Object.assign({}, op));
+    ops = ops.map(op => Object.assign({}, op));
+    for (let bi = 0; bi < against.length; bi++) {
+        let b = Object.assign({}, against[bi]);
+        for (let ai = 0; ai < ops.length; ai++) {
+            const oldA  = ops[ai];
+            ops[ai]     = xfOp(ops[ai], b, bWins);
+            b           = xfOp(b, oldA, bWins === false ? true : false);
+        }
+    }
+    return ops;
 }
 
 /* Adjust a cursor position through a set of ops. */
@@ -1360,6 +1383,26 @@ function adjustPos(pos, ops) {
         else { if (op.pos + op.len <= pos) pos -= op.len; else if (op.pos < pos) pos = op.pos; }
     }
     return pos;
+}
+
+/*
+ * Compute and enqueue OT ops for a programmatic change to editorEl.value,
+ * then schedule a flush. Call this after any direct assignment to editorEl.value
+ * that bypasses the 'input' event (insertMarkdown, insertMedia, tab handling).
+ */
+function otApplyLocalChange(newValue) {
+    content = newValue;
+    if (otConnected) {
+        const ops = computeOps(_otPrevContent, newValue);
+        _otPrevContent = newValue;
+        if (ops.length > 0) {
+            otPending = otPending.concat(ops);
+            scheduleOtFlush();
+        }
+    } else {
+        _otPrevContent = newValue;
+        scheduleAutosave();
+    }
 }
 
 /*
@@ -1384,7 +1427,7 @@ function scheduleOtFlush() {
 }
 
 function otConnect() {
-    if (otWs) { try { otWs.close(); } catch(e){} }
+    if (otWs) { try { otWs.close(); } catch(e){} otWs = null; }
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     let ws;
     try { ws = new WebSocket(`${proto}//${location.host}/ws/documents/${DOC_UUID}`); }
@@ -1417,8 +1460,22 @@ function otConnect() {
                 _otPrevContent    = msg.content;
                 debouncedRender(); updateStatusBar();
             } else {
-                /* Reconnect — recover any local edits not yet confirmed. */
-                otPending = computeOps(msg.content, editorEl.value);
+                /*
+                 * Reconnect — recover any local edits the server hasn't seen yet.
+                 *
+                 * computeOps(server_content, editor_value) produces the minimal set of
+                 * ops to bring server_content up to editor_value. If the server already
+                 * applied all of our previous ops (because they arrived before the
+                 * connection dropped), the diff is empty and nothing is re-sent.
+                 * If the server missed some ops, the diff re-derives them correctly.
+                 *
+                 * Guard: if server content is identical to editor, nothing to do.
+                 */
+                if (msg.content !== editorEl.value) {
+                    otPending = computeOps(msg.content, editorEl.value);
+                } else {
+                    otPending = [];
+                }
                 _otPrevContent = editorEl.value;
                 if (otPending.length > 0) otDoFlush();
             }
@@ -1447,29 +1504,43 @@ function otConnect() {
             } else {
                 /*
                  * Concurrent ops from another client.
-                 * Transform server ops to apply on top of our local (sent+pending) work,
-                 * then transform our local work to apply on top of the server op.
+                 *
+                 * The state diamond has two levels when we have both otSent and otPending:
+                 *
+                 *   shadow ──serverOps──► S'       (server canonical, shared base)
+                 *     │                   │
+                 *   otSent              xfSent      (server xf'd through sent — same base as pending)
+                 *     │                   │
+                 *   otPending          xfFull       (server xf'd through both — applies to editor)
+                 *     │                   │
+                 *   editor ──xfFull──────► editor'
+                 *
+                 * Step 1: transform serverOps through otSent → xfSent
+                 *   (brings serverOps to the same base as otPending)
+                 * Step 2: transform xfSent through otPending → xfFull
+                 *   (brings serverOps to the editor's current base; this applies to editor)
+                 * Step 3: rebase otSent through serverOps (server wins ties)
+                 * Step 4: rebase otPending through xfSent (not raw serverOps — xfSent is on the
+                 *   same base as otPending; server wins ties)
+                 * Step 5: advance shadow by raw serverOps (shadow mirrors server canonical)
                  */
-                const allLocal  = [...otSent, ...otPending];
-                /* Server op is 'a', local op is 'b'. Server was applied first, so it wins
-                 * insert-insert ties — pass bWins=false so a (server op) is not shifted. */
-                const xfServer  = xfOps(serverOps, allLocal,  false);
-                /* Local op is 'a', server op is 'b'. Server wins — default bWins=true. */
-                otSent          = xfOps(otSent,    serverOps);
-                otPending       = xfOps(otPending, serverOps);
-                otShadow        = applyOps(otShadow, serverOps);
-                otVersion       = msg.version;
+                const xfSent   = xfOps(serverOps, otSent,    false); /* server xf'd past sent   */
+                const xfFull   = xfOps(xfSent,    otPending, false); /* server xf'd past pending */
+                otSent         = xfOps(otSent,     serverOps);        /* sent rebased on server   */
+                otPending      = xfOps(otPending,  xfSent);           /* pending rebased on xfSent */
+                otShadow       = applyOps(otShadow, serverOps);
+                otVersion      = msg.version;
 
-                if (xfServer.length > 0) {
+                if (xfFull.length > 0) {
                     const ss     = editorEl.selectionStart;
                     const se     = editorEl.selectionEnd;
-                    const newVal = applyOps(editorEl.value, xfServer);
+                    const newVal = applyOps(editorEl.value, xfFull);
                     if (newVal !== editorEl.value) {
                         editorEl.value          = newVal;
                         content                 = newVal;
                         _otPrevContent          = newVal;
-                        editorEl.selectionStart = adjustPos(ss, xfServer);
-                        editorEl.selectionEnd   = adjustPos(se, xfServer);
+                        editorEl.selectionStart = adjustPos(ss, xfFull);
+                        editorEl.selectionEnd   = adjustPos(se, xfFull);
                         debouncedRender(); updateStatusBar();
                     }
                 }
@@ -1492,7 +1563,7 @@ function otConnect() {
             editorEl.selectionStart = Math.min(ss, msg.content.length);
             editorEl.selectionEnd   = Math.min(se, msg.content.length);
             debouncedRender(); updateStatusBar();
-            showToast(`Updated by ${msg.by || 'another user'}`, 2500);
+            if (msg.by) showToast(`Updated by ${msg.by}`, 2500);
             return;
         }
 
@@ -1521,6 +1592,35 @@ function otConnect() {
 function scheduleOtReconnect() {
     clearTimeout(otReconnectTimer);
     otReconnectTimer = setTimeout(otConnect, 3000);
+}
+
+/*
+ * Reset all OT state so the next otConnect() treats this as a brand-new session.
+ * Used when the page is restored from BFCache (Back/Forward navigation) — the JS
+ * state was frozen mid-session and can no longer be trusted as a live OT context.
+ */
+function otResetState() {
+    clearTimeout(otFlushTimer);
+    clearTimeout(otReconnectTimer);
+    otFlushTimer     = null;
+    otReconnectTimer = null;
+
+    if (otWs) {
+        /* Silence the onclose handler so it doesn't schedule another reconnect. */
+        try { otWs.onclose = null; otWs.onerror = null; otWs.close(); } catch(e) {}
+        otWs = null;
+    }
+
+    otCollabId   = null;
+    otVersion    = 0;
+    otShadow     = '';
+    otSent       = [];
+    otPending    = [];
+    otWaitingAck = false;
+    otConnected  = false;
+    /* otEverConnected = false so init path is taken (server authoritative). */
+    otEverConnected = false;
+    _otPageHidden   = false;
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -1578,10 +1678,8 @@ document.addEventListener('DOMContentLoaded', function(){
             const s=this.selectionStart,en=this.selectionEnd;
             if(e.shiftKey){const before=this.value.substring(0,s),ls=before.lastIndexOf('\n')+1,lc=this.value.substring(ls,s);if(lc.startsWith('    ')||lc.startsWith('\t')){const n=lc.startsWith('    ')?4:1;this.value=this.value.substring(0,ls)+this.value.substring(ls+n);this.selectionStart=this.selectionEnd=s-n;}}
             else{this.value=this.value.substring(0,s)+'    '+this.value.substring(en);this.selectionStart=this.selectionEnd=s+4;}
-            const newVal=this.value;
-            if(otConnected){const ops=computeOps(_otPrevContent,newVal);_otPrevContent=newVal;if(ops.length>0){otPending=otPending.concat(ops);scheduleOtFlush();}}
-            else{_otPrevContent=newVal;scheduleAutosave();}
-            content=newVal; debouncedRender(); updateStatusBar();
+            otApplyLocalChange(this.value);
+            debouncedRender(); updateStatusBar();
         }
     });
 
@@ -1597,6 +1695,42 @@ document.addEventListener('DOMContentLoaded', function(){
     });
     window.addEventListener('beforeunload',e=>{
         if(otSent.length>0||otPending.length>0||content!==lastSaved){e.preventDefault();e.returnValue='';}
+    });
+
+    /*
+     * BFCache handling — when the user navigates away (View button) and then
+     * presses Back, the browser may restore this page from BFCache with all JS
+     * state frozen at the moment of navigation.  The frozen WS is dead and the
+     * frozen OT state (otSent, otPending, version) is stale.  Without resetting,
+     * the reconnect path treats stale editor content as "local edits to recover"
+     * and can re-send ops the server already has, producing content duplication.
+     *
+     * pagehide: close the WS cleanly (prevents zombie server sessions) and mark
+     * the page as hidden so pageshow knows a reset is needed.
+     *
+     * pageshow(persisted): page came from BFCache — reset all OT state and start
+     * fresh.  The editor textarea retains the BFCache content visually, but the
+     * server is authoritative: the init message will overwrite it.
+     */
+    window.addEventListener('pagehide', () => {
+        _otPageHidden = true;
+        clearTimeout(otFlushTimer);
+        clearTimeout(otReconnectTimer);
+        if (otWs) {
+            try { otWs.onclose = null; otWs.onerror = null; otWs.close(); } catch(e) {}
+            otWs = null;
+        }
+        otConnected = false;
+    });
+
+    window.addEventListener('pageshow', (e) => {
+        if (e.persisted || _otPageHidden) {
+            /* Page restored from BFCache or hidden/shown within the same session. */
+            otResetState();
+            editorEl.readOnly = true;
+            setSaveStatus('saving', 'Syncing…');
+            otConnect();
+        }
     });
 
     // Move media panel elements to body (escape stacking context)

@@ -12,7 +12,7 @@ Auto-migration runs on startup; no manual DB steps needed.
 2. **Raw Path** — `PUT /raw/:token` — full content replace, broadcasts to WS clients via notify queue
 3. **HTTP PUT** — `PUT /api/documents/{uuid}/content` — full content replace, broadcasts to WS clients
 
-## Key Files Changed
+## Key Files
 - `include/collab.h` — collab manager, ws_conn_data_t, OT types
 - `src/collab.c` — OT engine (transform_op, apply_op), WS session manager, flush logic, notify queue
 - `include/localdocsmd.h` — added `int64_t version` to ldmd_document_t
@@ -39,7 +39,7 @@ Auto-migration runs on startup; no manual DB steps needed.
 Server→Client:
 - `{type:"init", version:N, collab_id:"...", content:"..."}`
 - `{type:"ops", version:N, collab_id:"...", ops:[{t:"i",pos:P,text:"..."},{t:"d",pos:P,len:L}]}`
-- `{type:"replace", version:N, content:"...", by:"username"}` — broadcasts on raw PUT / HTTP PUT
+- `{type:"replace", version:N, content:"...", by:"username"}` — broadcasts on raw PUT / HTTP PUT, or resync
 - `{type:"presence", users:[{collab_id:"...", username:"..."}]}`
 
 Client→Server:
@@ -53,7 +53,7 @@ Client→Server:
 
 ## Flush + Session Lifetime Strategy
 - collab_tick() called every mg_mgr_poll (100ms)
-- Dirty docs flushed every COLLAB_FLUSH_SECS(30)s while clients active
+- Dirty docs flushed every COLLAB_FLUSH_SECS(5)s while clients active
 - Immediate flush when last client disconnects
 - On flush: document_audit_snapshot (5-min debounce), atomic file write (utils_write_file), db_document_save_flush (increments version)
 - After last client disconnects, session stays alive for COLLAB_SESSION_GRACE_SECS(10)s before eviction
@@ -78,17 +78,104 @@ stays at its position and the later-arriving op is shifted right. Both sides mus
 | Side | Call | a | b | rule |
 |------|------|---|---|------|
 | Server | `transform_op(arriving, history)` | arriving (later) | history (first) | `b->pos <= a->pos` → shift a |
-| Client | `xfOps(serverOps, allLocal, false)` | server op (first) | local op (later) | `b.pos < a.pos` (strict) → don't shift a |
-| Client | `xfOps(otSent/otPending, serverOps)` | local (later) | server (first) | `b.pos <= a.pos` → shift a |
+| Client | `xfOps(serverOps, otSent, false)` | server op (first) | sent op (later) | `b.pos < a.pos` (strict) → don't shift a |
+| Client | `xfOps(xfSent, otPending, false)` | server op (first) | pending op (later) | same — brings server to editor base |
+| Client | `xfOps(otSent, serverOps)` | sent (later) | server (first) | `b.pos <= a.pos` → shift a |
+| Client | `xfOps(otPending, xfSent)` | pending (later) | xfSent (first) | `b.pos <= a.pos` → shift a |
 
 The `bWins` parameter on `xfOp`/`xfOps` encodes this:
 - `bWins=true` (default): `b.pos <= a.pos` — b wins on tie
-- `bWins=false`: `b.pos < a.pos` — a wins on tie (used for `xfOps(serverOps, allLocal, false)`)
+- `bWins=false`: `b.pos < a.pos` — a wins on tie (used when transforming server op past local ops)
 
-Without this, concurrent inserts at the same character position diverge permanently.
-The reconnect path (`computeOps(server_content, editor_value)`) then materialises the
-divergence as real ops, producing the "extra content at the end after refresh" symptom.
+## Two-Level Diamond (concurrent-ops transform correctness)
+
+When a concurrent `ops` message arrives and we have both `otSent` (in-flight) and `otPending`
+(queued), `otPending` is NOT at the same base as `serverOps` — it sits on top of `otSent`.
+Treating all of them as concurrent to `serverOps` (the old `allLocal = [...otSent, ...otPending]`)
+was wrong and caused position divergence under rapid concurrent editing.
+
+Correct two-level diamond:
+```
+  shadow ──serverOps──► S'
+    │                    │
+  otSent             xfSent = xfOps(serverOps, otSent, false)
+    │                    │
+  otPending          xfFull = xfOps(xfSent, otPending, false)
+    │                    │
+  editor ──xfFull──────► editor'
+```
+- `xfSent` brings serverOps to the base after otSent (concurrent with otPending)
+- `xfFull` brings serverOps to the editor's current base (apply this to editor)
+- `otSent` rebased through raw `serverOps`
+- `otPending` rebased through `xfSent` (not raw serverOps — xfSent is concurrent with pending)
+
+Without this, a send-while-receiving scenario produces wrong positions in `otPending` and the
+next flush sends corrupted ops; repeated rapid edits cause visible divergence between editors.
 
 ## Raw Path Attribution
 presign_validate() now returns user_id alongside doc_uuid.
 raw PUT attributes saves to the user who generated the presign token (not the last editor).
+
+## Bug Fixes (2026-06-13)
+
+### BFCache Content Duplication (primary glitch)
+**Root cause**: When user clicks View button (navigate away) then Back (BFCache restore), the
+browser restores frozen JS state including `otEverConnected = true`, stale `otSent`/`otPending`,
+and a dead WS. The reconnect path used stale `editorEl.value` vs server canonical content to
+compute ops, potentially re-sending ops the server already had (duplication) or missing the
+server's newer content (divergence).
+
+**Fix**:
+- `pagehide` event: close WS cleanly (null out handlers first to suppress stale onclose), clear timers, set `_otPageHidden = true`
+- `pageshow(persisted || _otPageHidden)`: call `otResetState()` which zeroes all OT vars, sets `otEverConnected = false`, then reconnects fresh — server is authoritative on init
+
+### Programmatic editor changes bypassing OT (insertMarkdown, insertMedia, Tab)
+**Root cause**: These functions assign directly to `editorEl.value` (no `input` event fires), so
+OT ops were never computed or sent. Edits sat unsent until the next keystroke. Media inserts
+called `scheduleAutosave()` even when WS was live.
+
+**Fix**: Extracted `otApplyLocalChange(newValue)` — computes OT ops if connected (scheduleOtFlush),
+otherwise schedules autosave. All programmatic edits now call this.
+
+### Server: stale client version rejection
+**Fix**: If client sends `base_version > doc->version` (impossible in normal flow — indicates stale
+reconnect), server sends a `replace` resync instead of applying ops incorrectly.
+
+### Server: history ring-buffer gap detection
+**Fix**: Before transforming, check if oldest history op version covers `base_version + 1`. If the
+ring buffer was evicted past what the client needs, send `replace` resync instead of silently
+producing wrong transforms.
+
+### replace message toast
+Empty `by` field (resync messages) no longer shows a misleading toast.
+
+### Multi-editor OT divergence — Root cause 1: wrong base for otPending
+**Root cause**: The concurrent-ops path in `editor.html` used `allLocal = [...otSent, ...otPending]`
+and called `xfOps(serverOps, allLocal, false)`. This treats `otPending` as concurrent to
+`serverOps` at the same base as `otSent`, which is wrong — `otPending` is based on the state
+*after* `otSent`.
+
+**Fix**: Two-level diamond transform (see above). `xfSent = xfOps(serverOps, otSent, false)` first,
+then `xfFull = xfOps(xfSent, otPending, false)`. Rebase `otPending` through `xfSent`.
+
+### Multi-editor OT divergence — Root cause 2: incorrect batch transform (xfOps / server loop)
+**Root cause**: When transforming a sequential batch of ops (e.g. `[delete, insert]` from
+`computeOps`) against another sequential op, the transform function treated each op in the batch
+independently. But op[1] was computed after op[0] was applied — so the history/server op's
+effective position shifts as op[0] is processed. Without advancing the history op past op[0]
+before using it to transform op[1], positions in op[1] are wrong.
+
+**Same bug on server**: `collab.c` transform loop transformed each client op against the raw
+history op independently — same incorrect base assumption.
+
+**Fix (client `xfOps`)**: For each op in `against`, maintain a working copy `b` that advances
+past each `ops[i]` (using `xfOp(b, oldA, ...)`) before processing `ops[i+1]`. This ensures b
+is always at the correct base for the next client op. Single-element batches are unaffected.
+
+**Fix (server transform loop in `collab_ws_message`)**: Same pattern — `hcopy` starts as the
+history op and advances past each `client_ops[i]` (using `transform_op(hcopy, old_ci, false)`)
+after transforming `client_ops[i]`. `transform_op` now takes a `b_wins` bool parameter.
+
+**Tie-breaking for advancement**: When advancing `b` past `oldA`, the winner is the *inverse* of
+the original `bWins` — if the original call says "b wins," then when transposing to advance b,
+`oldA` (the ops element) does NOT win, so `bWins=false` for the advance call.

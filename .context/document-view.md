@@ -52,6 +52,32 @@
 - Escape key closes lightbox (separate keydown listener in IIFE)
 - `openLightbox(node)` / `closeLightbox()` — events attached/removed to avoid leaks
 
+## Live View (WS subscriber)
+The view page connects to `/ws/documents/{uuid}` as a read-only subscriber alongside the editor.
+
+**Flow:**
+1. On `DOMContentLoaded`: `liveConnect()` and HTTP fetch run in parallel
+2. WS `init` → overwrite content with live in-memory canonical version, render, show "Live" indicator
+3. WS `ops` → `applyOps()` on `rawMarkdown`, debounced re-render (300 ms)
+4. WS `replace` → immediate full re-render
+5. HTTP fetch → only renders if WS init hasn't arrived yet (fallback for no active session)
+6. WS close → hide indicator, retry after 5 s (longer than editor's 3 s to deprioritise)
+7. `pagehide` → `liveDisconnect()` (clean close, no reconnect timer)
+8. `pageshow(persisted)` → `liveDisconnect()` + `liveConnect()` (BFCache restore)
+
+**No ops are ever sent** — the view WS is purely read-only. Server auth is session-cookie only (same as editor). Any authenticated user with access can subscribe.
+
+**Live indicator**: `#live-indicator` pulse dot + "Live" text shown when WS is connected.
+
+**Key functions:**
+| Function | Purpose |
+|---|---|
+| `liveConnect()` | Open WS, handle init/ops/replace messages |
+| `liveDisconnect()` | Clean close, cancel timers |
+| `applyOps(text, ops)` | Apply OT op array to text string |
+| `scheduleLiveRender()` | 300 ms debounced renderMarkdown call |
+| `setLiveIndicator(on)` | Show/hide the live pulse indicator |
+
 ## Key functions
 | Function | Location | Purpose |
 |---|---|---|
